@@ -31,11 +31,11 @@ start(Id) ->
 ```
 
 The ``init/0`` function will be called only once per test run, at the very beginning.
-It can be used for setting up necessary (global) state (metrics, database
-connections, etc).
+It can be used for setting up necessary (global) state: metrics, database
+connections, etc.
 
-The  ``start/1`` describes the actual scenario and will be executed for
-each user, in the context of that user process.
+The ``start/1`` function describes the actual scenario and will be executed for
+each user, in the context of that user's process.
 
 ``Id`` is the given user's unique integer id.
 After this function returns, it will be executed again following some delay (60
@@ -50,14 +50,14 @@ merged with amoc's `deps`.
 
 ## Running a scenario
 
-To start your scenario type in shell:
+To start your scenario, execute the following:
 
 ```bash
-./rebar get-deps  # This is needed only for the first time
+./rebar get-deps  # This is needed only for the first run
 ./run.sh my_scenario 1 1000
 ```
 
-These commands will fetch all required dependencies, compile all the
+These commands will fetch all the required dependencies, compile all the
 source files and scenarios.
 
 The scenario ``my_scenario`` will be started in an Erlang interactive shell,
