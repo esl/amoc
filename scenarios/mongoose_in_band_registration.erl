@@ -20,6 +20,7 @@ user_spec(ProfileId, XMPPToken, Res) ->
       {password, XMPPToken},
       {carbons, false},
       {stream_management, false},
+      {starttls, optional},
       {resource, Res}
     ].
 
