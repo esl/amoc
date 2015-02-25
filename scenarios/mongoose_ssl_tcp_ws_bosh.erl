@@ -42,7 +42,8 @@ start(MyId) ->
     %escalus_connection:set_filter_predicate(Client, none),
 
     send_presence_available(Client),
-    lager:info("presence resp ~p", [escalus_client:wait_for_stanza(Client)]),
+
+    lager:info("~p presence resp ~p", [Transport, escalus_client:wait_for_stanza(Client)]),
     timer:sleep(5000),
 
     NeighbourIds = lists:delete(MyId, lists:seq(max(1,MyId-4),MyId+4)),
