@@ -1,12 +1,26 @@
 %%==============================================================================
 %% Copyright 2015 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
+%%
+%% In this scenarion users are sending message to its neighbours
+%% (users wiht lower and grater idea defined by NUMBER_OF_*_NEIGHBOURS values)
+%% Messages will be send NUMBER_OF_SEND_MESSAGE_REPEATS to every selected neighbour
+%% after every message given the script will wait SLEEP_TIME_AFTER_EVERY_MESSAGE ms
+%% Every CHECKER_SESSIONS_INDICATOR is a checker session which just measures message TTD
+%%
 %%==============================================================================
 -module(mongoose_simple_with_metrics).
 
 -include_lib("exml/include/exml.hrl").
 
--define(HOST, <<"localhost">>).
+-define(HOST, <<"localhost">>). %% The virtual host served by the server
+-define(SERVER_IPS, {<<"127.0.0.1">>}). %% Tuple of servers, for example {<<"10.100.0.21">>, <<"10.100.0.22">>}
+-define(CHECKER_SESSIONS_INDICATOR, 10). %% How often a checker session should be generated
+-define(SLEEP_TIME_AFTER_SCENARIO, 10000). %% wait 10s after scenario before disconnecting
+-define(NUMBER_OF_PREV_NEIGHBOURS, 4).
+-define(NUMBER_OF_NEXT_NEIGHBOURS, 4).
+-define(NUMBER_OF_SEND_MESSAGE_REPEATS, 73).
+-define(SLEEP_TIME_AFTER_EVERY_MESSAGE, 20000).
 
 -export([start/1]).
 -export([init/0]).
@@ -22,11 +36,11 @@ init() ->
     exometer_report:subscribe(exometer_report_graphite, ?MESSAGE_TTD_CT, [mean, min, max, median, 95, 99, 999], 10000),
     ok.
 
-user_spec(ProfileId, XMPPToken, Res) ->
+user_spec(ProfileId, Password, Res) ->
     [ {username, ProfileId},
       {server, ?HOST},
-      {host, <<"127.0.0.1">>},
-      {password, XMPPToken},
+      {host, pick_server(?SERVER_IPS)},
+      {password, Password},
       {carbons, false},
       {stream_management, false},
       {resource, Res}
@@ -41,7 +55,7 @@ make_user(Id, R) ->
 start(MyId) ->
     Cfg = make_user(MyId, <<"res1">>),
 
-    IsChecker = MyId rem 10 == 0,
+    IsChecker = MyId rem ?CHECKER_SESSIONS_INDICATOR == 0,
 
     {ConnectionTime, ConnectionResult} = timer:tc(escalus_connection, start, [Cfg]),
     Client = case ConnectionResult of
@@ -57,7 +71,7 @@ start(MyId) ->
 
     do(IsChecker, MyId, Client),
 
-    timer:sleep(10*1000),
+    timer:sleep(?SLEEP_TIME_AFTER_SCENARIO),
     send_presence_unavailable(Client),
     escalus_connection:stop(Client).
 
@@ -67,8 +81,9 @@ do(false, MyId, Client) ->
     send_presence_available(Client),
     timer:sleep(5000),
 
-    NeighbourIds = lists:delete(MyId, lists:seq(max(1,MyId-4),MyId+4)),
-    send_messages_many_times(Client, 20000, NeighbourIds);
+    NeighbourIds = lists:delete(MyId, lists:seq(max(1,MyId-?NUMBER_OF_PREV_NEIGHBOURS),
+                                                MyId+?NUMBER_OF_NEXT_NEIGHBOURS)),
+    send_messages_many_times(Client, ?SLEEP_TIME_AFTER_EVERY_MESSAGE, NeighbourIds);
 do(_Other, _MyId, Client) ->
     lager:info("checker"),
     send_presence_available(Client),
@@ -104,7 +119,7 @@ send_messages_many_times(Client, MessageInterval, NeighbourIds) ->
     S = fun(_) ->
                 send_messages_to_neighbors(Client, NeighbourIds, MessageInterval)
         end,
-    lists:foreach(S, lists:seq(1, 5)).
+    lists:foreach(S, lists:seq(1, ?NUMBER_OF_SEND_MESSAGE_REPEATS)).
 
 
 send_messages_to_neighbors(Client, TargetIds, SleepTime) ->
@@ -129,3 +144,7 @@ make_jid(Id) ->
     Host = ?HOST,
     << ProfileId/binary, "@", Host/binary >>.
 
+pick_server(Servers) ->
+    S = size(Servers),
+    N = erlang:phash2(self(), S) + 1,
+    element(N, Servers).
