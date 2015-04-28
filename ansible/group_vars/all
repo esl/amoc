@@ -1,0 +1,5 @@
+; enter your graphite ip (should listen on tcp 2003)
+graphite_ip: "192.168.0.1"
+
+; where do you want to install amoc on master and slave nodes?
+install_dir: "/home/user/"

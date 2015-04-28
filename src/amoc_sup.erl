@@ -25,7 +25,18 @@ start_link() ->
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
-
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, [?CHILD(amoc_users_sup, supervisor)]} }.
+    amoc_users = start_users_ets(),
+    {ok, { {one_for_one, 5, 10},
+           [
+            ?CHILD(amoc_users_sup, supervisor),
+            ?CHILD(amoc_controller, worker),
+            ?CHILD(amoc_slave, worker)
+           ]} }.
 
+start_users_ets() ->
+    ets:new(amoc_users, [named_table,
+                         ordered_set,
+                         public,
+                         {write_concurrency, true},
+                         {read_concurrency, true}]).
