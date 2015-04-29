@@ -120,7 +120,10 @@ handle_add(Count, #state{scenario=Scenario,
                          nodes = Nodes,
                          node_id = NodeId}) when
       is_integer(Count), Count > 0 ->
-    Last = ets:last(?TABLE),
+    Last = case ets:last(?TABLE) of
+               '$end_of_table' -> 0;
+               Other -> Other
+           end,    
     UserIds = node_userids(Last+1, Last+Count, Nodes, NodeId),
     start_users(Scenario, UserIds, State).
 

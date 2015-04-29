@@ -14,3 +14,6 @@ do:
 deploy:
 	ansible-playbook -i hosts ansible/amoc-master.yml;
 	ansible-playbook -i hosts ansible/amoc-slaves.yml
+
+prepare:
+	ansible-playbook -i hosts ansible/amoc-prepare.yml

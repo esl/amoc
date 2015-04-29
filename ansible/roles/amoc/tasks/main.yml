@@ -6,10 +6,10 @@
   file: dest={{ install_dir }}/amoc mode=755 state=directory
 
 - name: unarchive amoc tarball remotely
-  unarchive: src=../_rel/amoc/amoc-0.9.tar.gz dest={{ install_dir }}/amoc
+  unarchive: src=../_rel/amoc/amoc-0.9.tar.gz dest={{ install_dir }}
 
 - name: template configuration
-  template: src=app.config.j2 dest={{ install_dir }}/amoc/releases/0.9/sys.config
+  template: src=app.config.j2 dest={{ install_dir }}/releases/0.9/sys.config
 
 - name: template vm.args
-  template: src=vm.args.j2 dest={{ install_dir }}/amoc/releases/0.9/vm.args
+  template: src=vm.args.j2 dest={{ install_dir }}/releases/0.9/vm.args
