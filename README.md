@@ -81,12 +81,14 @@ all the nodes, including them in the Erlang hostnames as well.
 3. Edit the ``ansible/group_vars/amoc-master`` file and enter hosts of all
    the slave nodes as in the example. This should be the same as the first
 column in the ``hosts`` file.
-4. Run ``make prepare`` in order to configure the slave nodes.
+4. Run ``make prepare`` in order to configure the slave nodes.  
+If you need to provide a SSH password, try ``make prepare ARGS="--ask-pass
+--ask-sudo-pass"`` instead.
 5. Run ``make rel`` in order to build the release.
 6. Run ``make deploy`` in order to deploy the release.
 7. Go to the master's node and start amoc by executing
-   ``~/amoc_master/bin/amoc start``. Now you can run commands by attaching
-to the amoc's node with ``~/amoc_master/bin/amoc attach``, typing a
+   ``~/amoc_master/bin/amoc start``.  
+Now you can run commands by attaching to the amoc's node with ``~/amoc_master/bin/amoc attach``, typing a
 command and pressing Ctrl+D.
 8. Execute ``amoc_dist:do(my_scenario, 1, 100).`` to start
    a scenario.
