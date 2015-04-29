@@ -1,15 +1,15 @@
-.PHONY: all rel compile do deploy
+.PHONY: all rel compile deploy prepare deps
 
 all: rel deploy
 
 rel: compile
 	./relx tar
 
-compile:
-	./rebar get-deps compile
+compile: deps
+	./rebar compile
 
-do:
-	erl -pa ./deps/*/ebin ./ebin -s amoc do 100
+deps:
+	./rebar get-deps
 
 deploy:
 	ansible-playbook -i hosts ansible/amoc-master.yml;
