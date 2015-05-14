@@ -14,7 +14,9 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    amoc_sup:start_link().
+    Ret = amoc_sup:start_link(),
+    amoc_dist:start_nodes(),
+    Ret.
 
 stop(_State) ->
     ok.

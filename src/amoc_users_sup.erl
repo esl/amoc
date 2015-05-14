@@ -21,9 +21,6 @@ start_link() ->
     }} | ignore | {error, Reason :: term()}).
 
 init([]) ->
-    ets:new(amoc_users, [named_table, public,
-                         {write_concurrency, true},
-                         {read_concurrency, true}]),
     process_flag(priority, max),
 
     RestartStrategy = simple_one_for_one,

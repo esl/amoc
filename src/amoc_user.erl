@@ -10,37 +10,47 @@
     application:get_env(amoc, repeat_interval, ?REPEAT_INTERVAL_DEFAULT)).
 
 %% API
--export([start_link/2]).
--export([init/3]).
+-export([start_link/3]).
+-export([init/4]).
 
+start_link(Scenario, Id, State) ->
+    proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
 
-start_link(Scenario, Id) ->
-    proc_lib:start_link(?MODULE, init, [self(), Scenario, Id]).
-
-init(Parent, Scenario, Id) ->
+init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     ets:insert(amoc_users, {Id, self()}),
     R = try
-        forever(Scenario, Id),
-        normal
-    catch
-        %% {R, get_stack()} will result in a compact error message
-        %% {E, R, get_stack()} will result in a full stack report
-        E:Reason -> {E, Reason, erlang:get_stacktrace()}
-    after
-        ets:delete(amoc_users, Id)
-    end,
+            forever(Scenario, Id, State),
+            normal
+        catch
+            throw:stop ->
+                normal;
+            %% {R, get_stack()} will result in a compact error message
+            %% {E, R, get_stack()} will result in a full stack report
+            E:Reason ->
+                {E, {abnormal_exit, Reason}, erlang:get_stacktrace()}
+        after
+            ets:delete(amoc_users, Id)
+        end,
     exit(R).
 
-forever(Scenario, Id) ->
-    Scenario:start(Id),
+forever(Scenario, Id, State) ->
+    case erlang:function_exported(Scenario, start, 2) of
+        true ->
+            Scenario:start(Id, State);
+        false ->
+            Scenario:start(Id)
+    end,
     flush_mailbox(),
     timer:sleep(?REPEAT_INTERVAL),
-    forever(Scenario, Id).
+    forever(Scenario, Id, State).
 
 flush_mailbox() ->
     receive
-        _ -> flush_mailbox()
+        stop ->
+            throw(stop);
+        _ ->
+            flush_mailbox()
     after 0 ->
         ok
     end.
