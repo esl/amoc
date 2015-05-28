@@ -1,7 +1,8 @@
 [
  {amoc, [{hosts, {{ hosts }} },
          {path, "{{ slave_install_dir }}" },
-         {interarrival, 75}]},
+         {interarrival, 75},
+         {graphite_endpoint, "{{ graphite_ip }}:{{ graphite_http_port }}"}]},
  {exometer, [
     {predefined, [
         {[erlang, system_info],
