@@ -8,6 +8,7 @@
                   stdlib,
                   lager,
                   exometer,
+                  lhttpc,
                   ssl
                  ]},
   {mod, { amoc_app, []}},

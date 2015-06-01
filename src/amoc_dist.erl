@@ -24,6 +24,7 @@ do(Scenario, Start, End) ->
     do(Scenario, Start, End, nodes()).
 
 do(Scenario, Start, End, Nodes) ->
+    amoc_event:notify({dist_do, Scenario, Start, End, Nodes}),
     Count = length(Nodes),
     [ amoc_controller:do(Node, Scenario, Start, End, Count, Id) ||
       {Id, Node} <- lists:zip(lists:seq(1, Count), Nodes) ].
@@ -32,12 +33,14 @@ add(Count) ->
     add(Count, nodes()).
 
 add(Count, Nodes) ->
+    amoc_event:notify({dist_add, Count}),
     [ amoc_controller:add(Node, Count) || Node <- Nodes ].
 
 remove(Count, Opts) ->
     remove(Count, Opts, nodes()).
 
 remove(Count, Opts, Nodes) ->
+    amoc_event:notify({dist_remove, Count, Opts}),
     CountPerNode = ceil(Count / length(Nodes)),
     [ amoc_controller:remove(Node, CountPerNode, Opts) || Node <- Nodes ].
 
