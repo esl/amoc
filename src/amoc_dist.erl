@@ -21,10 +21,12 @@ start_nodes() ->
     start_nodes(Hosts, Path).
 
 do(Scenario, Start, End) ->
-    do(Scenario, Start, End, nodes()).
+    do(Scenario, Start, End, []).
 
-do(Scenario, Start, End, Nodes) ->
-    amoc_event:notify({dist_do, Scenario, Start, End, Nodes}),
+do(Scenario, Start, End, Opts) ->
+    Nodes = proplists:get_value(nodes, Opts, nodes()),
+    Comment = proplists:get_value(comment, Opts, "none"),
+    amoc_event:notify({dist_do, Scenario, Start, End, Nodes, Comment}),
     Count = length(Nodes),
     [ amoc_controller:do(Node, Scenario, Start, End, Count, Id) ||
       {Id, Node} <- lists:zip(lists:seq(1, Count), Nodes) ].
