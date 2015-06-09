@@ -26,9 +26,14 @@ do(Scenario, Start, End) ->
 do(Scenario, Start, End, Opts) ->
     Nodes = proplists:get_value(nodes, Opts, nodes()),
     Comment = proplists:get_value(comment, Opts, "none"),
+
+    InterArrival = proplists:get_value(interarrival, Opts, 75),
+    RepeatTimeout = proplists:get_value(repeat, Opts, 75),
+    Step = proplists:get_value(step, Opts, 1),
+
     amoc_event:notify({dist_do, Scenario, Start, End, Nodes, Comment}),
     Count = length(Nodes),
-    [ amoc_controller:do(Node, Scenario, Start, End, Count, Id) ||
+    [ amoc_controller:do(Node, Scenario, Start, End, Count, Id, Opts) ||
       {Id, Node} <- lists:zip(lists:seq(1, Count), Nodes) ].
 
 add(Count) ->

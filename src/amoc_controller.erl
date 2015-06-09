@@ -22,7 +22,7 @@
 %% ------------------------------------------------------------------
 -export([start_link/0,
          do/3,
-         do/6,
+         do/7,
          add/1,
          add/2,
          remove/1,
@@ -49,8 +49,8 @@ start_link() ->
 do(Scenario, Start, End) ->
     gen_server:call(?SERVER, {do, Scenario, Start, End}).
 
-do(Node, Scenario, Start, End, Nodes, NodeId) ->
-    gen_server:call({?SERVER, Node}, {do, Scenario, Start, End, Nodes, NodeId}).
+do(Node, Scenario, Start, End, Nodes, NodeId, Opts) ->
+    gen_server:call({?SERVER, Node}, {do, Scenario, Start, End, Nodes, NodeId, Opts}).
 
 add(Count) ->
     gen_server:cast(?SERVER, {add, Count}).
@@ -80,8 +80,8 @@ init([]) ->
 
 handle_call({do, Scenario, Start, End}, _From, State) ->
     handle_local_do(Scenario, Start, End, State);
-handle_call({do, Scenario, Start, End, Nodes, NodeId}, _From, State) ->
-    handle_dist_do(Scenario, Start, End, Nodes, NodeId, State);
+handle_call({do, Scenario, Start, End, Nodes, NodeId, Opts}, _From, State) ->
+    handle_dist_do(Scenario, Start, End, Nodes, NodeId, Opts, State);
 handle_call(users, _From, State) ->
     Reply = [{count, ets:info(?TABLE, size)},
              {last, ets:last(?TABLE)}],
@@ -123,7 +123,7 @@ handle_add(Count, #state{scenario=Scenario,
     Last = case ets:last(?TABLE) of
                '$end_of_table' -> 0;
                Other -> Other
-           end,    
+           end,
     UserIds = node_userids(Last+1, Last+Count, Nodes, NodeId),
     start_users(Scenario, UserIds, State).
 
@@ -138,7 +138,7 @@ handle_remove(Count, Opts, _State) when
 handle_local_do(Scenario, Start, End, State) ->
     handle_do(Scenario, lists:seq(Start, End), State).
 
-handle_dist_do(Scenario, Start, End, Nodes, NodeId, State) ->
+handle_dist_do(Scenario, Start, End, Nodes, NodeId, Opts, State) ->
     UserIds = node_userids(Start, End, Nodes, NodeId),
     State1 = State#state{nodes = Nodes,
                          node_id = NodeId},
