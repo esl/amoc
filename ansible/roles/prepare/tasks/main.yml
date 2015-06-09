@@ -1,71 +1,72 @@
-- name: disable selinux
-  selinux: state=disabled
-
-- name: increase filedescriptor limit in sysctl
-  sysctl: name="fs.file-max" value="{{fileno}}" sysctl_set=yes state=present reload=yes
-
-- name: change security limits
-  lineinfile: line="{{user}} {{item}} nofile {{fileno}}" dest=/etc/security/limits.conf regexp="{{user}} {{item}} nofile*"
-  with_items:
-    - hard
-    - soft
-
 - name: add public key
   authorized_key: user={{user}} key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
 
-- name: increase ipv4 local port range in sysctl
-  sysctl: name="net.ipv4.ip_local_port_range" value="1024 65535" sysctl_set=yes state=present reload=yes
-
-- name: increase ipv4 syn backlog
-  sysctl: name="net.ipv4.tcp_max_syn_backlog" value="40000" sysctl_set=yes state=present reload=yes
-
-- name: increase maximum number of backlogged sockets
-  sysctl: name="net.core.somaxconn" value="40000" sysctl_set=yes state=present reload=yes
-
-- name: enable selective tcp ack
-  sysctl: name="net.ipv4.tcp_sack" value="1" sysctl_set=yes state=present reload=yes
-
-- name: enable tcp window scaling
-  sysctl: name="net.ipv4.tcp_window_scaling" value="1" sysctl_set=yes state=present reload=yes
-
-- name: decrease fin-wait-2 timeout
-  sysctl: name="net.ipv4.tcp_fin_timeout" value="15" sysctl_set=yes state=present reload=yes
-
-- name: decrease keepalive interval
-  sysctl: name="net.ipv4.tcp_keepalive_intvl" value="60" sysctl_set=yes state=present reload=yes
-
-- name: decrease keepalive probes
-  sysctl: name="net.ipv4.tcp_keepalive_probes" value="5" sysctl_set=yes state=present reload=yes
-
-- name: decrease keepalive timeout after successful transfer
-  sysctl: name="net.ipv4.tcp_keepalive_time" value="180" sysctl_set=yes state=present reload=yes
-
-- name: enable time-wait reuse
-  sysctl: name="net.ipv4.tcp_tw_reuse" value="1" sysctl_set=yes state=present reload=yes
-
-- name: enable moderate receiver buffer
-  sysctl: name="net.ipv4.tcp_moderate_rcvbuf" value="1" sysctl_set=yes state=present reload=yes
-
-- name: increase default read buffer
-  sysctl: name="net.core.rmem_default" value="8388608" sysctl_set=yes state=present reload=yes
-
-- name: increase default write buffer
-  sysctl: name="net.core.wmem_default" value="8388608" sysctl_set=yes state=present reload=yes
-
-- name: increase max read buffer
-  sysctl: name="net.core.rmem_max" value="134217728" sysctl_set=yes state=present reload=yes
-
-- name: increase max write buffer
-  sysctl: name="net.core.wmem_max" value="134217728" sysctl_set=yes state=present reload=yes
-
-- name: increase tcp buffer size
-  sysctl: name="net.ipv4.tcp_mem" value="134217728 134217728 134217728" sysctl_set=yes state=present reload=yes
-
-- name: increase tcp read buffer size
-  sysctl: name="net.ipv4.tcp_rmem" value="4096 277750 134217728" sysctl_set=yes state=present reload=yes
-
-- name: increase tcp write buffer size
-  sysctl: name="net.ipv4.tcp_wmem" value="4096 277750 134217728" sysctl_set=yes state=present reload=yes
-
-- name: increase maximum interface backlog
-  sysctl: name="net.core.netdev_max_backlog" value="300000" sysctl_set=yes state=present reload=yes
+# don't need to do that in the docker environment
+#- name: disable selinux
+#  selinux: state=disabled
+#
+#- name: increase filedescriptor limit in sysctl
+#  sysctl: name="fs.file-max" value="{{fileno}}" sysctl_set=yes state=present reload=yes
+#
+#- name: change security limits
+#  lineinfile: line="{{user}} {{item}} nofile {{fileno}}" dest=/etc/security/limits.conf regexp="{{user}} {{item}} nofile*"
+#  with_items:
+#    - hard
+#    - soft
+#
+#- name: increase ipv4 local port range in sysctl
+#  sysctl: name="net.ipv4.ip_local_port_range" value="1024 65535" sysctl_set=yes state=present reload=yes
+#
+#- name: increase ipv4 syn backlog
+#  sysctl: name="net.ipv4.tcp_max_syn_backlog" value="40000" sysctl_set=yes state=present reload=yes
+#
+#- name: increase maximum number of backlogged sockets
+#  sysctl: name="net.core.somaxconn" value="40000" sysctl_set=yes state=present reload=yes
+#
+#- name: enable selective tcp ack
+#  sysctl: name="net.ipv4.tcp_sack" value="1" sysctl_set=yes state=present reload=yes
+#
+#- name: enable tcp window scaling
+#  sysctl: name="net.ipv4.tcp_window_scaling" value="1" sysctl_set=yes state=present reload=yes
+#
+#- name: decrease fin-wait-2 timeout
+#  sysctl: name="net.ipv4.tcp_fin_timeout" value="15" sysctl_set=yes state=present reload=yes
+#
+#- name: decrease keepalive interval
+#  sysctl: name="net.ipv4.tcp_keepalive_intvl" value="60" sysctl_set=yes state=present reload=yes
+#
+#- name: decrease keepalive probes
+#  sysctl: name="net.ipv4.tcp_keepalive_probes" value="5" sysctl_set=yes state=present reload=yes
+#
+#- name: decrease keepalive timeout after successful transfer
+#  sysctl: name="net.ipv4.tcp_keepalive_time" value="180" sysctl_set=yes state=present reload=yes
+#
+#- name: enable time-wait reuse
+#  sysctl: name="net.ipv4.tcp_tw_reuse" value="1" sysctl_set=yes state=present reload=yes
+#
+#- name: enable moderate receiver buffer
+#  sysctl: name="net.ipv4.tcp_moderate_rcvbuf" value="1" sysctl_set=yes state=present reload=yes
+#
+#- name: increase default read buffer
+#  sysctl: name="net.core.rmem_default" value="8388608" sysctl_set=yes state=present reload=yes
+#
+#- name: increase default write buffer
+#  sysctl: name="net.core.wmem_default" value="8388608" sysctl_set=yes state=present reload=yes
+#
+#- name: increase max read buffer
+#  sysctl: name="net.core.rmem_max" value="134217728" sysctl_set=yes state=present reload=yes
+#
+#- name: increase max write buffer
+#  sysctl: name="net.core.wmem_max" value="134217728" sysctl_set=yes state=present reload=yes
+#
+#- name: increase tcp buffer size
+#  sysctl: name="net.ipv4.tcp_mem" value="134217728 134217728 134217728" sysctl_set=yes state=present reload=yes
+#
+#- name: increase tcp read buffer size
+#  sysctl: name="net.ipv4.tcp_rmem" value="4096 277750 134217728" sysctl_set=yes state=present reload=yes
+#
+#- name: increase tcp write buffer size
+#  sysctl: name="net.ipv4.tcp_wmem" value="4096 277750 134217728" sysctl_set=yes state=present reload=yes
+#
+#- name: increase maximum interface backlog
+#  sysctl: name="net.core.netdev_max_backlog" value="300000" sysctl_set=yes state=present reload=yes
