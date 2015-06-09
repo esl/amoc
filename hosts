@@ -19,7 +19,7 @@ amoc-slave
 ;ansible_ssh_pass=root
 ;node_name_type=sname
 ;ansible_sudo=false
-;graphite_ip="guest:guest@172.17.0.38"
+;graphite_ip="172.17.0.38"
 ;graphite_http_port="80"
-;master_install_dir: "/root/amoc_master"
-;slave_install_dir: "/root/amoc"
+;master_install_dir="/root/amoc_master"
+;slave_install_dir="/root/amoc"
