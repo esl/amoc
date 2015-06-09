@@ -7,3 +7,19 @@ host2 graphite_prefix=amoc_2 node_name="amoc@192.168.0.3"
 host3 graphite_prefix=amoc_3 node_name="amoc@192.168.0.4"
 host4 graphite_prefix=amoc_4 node_name="amoc@192.168.0.5"
 ; hostname graphite_prefix="metric_prefix" node_name="example@fully.qualified.name"
+
+; group all amoc nodes
+[amoc:children]
+amoc-master
+amoc-slave
+
+; allow to setup common variables in one place
+;[amoc:vars]
+;user=root
+;ansible_ssh_pass=root
+;node_name_type=sname
+;ansible_sudo=false
+;graphite_ip="guest:guest@172.17.0.38"
+;graphite_http_port="80"
+;master_install_dir: "/root/amoc_master"
+;slave_install_dir: "/root/amoc"
