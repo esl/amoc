@@ -62,9 +62,9 @@ annotate(Tags, Format, Args) ->
             ok
     end.
 
-annotation({dist_do, Scenario, Start, End, Nodes}) ->
-    {<<"amoc start">>, "Scenario: ~p. Start: ~p. End: ~p. Nodes: ~p.",
-     [Scenario, Start, End, length(Nodes)]};
+annotation({dist_do, Scenario, Start, End, Nodes, Comment}) ->
+    {<<"amoc start">>, "Scenario: ~p. comment: ~p Start: ~p. End: ~p. Nodes: ~p.",
+     [Scenario, Comment, Start, End, length(Nodes)]};
 annotation({dist_add, Count}) ->
     {<<"amoc add">>, "Added ~p users", [Count]};
 annotation({dist_remove, Count, Opts}) ->
