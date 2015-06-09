@@ -1,11 +1,11 @@
 [amoc-master]
-localhost graphite_prefix=amoc_master node_name="amoc_master@192.168.0.1"
+localhost graphite_prefix=amoc_master node_name="amoc_master@amocmaster"
 
 [amoc-slave]
-host1 graphite_prefix=amoc_1 node_name="amoc@192.168.0.2"
-host2 graphite_prefix=amoc_2 node_name="amoc@192.168.0.3"
-host3 graphite_prefix=amoc_3 node_name="amoc@192.168.0.4"
-host4 graphite_prefix=amoc_4 node_name="amoc@192.168.0.5"
+;host1 graphite_prefix=amoc_1 node_name="amoc@192.168.0.2"
+;host2 graphite_prefix=amoc_2 node_name="amoc@192.168.0.3"
+;host3 graphite_prefix=amoc_3 node_name="amoc@192.168.0.4"
+;host4 graphite_prefix=amoc_4 node_name="amoc@192.168.0.5"
 ; hostname graphite_prefix="metric_prefix" node_name="example@fully.qualified.name"
 
 ; group all amoc nodes
