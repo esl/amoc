@@ -13,3 +13,6 @@ master_install_dir: "/home/{{user}}/amoc_master"
 
 # where do you want to install amoc on a slave node?
 slave_install_dir: "/home/{{user}}/amoc"
+
+# erlang node name type: name | sname
+node_name_type: "name"
