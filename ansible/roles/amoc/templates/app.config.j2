@@ -1,5 +1,5 @@
 [
- {amoc, [{hosts, {{ hosts }} },
+ {amoc, [{hosts, [{% for h in groups["amoc-slave"] %} "{{h}}" {% if not loop.last %},{% endif %} {% endfor %}] },
          {path, "{{ slave_install_dir }}" },
          {interarrival, 75},
          {graphite_endpoint, "{{ graphite_ip }}:{{ graphite_http_port }}"}]},
