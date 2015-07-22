@@ -2,5 +2,7 @@
 - hosts: amoc-master
   connection: local
   sudo: no
+  vars:
+    - install_dir: "{{ master_install_dir }}"
   roles:
     - amoc

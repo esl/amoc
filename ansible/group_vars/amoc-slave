@@ -1,3 +1,0 @@
-hosts: "[]"
-
-install_dir: "{{ slave_install_dir }}"
