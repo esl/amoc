@@ -4,13 +4,14 @@
 ;; if you want to alter one of the values from [amoc:vars] (like ssh_pass) for a given host you can do it here
 
 [amoc-master]
-localhost graphite_prefix=amoc_master node_name="amoc_master@192.168.0.1"
+172.28.128.11 graphite_prefix=amoc_master node_name="amoc_master@172.28.128.11"
 
 [amoc-slave]
-host1 graphite_prefix=amoc_1 node_name="amoc@192.168.0.2"
-host2 graphite_prefix=amoc_2 node_name="amoc@192.168.0.3"
-host3 graphite_prefix=amoc_3 node_name="amoc@192.168.0.4"
-host4 graphite_prefix=amoc_4 node_name="amoc@192.168.0.5"
+172.28.128.11 graphite_prefix=amoc_1 node_name="amoc@172.28.128.11"
+172.28.128.12 graphite_prefix=amoc_2 node_name="amoc@172.28.128.12"
+
+[amoc-slave:vars]
+ansible_ssh_private_key_file=/Users/erszcz/.vagrant.d/insecure_private_key
 
 ;; group all amoc nodes
 
@@ -23,7 +24,7 @@ amoc-slave
 
 [amoc:vars]
 ;; ssh user
-;user=vagrant
+user=vagrant
 
 ;; ssh password if it is required (no public key auth)
 ;ansible_ssh_pass=root
@@ -43,7 +44,7 @@ amoc-slave
 ;; where to install the amoc release on the master node
 ;; make it distinct from slave_install_dir if you want to run master
 ;; and slave side by side on one node
-;master_install_dir="/root/amoc_master"
+;master_install_dir="/home/vagrant/amoc_master"
 
 ;; where to install the amoc release on the slave nodes
-;slave_install_dir="/root/amoc"
+;slave_install_dir="/home/vagrant/amoc"
