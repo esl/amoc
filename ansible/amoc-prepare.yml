@@ -4,3 +4,5 @@
   sudo: yes
   roles:
     - prepare
+  vars:
+    selinux_available: "{{ lookup('env', 'SELINUX') }}"

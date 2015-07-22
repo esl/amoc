@@ -1,5 +1,6 @@
 - name: disable selinux
   selinux: state=disabled
+  when: not selinux_available == ""
 
 - name: increase filedescriptor limit in sysctl
   sysctl: name="fs.file-max" value="{{fileno}}" sysctl_set=yes state=present reload=yes
