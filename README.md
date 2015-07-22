@@ -60,7 +60,7 @@ do this run `_rel/amoc/bin/amoc console`.
 amoc_local:do(my_scenario, 1, 10).
 ```
 
-Start `my_scenario` spawning 10 amoc users whith id's from range (1,10) inclusive.
+Start `my_scenario` spawning 10 amoc users with IDs from range (1,10) inclusive.
 
 ```erlang
 amoc_local:add(10).
@@ -102,13 +102,14 @@ and start scenarios on all known nodes (except master).
 amoc_dist:do(my_scenario, 1, 100, Opts).
 ```
 
-Start `my_scenario` spawning 100 amoc users whith id's from range (1,100) inclusive.
-In this case sessions are going to be distribute across all nodes except master.
-At this moment users are ditributed in round-robin fashion - user1 goes to slave1,
-user2 goes slave2, ...., user 9 goes to slave9, user10 goes to slave1 etc.
+Start `my_scenario` spawning 100 amoc users with IDs from range (1,100) inclusive.
+In this case sessions are going to be distributed across all nodes except master.
+At this moment users are distributed in round-robin fashion - user1 goes to slave1,
+user2 goes to slave2, ...., user10 goes to slave10, user11 goes to slave1 etc
+(with the assumption that there are 10 slave nodes configured).
 We are planning to make the strategy configurable.
 
-where Opts:
+Opts may contain:
 
 * {nodes, Nodes} - list of nodes on which scenario should be started, by default all available slaves
 * {comment, String} - comment displayed used in the graphite annotations
@@ -123,9 +124,9 @@ Add 50 more users to the currently started scenario.
 amoc_dist:remove(50, Opts).
 ```
 
-Remove 50 sessions
+Remove 50 sessions.
 
-where Opts:
+Where Opts may contain:
 
 * {force, true}  - immediately kill the processes responsible for user connections
 * {force, false} (default) - stop user processes gently - do not start them again
@@ -134,8 +135,8 @@ where Opts:
 ### Don't stop scenario on exit
 
 There is one problem with the `bin/amoc console` command. When you exit the Erlang
-shell scenario is stopped (in fact the erlang nodes are killed). To prevent thath start
-the amoc node in the background using `bin/amoc start`. Now you can run commands by attaching to the amoc's node with `bin/amoc attach`, typing a command and then pressing Ctrl+D to exit
-the shell. After thath stpes scenario will keep running.
-
-
+shell the scenario is stopped (in fact the erlang nodes are killed).
+To prevent that start the amoc node in the background using `bin/amoc start`.
+Now you can run commands by attaching to the amoc's node with `bin/amoc attach`,
+typing a command and then pressing Ctrl+D to exit the shell.
+After that the scenario will keep running.
