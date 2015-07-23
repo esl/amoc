@@ -3,6 +3,7 @@
   remote_user: "{{user}}"
   sudo: no
   vars:
+    - amoc_slaves: []
     - install_dir: "{{ slave_install_dir }}"
   roles:
     - amoc
