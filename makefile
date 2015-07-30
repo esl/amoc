@@ -11,7 +11,7 @@ compile: deps
 deps:
 	./rebar get-deps
 
-deploy:
+deploy: rel
 	ansible-playbook -i hosts ansible/amoc-master.yml;
 	ansible-playbook -i hosts ansible/amoc-slaves.yml
 

@@ -1,6 +1,9 @@
 ---
 - hosts: amoc-master
-  connection: local
+  remote_user: "{{user}}"
   sudo: no
+  vars:
+    - amoc_slaves: "{{ groups['amoc-slave'] }}"
+    - install_dir: "{{ master_install_dir }}"
   roles:
     - amoc

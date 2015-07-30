@@ -3,7 +3,7 @@
   ignore_errors: yes
 
 - name: create amoc directory
-  file: dest={{ install_dir }}/amoc mode=755 state=directory
+  file: dest={{ install_dir }} mode=755 state=directory
 
 - name: unarchive amoc tarball remotely
   unarchive: src=../_rel/amoc/amoc-0.9.tar.gz dest={{ install_dir }}
