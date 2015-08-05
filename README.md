@@ -1,6 +1,11 @@
 # A Murder of Crows
 
-A simple tool for running parallel XMPP tests
+A Murder of Crows, aka amoc, is simple tool for running massively parallel XMPP tests. It can be used to load test [ESL's MongooseIM](https://github.com/esl/MongooseIM).
+
+It uses :
+* [escalus](https://github.com/esl/escalus): Erlang XMPP client
+* [mercutio](https://github.com/esl/mercutio): test suite for XMPP servers (uses escalus)
+
 
 ## Developing a scenario
 
