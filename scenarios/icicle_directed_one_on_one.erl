@@ -33,7 +33,9 @@ start(Id) when Id >= 0 ->
     %% a response, so that's 2 datagrams for each. The send/3 will
     %% simply send 1 STUN formatted "indication", with NO response to
     %% be received. As for get_message_buffer/1, this is a call, but
-    %% only to the generic server process (that is, the client).
+    %% only to the generic server process (that is, the
+    %% client). Clients are not stopped cleanly as they send and
+    %% receive payloads indefinitely.
     {ok, Client} = icicle_client_server:start_link(?TEST_CREDENTIALS,
         ?TEST_SERVER_SOCK),
     failure_response = icicle_client_server:request_relay(Client),
@@ -43,36 +45,41 @@ start(Id) when Id >= 0 ->
     Peer = mock_out_of_band_rendezvous(Id, Sock),
 
     permission_success = icicle_client_server:set_permission(Client, Peer),
+    {ok, 900} = icicle_client_server:set_allocation_lifetime(Client, 900),
     case parity(Id) of
 	odd ->
 	    send_forever(Client, Peer);
 	even ->
-	    timer:sleep(32 * 1000),
 	    receive_forever(Client)
-    end,
-    lager:info("Id ~p done.", [Id]),
-    ok = icicle_client_server:stop(Client).
+    end.
+
+sleep() ->
+    timer:sleep(8*1000).
 
 send_forever(Client, Peer) ->
+    sleep(),
     icicle_client_server:send(Client, ?DATA, Peer),
     send_forever(Client, Peer).
 
 receive_forever(Client) ->
+    sleep(),
     case icicle_client_server:get_message_buffer(Client) of
-	[{_Peer, Raw}|More] ->
-	    do_something(Raw, More);
+	Buff when is_list(Buff) ->
+	    process_buffer(Buff);
 	[] ->
 	    ok
     end,
     receive_forever(Client).
 
-do_something(?DATA, _More) ->
+process_buffer([{_Peer, ?DATA}|Rest]) ->
+    process_buffer(Rest);
+process_buffer([]) ->
     ok.
 
 mock_out_of_band_rendezvous(Id, Sock) ->
     mock_out_of_band_rendezvous(Id, Sock, ?PUT_TIME).
 
- mock_out_of_band_rendezvous(Id, Sock, Wait) ->
+mock_out_of_band_rendezvous(Id, Sock, Wait) ->
     ok = put_client_in_table(Id, Sock),
     timer:sleep(Wait),
     {ok, Peer} = get_peer_from_table(Id),
