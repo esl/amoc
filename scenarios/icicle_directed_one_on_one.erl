@@ -39,22 +39,35 @@ start(Id) when Id >= 0 ->
     failure_response = icicle_client_server:request_relay(Client),
     success_response = icicle_client_server:request_relay(Client),
     Sock = icicle_client_server:get_relay_address(Client),
+
     Peer = mock_out_of_band_rendezvous(Id, Sock),
+
     permission_success = icicle_client_server:set_permission(Client, Peer),
     case parity(Id) of
 	odd ->
-	    icicle_client_server:send(Client, ?DATA, Peer);
+	    send_forever(Client, Peer);
 	even ->
 	    timer:sleep(32 * 1000),
-	    case icicle_client_server:get_message_buffer(Client) of
-		[{Peer, ?DATA}|_More] ->
-		    ok;
-		[] ->
-		    error(got_nothing)
-	    end
+	    receive_forever(Client)
     end,
     lager:info("Id ~p done.", [Id]),
     ok = icicle_client_server:stop(Client).
+
+send_forever(Client, Peer) ->
+    icicle_client_server:send(Client, ?DATA, Peer),
+    send_forever(Client, Peer).
+
+receive_forever(Client) ->
+    case icicle_client_server:get_message_buffer(Client) of
+	[{_Peer, Raw}|More] ->
+	    do_something(Raw, More);
+	[] ->
+	    ok
+    end,
+    receive_forever(Client).
+
+do_something(?DATA, _More) ->
+    ok.
 
 mock_out_of_band_rendezvous(Id, Sock) ->
     mock_out_of_band_rendezvous(Id, Sock, ?PUT_TIME).
