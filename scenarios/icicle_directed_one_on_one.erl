@@ -10,6 +10,7 @@
 -export([start/1]).
 
 -define(SOCK_TABLE, sockets).
+-define(PUT_TIME, 48 * 1000).
 
 -define(USERNAME, <<"alice">>).
 -define(PASSWORD, <<"ali">>).
@@ -38,14 +39,7 @@ start(Id) when Id >= 0 ->
     failure_response = icicle_client_server:request_relay(Client),
     success_response = icicle_client_server:request_relay(Client),
     Sock = icicle_client_server:get_relay_address(Client),
-
-    %% === Below mocks out of band commumication =====
-    ok = put_client_in_table(Id, Sock),
-    %% SLEEP FOR ALL TO PUT
-    timer:sleep(48 * 1000),
-    {ok, Peer} = get_peer_from_table(Id),
-    %% === Above mocks out of band communication =====
-
+    Peer = mock_out_of_band_rendezvous(Id, Sock),
     permission_success = icicle_client_server:set_permission(Client, Peer),
     case parity(Id) of
 	odd ->
@@ -61,6 +55,15 @@ start(Id) when Id >= 0 ->
     end,
     lager:info("Id ~p done.", [Id]),
     ok = icicle_client_server:stop(Client).
+
+mock_out_of_band_rendezvous(Id, Sock) ->
+    mock_out_of_band_rendezvous(Id, Sock, ?PUT_TIME).
+
+ mock_out_of_band_rendezvous(Id, Sock, Wait) ->
+    ok = put_client_in_table(Id, Sock),
+    timer:sleep(Wait),
+    {ok, Peer} = get_peer_from_table(Id),
+    Peer.
 
 put_client_in_table(Id, Sock) ->
     %% Make sure the mapping between client and their socket is only
