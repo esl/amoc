@@ -20,10 +20,12 @@
 -define(REMOTE_INSTANCE, {54,172,65,222}).
 -define(TEST_SERVER_SOCK, {?REMOTE_INSTANCE, ?TURN_PORT}).
 
--define(DATA, <<"Hello, world!">>).
-
+-define(METRIC_NAME, [amoc, icicle, lapsetime]).
 
 init() ->
+    exometer:new(?METRIC_NAME, histogram),
+    exometer_report:subscribe(exometer_report_graphite,
+        ?METRIC_NAME, [mean, min, max, median, 95, 97], 10000),
     ets:new(?SOCK_TABLE, [public, named_table, set]),
     ok.
 
@@ -58,20 +60,23 @@ sleep() ->
 
 send_forever(Client, Peer) ->
     sleep(),
-    icicle_client_server:send(Client, ?DATA, Peer),
+    Data = payload_with_timestamp(),
+    icicle_client_server:send(Client, Data, Peer),
     send_forever(Client, Peer).
 
 receive_forever(Client) ->
-    sleep(),
     case icicle_client_server:get_message_buffer(Client) of
-	Buff when is_list(Buff) ->
-	    process_buffer(Buff);
 	[] ->
-	    ok
+	    ok;
+	[{_Peer, Raw}] ->
+	    sample_time_elapsed(Raw);
+	Buff when is_list(Buff) ->
+	    process_buffer(Buff)
     end,
     receive_forever(Client).
 
-process_buffer([{_Peer, ?DATA}|Rest]) ->
+process_buffer([{_Peer, Raw}|Rest]) ->
+    sample_time_elapsed(Raw),
     process_buffer(Rest);
 process_buffer([]) ->
     ok.
@@ -127,3 +132,16 @@ partner_one_down(Id) when is_integer(Id), Id > 0 ->
 
 partner_one_up(Id) when is_integer(Id), Id > 0 ->
     Id + 1.
+
+payload_with_timestamp() ->
+    T = usec:from_now(os:timestamp()),
+    integer_to_binary(T).
+
+sample_time_elapsed(Raw) ->
+    Time = calculate_time_elapsed(Raw),
+    exometer:update(?METRIC_NAME, Time).
+
+calculate_time_elapsed(Raw) when is_binary(Raw) ->
+    Received = usec:from_now(os:timestamp()),
+    Sent = binary_to_integer(Raw),
+    _Lapsetime = Received - Sent.
