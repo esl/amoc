@@ -10,7 +10,9 @@
 -export([start/1]).
 
 -define(SOCK_TABLE, sockets).
--define(PUT_TIME, 48 * 1000).
+-define(PUT_TIME, 2 * 1000).
+-define(INIT_REFRESH_COUNT, 512 * 1000).
+-define(METRIC_NAME, [amoc, icicle, lapsetime]).
 
 -define(USERNAME, <<"alice">>).
 -define(PASSWORD, <<"ali">>).
@@ -19,8 +21,6 @@
 -define(TURN_PORT, 34780).
 -define(REMOTE_INSTANCE, {54,172,65,222}).
 -define(TEST_SERVER_SOCK, {?REMOTE_INSTANCE, ?TURN_PORT}).
-
--define(METRIC_NAME, [amoc, icicle, lapsetime]).
 
 init() ->
     exometer:new(?METRIC_NAME, histogram),
@@ -52,28 +52,42 @@ start(Id) when Id >= 0 ->
 	odd ->
 	    send_forever(Client, Peer);
 	even ->
-	    receive_forever(Client)
+	    receive_forever(Client, Peer)
     end.
 
-sleep() ->
-    timer:sleep(8*1000).
-
 send_forever(Client, Peer) ->
-    sleep(),
-    Data = payload_with_timestamp(),
-    icicle_client_server:send(Client, Data, Peer),
-    send_forever(Client, Peer).
+    service_forever(Client, Peer, fun send/2).
 
-receive_forever(Client) ->
+receive_forever(Client, Peer) ->
+    service_forever(Client, Peer, fun recv/2).
+
+send(Client, Peer) ->
+    Data = payload_with_timestamp(),
+    icicle_client_server:send(Client, Data, Peer).
+
+recv(Client, Peer) ->
     case icicle_client_server:get_message_buffer(Client) of
 	[] ->
 	    ok;
-	[{_Peer, Raw}] ->
+	[{Peer, Raw}] ->
 	    sample_time_elapsed(Raw);
 	Buff when is_list(Buff) ->
 	    process_buffer(Buff)
-    end,
-    receive_forever(Client).
+    end.
+
+service_forever(C, P, Action) ->
+    service_forever(C, P, Action, ?INIT_REFRESH_COUNT).
+
+service_forever(C, P, Action, 0) ->
+    refresh_allocation_and_permission(C, P),
+    service_forever(C, P, Action, ?INIT_REFRESH_COUNT);
+service_forever(C, P, Action, Countdown) when Countdown > 0 ->
+    Action(C, P),
+    service_forever(C, P, Action, Countdown - 1).
+
+refresh_allocation_and_permission(C, P) ->
+    {ok, Permitted} = icicle_client_server:set_allocation_lifetime(C, 900),
+    permission_success = icicle_client_server:reset_permission(C, P).
 
 process_buffer([{_Peer, Raw}|Rest]) ->
     sample_time_elapsed(Raw),
