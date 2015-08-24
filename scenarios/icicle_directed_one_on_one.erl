@@ -64,7 +64,7 @@ receive_forever(Client, Peer) ->
 
 send(Client, Peer) ->
     sleep(?SEND_SLEEP_TIME),
-    Data = payload_with_timestamp(),
+    Data = padded_payload_with_timestamp(),
     icicle_client_server:send(Client, Data, Peer).
 
 recv(Client, Peer) ->
@@ -72,7 +72,8 @@ recv(Client, Peer) ->
 	[] ->
 	    ok;
 	[{Peer, Raw}] ->
-	    sample_time_elapsed(Raw);
+	    Bin = extract_just_timestamp(Raw),
+	    sample_time_elapsed(Bin);
 	Buff when is_list(Buff) ->
 	    process_buffer(Buff)
     end.
@@ -82,7 +83,8 @@ service_forever(C, P, Action) ->
     service_forever(C, P, Action).
 
 process_buffer([{_Peer, Raw}|Rest]) ->
-    sample_time_elapsed(Raw),
+    Bin = extract_just_timestamp(Raw),
+    sample_time_elapsed(Bin),
     process_buffer(Rest);
 process_buffer([]) ->
     ok.
@@ -139,6 +141,10 @@ partner_one_down(Id) when is_integer(Id), Id > 0 ->
 partner_one_up(Id) when is_integer(Id), Id > 0 ->
     Id + 1.
 
+padded_payload_with_timestamp() ->
+    Timestamp = payload_with_timestamp(),
+    <<Timestamp/binary,0:(484*8)>>.
+
 payload_with_timestamp() ->
     T = usec:from_now(os:timestamp()),
     integer_to_binary(T).
@@ -146,6 +152,9 @@ payload_with_timestamp() ->
 sample_time_elapsed(Raw) ->
     Time = calculate_time_elapsed(Raw),
     exometer:update(?METRIC_NAME, Time).
+
+extract_just_timestamp(<<Timestamp:16/bytes,_/binary>>) ->
+    Timestamp.
 
 calculate_time_elapsed(Raw) when is_binary(Raw) ->
     Received = usec:from_now(os:timestamp()),
