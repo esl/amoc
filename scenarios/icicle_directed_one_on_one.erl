@@ -10,9 +10,10 @@
 -export([start/1]).
 
 -define(SOCK_TABLE, sockets).
--define(PUT_TIME, 2 * 1000).
+-define(PUT_TIME, 20 * 1000).
 -define(INIT_REFRESH_COUNT, 512 * 1000).
 -define(METRIC_NAME, [amoc, icicle, lapsetime]).
+-define(SEND_SLEEP_TIME, 1). %% This is in seconds.
 
 -define(USERNAME, <<"alice">>).
 -define(PASSWORD, <<"ali">>).
@@ -20,7 +21,8 @@
 
 -define(TURN_PORT, 34780).
 -define(REMOTE_INSTANCE, {54,172,65,222}).
--define(TEST_SERVER_SOCK, {?REMOTE_INSTANCE, ?TURN_PORT}).
+-define(LOCAL_INSTANCE, {127,0,0,1}).
+-define(TEST_SERVER_SOCK, {<<"TCP">>, ?LOCAL_INSTANCE, ?TURN_PORT}).
 
 init() ->
     exometer:new(?METRIC_NAME, histogram),
@@ -47,7 +49,6 @@ start(Id) when Id >= 0 ->
     Peer = mock_out_of_band_rendezvous(Id, Sock),
 
     permission_success = icicle_client_server:set_permission(Client, Peer),
-    {ok, 900} = icicle_client_server:set_allocation_lifetime(Client, 900),
     case parity(Id) of
 	odd ->
 	    send_forever(Client, Peer);
@@ -62,6 +63,7 @@ receive_forever(Client, Peer) ->
     service_forever(Client, Peer, fun recv/2).
 
 send(Client, Peer) ->
+    sleep(?SEND_SLEEP_TIME),
     Data = payload_with_timestamp(),
     icicle_client_server:send(Client, Data, Peer).
 
@@ -76,18 +78,8 @@ recv(Client, Peer) ->
     end.
 
 service_forever(C, P, Action) ->
-    service_forever(C, P, Action, ?INIT_REFRESH_COUNT).
-
-service_forever(C, P, Action, 0) ->
-    refresh_allocation_and_permission(C, P),
-    service_forever(C, P, Action, ?INIT_REFRESH_COUNT);
-service_forever(C, P, Action, Countdown) when Countdown > 0 ->
     Action(C, P),
-    service_forever(C, P, Action, Countdown - 1).
-
-refresh_allocation_and_permission(C, P) ->
-    {ok, Permitted} = icicle_client_server:set_allocation_lifetime(C, 900),
-    permission_success = icicle_client_server:reset_permission(C, P).
+    service_forever(C, P, Action).
 
 process_buffer([{_Peer, Raw}|Rest]) ->
     sample_time_elapsed(Raw),
@@ -159,3 +151,6 @@ calculate_time_elapsed(Raw) when is_binary(Raw) ->
     Received = usec:from_now(os:timestamp()),
     Sent = binary_to_integer(Raw),
     _Lapsetime = Received - Sent.
+
+sleep(Seconds) when is_integer(Seconds) ->
+    timer:sleep(timer:seconds(Seconds)).
