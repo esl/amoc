@@ -25,9 +25,9 @@
 -define(TEST_SERVER_SOCK, {<<"TCP">>, ?LOCAL_INSTANCE, ?TURN_PORT}).
 
 init() ->
-    exometer:new(?METRIC_NAME, histogram),
-    exometer_report:subscribe(exometer_report_graphite,
-        ?METRIC_NAME, [mean, min, max, median, 95, 97], 10000),
+    ok = exometer:new(?METRIC_NAME, histogram),
+    ok = exometer_report:subscribe(exometer_report_graphite,
+        ?METRIC_NAME, [mean, min, max, median, 95, 99], 10000),
     ets:new(?SOCK_TABLE, [public, named_table, set]),
     ok.
 
