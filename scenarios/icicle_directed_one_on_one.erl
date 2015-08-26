@@ -9,6 +9,8 @@
 -export([init/0]).
 -export([start/1]).
 
+-export([add_load_in_thousands/1]).
+
 -define(SOCK_TABLE, sockets).
 -define(PUT_TIME, 20 * 1000).
 -define(INIT_REFRESH_COUNT, 512 * 1000).
@@ -22,7 +24,19 @@
 -define(TURN_PORT, 34780).
 -define(REMOTE_INSTANCE, {54,172,65,222}).
 -define(LOCAL_INSTANCE, {127,0,0,1}).
--define(TEST_SERVER_SOCK, {<<"TCP">>, ?LOCAL_INSTANCE, ?TURN_PORT}).
+-define(MIM_ZERO, {10,10,10,222}).
+-define(TEST_SERVER_SOCK, {<<"TCP">>, ?MIM_ZERO, ?TURN_PORT}).
+
+add_load_in_thousands(N) when is_integer(N), N >= 0 ->
+    amoc_local:do(?MODULE, 1, 1000),
+    repeat_load_in_thousands(N-1).
+
+repeat_load_in_thousands(0) ->
+    ok;
+repeat_load_in_thousands(N) ->
+    sleep(60), %% To assess just payload traffic.
+    amoc_local:add(1000),
+    repeat_load_in_thousands(N-1).
 
 init() ->
     ok = exometer:new(?METRIC_NAME, histogram),
@@ -49,6 +63,7 @@ start(Id) when Id >= 0 ->
     Peer = mock_out_of_band_rendezvous(Id, Sock),
 
     permission_success = icicle_client_server:set_permission(Client, Peer),
+    log_every_thousandth(Id),
     case parity(Id) of
 	odd ->
 	    send_forever(Client, Peer);
@@ -102,7 +117,7 @@ put_client_in_table(Id, Sock) ->
     %% Make sure the mapping between client and their socket is only
     %% done once (to safeguard against anything strange happening).
     true  = ets:insert_new(?SOCK_TABLE, {Id, Sock}),
-    lager:info("Id ~p put in table", [Id]),
+%    lager:info("Id ~p put in table", [Id]),
     ok.
 
 get_peer_from_table(Id) ->
@@ -163,3 +178,11 @@ calculate_time_elapsed(Raw) when is_binary(Raw) ->
 
 sleep(Seconds) when is_integer(Seconds) ->
     timer:sleep(timer:seconds(Seconds)).
+
+log_every_thousandth(Id) ->
+    case Id rem 1000 =:= 0 of
+        true ->
+            lager:info("Up to ~p thousandth client.", [Id div 1000]);
+	false ->
+            ok
+    end.
