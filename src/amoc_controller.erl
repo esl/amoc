@@ -5,6 +5,7 @@
 -module(amoc_controller).
 -behaviour(gen_server).
 -include_lib("include/types.hrl").
+
 -define(SERVER, ?MODULE).
 -define(INTERARRIVAL_DEFAULT, 50).
 -define(INTERARRIVAL,

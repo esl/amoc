@@ -4,7 +4,7 @@
 %%==============================================================================
 -module(amoc_annotations).
 -behaviour(gen_event).
-
+-include_lib("include/types.hrl").
 %% ------------------------------------------------------------------
 %% gen_event Function Exports
 %% ------------------------------------------------------------------
@@ -15,14 +15,16 @@
          terminate/2,
          code_change/3]).
 
--record(state, {}).
+
 
 %% ------------------------------------------------------------------
 %% gen_event Function Definitions
 %% ------------------------------------------------------------------
+-spec init([]) -> {ok, state_annotations()}.
 init([]) ->
-    {ok, #state{}}.
+    {ok, #state_annotations{}}.
 
+-spec handle_event(event(), state_annotations()) ->{ok, state_annotations()}.
 handle_event(Event, State) ->
     case annotation(Event) of
         {Tags, Format, Args} ->
@@ -32,22 +34,27 @@ handle_event(Event, State) ->
     end,
     {ok, State}.
 
+-spec handle_call(any(), state_annotations()) -> {ok, any(), state_annotations()}.
 handle_call(_Request, State) ->
     Reply = ok,
     {ok, Reply, State}.
 
+-spec handle_info(any(), state_annotations()) -> {ok, state_annotations()}.
 handle_info(_Info, State) ->
     {ok, State}.
 
+-spec terminate(any(), any()) -> ok.
 terminate(_Reason, _State) ->
     ok.
 
+-spec code_change(any(), any(), any()) -> {ok, state_annotations()}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
+-spec annotate(tag(), list(), list(any())) -> {error, no_graphite} | ok.
 annotate(Tags, Format, Args) ->
     case application:get_env(amoc, graphite_endpoint) of
         undefined ->
@@ -62,6 +69,7 @@ annotate(Tags, Format, Args) ->
             ok
     end.
 
+-spec annotation(event()) -> {tag(), list(), list()} | {binary(), list(any())} | ignore.
 annotation({dist_do, Scenario, Start, End, Nodes, Comment}) ->
     {<<"amoc start">>, "Scenario: ~p. comment: ~p Start: ~p. End: ~p. Nodes: ~p.",
      [Scenario, Comment, Start, End, length(Nodes)]};
