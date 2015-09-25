@@ -3,7 +3,6 @@
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(amoc).
--include_lib("include/types.hrl").
 -define(INTERARRIVAL_DEFAULT, 30).
 -define(INTERARRIVAL,
     application:get_env(amoc, interarrival, ?INTERARRIVAL_DEFAULT)).
@@ -13,7 +12,7 @@
 %% ------------------------------------------------------------------
 %% Start scenario via shell script (run.sh)
 %% ------------------------------------------------------------------
--spec do([scenario() | integer(), ...]) -> ok | none().
+-spec do([amoc_controller:scenario() | integer(), ...]) -> ok | none().
 do([Scenario, Count]) ->
     do([Scenario, '1', Count]);
 do([Scenario, Start, End]) ->

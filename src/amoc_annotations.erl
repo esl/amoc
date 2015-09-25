@@ -4,7 +4,6 @@
 %%==============================================================================
 -module(amoc_annotations).
 -behaviour(gen_event).
--include_lib("include/types.hrl").
 %% ------------------------------------------------------------------
 %% gen_event Function Exports
 %% ------------------------------------------------------------------
@@ -14,7 +13,13 @@
          handle_info/2,
          terminate/2,
          code_change/3]).
-
+-record(state_annotations, {}).
+-type tag() :: binary().
+-type state_annotations() :: #state_annotations{}.
+-type event() :: {dist_do, amoc_controller:scenario(), integer(), integer(), amoc_controller:nodes(), any()} |
+                 {dist_add, integer()} |
+                 {dist_remove, integer(), list(amoc_controller:option())} |
+                 any().
 
 
 %% ------------------------------------------------------------------

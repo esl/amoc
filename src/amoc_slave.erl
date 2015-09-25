@@ -24,7 +24,6 @@
          code_change/3]).
 
 -record(state, {to_ack, master}).
-
 -define(DEFAULT_RETRIES, 10).
 
 %% ------------------------------------------------------------------
