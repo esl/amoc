@@ -30,6 +30,10 @@
 -define(MESSAGE_TTD_CT, [amoc, times, message_ttd]).
 -define(MAM_READ_CT, [amoc, times, mam_last_10_read]).
 
+-type binjid() :: binary().
+
+
+-spec init() -> ok.
 init() ->
     lager:info("init some metrics"),
     exometer:new(?MESSAGES_CT, spiral),
@@ -40,6 +44,7 @@ init() ->
     exometer_report:subscribe(exometer_report_graphite, ?MAM_READ_CT, [mean, min, max, median, 95, 99, 999], 10000),
     ok.
 
+-spec user_spec(binary(), binary(), binary()) -> escalus_users:user_spec().
 user_spec(ProfileId, Password, Res) ->
     [ {username, ProfileId},
       {server, ?HOST},
@@ -50,12 +55,14 @@ user_spec(ProfileId, Password, Res) ->
       {resource, Res}
     ].
 
+-spec make_user(amoc:user_id(), binary()) -> escalus_users:user_spec().
 make_user(Id, R) ->
     BinId = integer_to_binary(Id),
     ProfileId = <<"user_", BinId/binary>>,
     Password = <<"password_", BinId/binary>>,
     user_spec(ProfileId, Password, R).
 
+-spec start(amoc:user_id()) -> any().
 start(MyId) ->
     Cfg = make_user(MyId, <<"res1">>),
 
@@ -79,6 +86,7 @@ start(MyId) ->
     send_presence_unavailable(Client),
     escalus_connection:stop(Client).
 
+-spec do(boolean(), amoc:user_id(), escalus:client()) -> any().
 do(false, MyId, Client) ->
     escalus_connection:set_filter_predicate(Client, none),
 
@@ -99,13 +107,14 @@ do(_Other, _MyId, Client) ->
     escalus_connection:set_filter_predicate(Client, fun escalus_pred:is_message/1),
     receive_forever(Client).
 
+-spec read_archive(escalus:client()) -> any().
 read_archive(Client) ->
     Payload = [#xmlel{name = <<"set">>,
                       attrs = [{<<"xmlns">>, <<"http//jabber.org/protocol/rsm">>}],
                       children = [#xmlel{name = <<"before">>},
                                   #xmlel{name = <<"simple">>},
                                   #xmlel{name = <<"max">>,
-                                         children = #xmlcdata{content = <<"10">>}}]}],
+                                         children = [#xmlcdata{content = <<"10">>}]}]}],
     MamNS = <<"urn:xmpp:mam:tmp">>,
     Query = escalus_stanza:iq_get(MamNS, Payload),
     escalus_connection:set_filter_predicate(Client,
@@ -116,7 +125,7 @@ read_archive(Client) ->
     Diff = timer:now_diff(os:timestamp(), Start),
     exometer:update(?MAM_READ_CT, Diff).
 
-
+-spec receive_forever(escalus:client()) -> no_return().
 receive_forever(Client) ->
     Stanza = escalus_connection:get_stanza(Client, message, infinity),
     Now = usec:from_now(os:timestamp()),
@@ -134,26 +143,29 @@ receive_forever(Client) ->
     end,
     receive_forever(Client).
 
-
+-spec send_presence_available(escalus:client()) -> ok.
 send_presence_available(Client) ->
     Pres = escalus_stanza:presence(<<"available">>),
     escalus_connection:send(Client, Pres).
 
+-spec send_presence_unavailable(escalus:client()) -> ok.
 send_presence_unavailable(Client) ->
     Pres = escalus_stanza:presence(<<"unavailable">>),
     escalus_connection:send(Client, Pres).
 
+-spec send_messages_many_times(escalus:client(), timeout(), [binjid()]) -> ok.
 send_messages_many_times(Client, MessageInterval, NeighbourIds) ->
     S = fun(_) ->
                 send_messages_to_neighbors(Client, NeighbourIds, MessageInterval)
         end,
     lists:foreach(S, lists:seq(1, ?NUMBER_OF_SEND_MESSAGE_REPEATS)).
 
-
+-spec send_messages_to_neighbors(escalus:client(), [binjid()], timeout()) -> list().
 send_messages_to_neighbors(Client, TargetIds, SleepTime) ->
     [send_message(Client, make_jid(TargetId), SleepTime)
      || TargetId <- TargetIds].
 
+-spec send_message(escalus:client(), binjid(), timeout()) -> ok.
 send_message(Client, ToId, SleepTime) ->
     MsgIn = make_message(ToId),
     TimeStamp = integer_to_binary(usec:from_now(os:timestamp())),
@@ -161,17 +173,20 @@ send_message(Client, ToId, SleepTime) ->
     exometer:update([amoc, counters, messages_sent], 1),
     timer:sleep(SleepTime).
 
+-spec make_message(binjid()) -> exml:element().
 make_message(ToId) ->
     Body = <<"hello sir, you are a gentelman and a scholar.">>,
     Id = escalus_stanza:id(),
     escalus_stanza:set_id(escalus_stanza:chat_to(ToId, Body), Id).
 
+-spec make_jid(amoc:user_id()) -> binjid().
 make_jid(Id) ->
     BinInt = integer_to_binary(Id),
     ProfileId = <<"user_", BinInt/binary>>,
     Host = ?HOST,
     << ProfileId/binary, "@", Host/binary >>.
 
+-spec pick_server({binary()}) -> binary().
 pick_server(Servers) ->
     S = size(Servers),
     N = erlang:phash2(self(), S) + 1,

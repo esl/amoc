@@ -9,10 +9,15 @@
 
 -export([do/1]).
 
+-export_type([user_id/0]).
+
+-type user_id() :: non_neg_integer().
+-type scenario() :: module().
+
 %% ------------------------------------------------------------------
 %% Start scenario via shell script (run.sh)
 %% ------------------------------------------------------------------
--spec do([amoc_controller:scenario() | integer(), ...]) -> ok | none().
+-spec do([amoc_controller:scenario() | integer(), ...]) -> ok | no_return().
 do([Scenario, Count]) ->
     do([Scenario, '1', Count]);
 do([Scenario, Start, End]) ->
