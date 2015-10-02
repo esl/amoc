@@ -12,6 +12,8 @@
 %%==============================================================================
 -module(mongoose_mam_read_and_send_msgs_with_metrics).
 
+-behaviour(amoc_scenario).
+
 -include_lib("exml/include/exml.hrl").
 
 -define(HOST, <<"localhost">>). %% The virtual host served by the server
@@ -23,6 +25,7 @@
 -define(NUMBER_OF_SEND_MESSAGE_REPEATS, 10).
 -define(SLEEP_TIME_AFTER_EVERY_MESSAGE, 20000).
 
+%% scenario behavior
 -export([start/1]).
 -export([init/0]).
 
@@ -55,14 +58,14 @@ user_spec(ProfileId, Password, Res) ->
       {resource, Res}
     ].
 
--spec make_user(amoc:user_id(), binary()) -> escalus_users:user_spec().
+-spec make_user(amoc_scenario:user_id(), binary()) -> escalus_users:user_spec().
 make_user(Id, R) ->
     BinId = integer_to_binary(Id),
     ProfileId = <<"user_", BinId/binary>>,
     Password = <<"password_", BinId/binary>>,
     user_spec(ProfileId, Password, R).
 
--spec start(amoc:user_id()) -> any().
+-spec start(amoc_scenario:user_id()) -> any().
 start(MyId) ->
     Cfg = make_user(MyId, <<"res1">>),
 
@@ -86,7 +89,7 @@ start(MyId) ->
     send_presence_unavailable(Client),
     escalus_connection:stop(Client).
 
--spec do(boolean(), amoc:user_id(), escalus:client()) -> any().
+-spec do(boolean(), amoc_scenario:user_id(), escalus:client()) -> any().
 do(false, MyId, Client) ->
     escalus_connection:set_filter_predicate(Client, none),
 
@@ -179,7 +182,7 @@ make_message(ToId) ->
     Id = escalus_stanza:id(),
     escalus_stanza:set_id(escalus_stanza:chat_to(ToId, Body), Id).
 
--spec make_jid(amoc:user_id()) -> binjid().
+-spec make_jid(amoc_scenario:user_id()) -> binjid().
 make_jid(Id) ->
     BinInt = integer_to_binary(Id),
     ProfileId = <<"user_", BinInt/binary>>,
