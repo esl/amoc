@@ -13,9 +13,10 @@
 
 -type binjid() :: binary().
 
--spec init() -> any().
+-spec init() -> ok.
 init() ->
-    lager:info("init the scenario").
+    lager:info("init the scenario"),
+    ok.
 
 -spec user_spec(binary(), binary(), binary()) -> escalus_users:user_spec().
 user_spec(ProfileId, XMPPToken, Res) ->

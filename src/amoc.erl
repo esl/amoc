@@ -9,9 +9,8 @@
 
 -export([do/1]).
 
--export_type([user_id/0]).
+-export_type([scenario/0]).
 
--type user_id() :: non_neg_integer().
 -type scenario() :: module().
 
 %% ------------------------------------------------------------------

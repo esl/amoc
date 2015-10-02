@@ -12,28 +12,35 @@
          post_request/4]).
 -define(TIMEOUT, 12000).
 
+-spec start() -> any().
 start() ->
     error_logger:tty(false),
     start_fusco().
 
+-spec stop() -> any().
 stop() ->
     stop_fusco().
 
+-spec request(fusco:host(), string(), fusco:method(), iodata()) -> fusco:result().
 request(Host, Path, Method, Body) ->
     fusco_request(Host, Path, Method, [], Body, ?TIMEOUT).
 
+-spec post_request(fusco:host(), string(), iodata()) -> fusco:result().
 post_request(Host, Path, PostBody) ->
     post_request(Host, Path, [], PostBody).
 
 post_request(Host, Path, Headers, PostBody) ->
     fusco_request(Host, Path, <<"POST">>, Headers, PostBody, ?TIMEOUT).
 
+-spec get_request(fusco:host(), string()) -> fusco:result().
 get_request(Host, Path) ->
     get_request(Host, [], Path).
 get_request(Host, Path, Headers) ->
     fusco_request(Host, Path, <<"GET">>, Headers, [], ?TIMEOUT).
 
 %%% Internal
+
+-spec start_fusco() -> ok.
 start_fusco() ->
     %% In R16B01 and above, we could use application:ensure_started/1
     %% instead.
@@ -44,10 +51,13 @@ start_fusco() ->
                               {error, E} -> error({cannot_start, E}, [App])
                           end end,
                   [asn1,crypto,public_key,ssl,fusco]).
+
+-spec stop_fusco() ->  [ok].
 stop_fusco() ->
     [ok,ok,ok,ok,ok] = lists:map(fun application:stop/1,
                                  [fusco,ssl,public_key,crypto,asn1]).
 
+-spec fusco_request(fusco:host(), string(), fusco:method(), fusco:headers(), iodata(), fusco:pos_timeout()) -> fusco:result().
 fusco_request(URL, Path, Method, Hdrs, Body, Timeout) ->
     {ok, P}=fusco:start(URL,[]),
     ok = fusco:connect(P),
