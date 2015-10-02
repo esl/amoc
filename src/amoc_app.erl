@@ -13,11 +13,13 @@
 %% Application callbacks
 %% ===================================================================
 
+-spec start(application:start_type(), term()) -> {ok, pid()}.
 start(_StartType, _StartArgs) ->
     Ret = amoc_sup:start_link(),
     amoc_dist:start_nodes(),
     ok = amoc_event:add_handler(amoc_annotations, []),
     Ret.
 
+-spec stop(term()) -> ok.
 stop(_State) ->
     ok.
