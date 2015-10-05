@@ -19,12 +19,14 @@
 %% API functions
 %% ===================================================================
 
+-spec start_link() -> {ok, Pid :: pid()}.
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
+-spec init(term()) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
     amoc_users = start_users_ets(),
     {ok, { {one_for_one, 5, 10},
@@ -35,6 +37,7 @@ init([]) ->
             ?CHILD(amoc_slave, worker)
            ]} }.
 
+-spec start_users_ets() -> tid() | atom().
 start_users_ets() ->
     ets:new(amoc_users, [named_table,
                          ordered_set,

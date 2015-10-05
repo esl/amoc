@@ -14,10 +14,7 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
--spec init(Args :: term()) ->
-    {ok, {SupFlags :: {RestartStrategy :: supervisor:strategy(),
-                       MaxR :: non_neg_integer(), MaxT :: non_neg_integer()},
-          [ChildSpec :: supervisor:child_spec()]}}.
+-spec init(term()) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
     process_flag(priority, max),
 
