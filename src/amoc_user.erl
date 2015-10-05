@@ -13,9 +13,13 @@
 -export([start_link/3]).
 -export([init/4]).
 
+-type state() :: term().
+
+-spec start_link(amoc:scenario(), amoc_scenario:user_id(), state()) -> {ok, pid()}.
 start_link(Scenario, Id, State) ->
     proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
 
+-spec init(pid(), amoc:sceanario(), amoc_scenario:user_id(), state()) -> no_return().
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     ets:insert(amoc_users, {Id, self()}),
@@ -34,6 +38,7 @@ init(Parent, Scenario, Id, State) ->
         end,
     exit(R).
 
+-spec forever(amoc:scenario(), amoc_scenario:user_id(), state()) -> no_return().
 forever(Scenario, Id, State) ->
     case erlang:function_exported(Scenario, start, 2) of
         true ->
@@ -45,6 +50,7 @@ forever(Scenario, Id, State) ->
     timer:sleep(?REPEAT_INTERVAL),
     forever(Scenario, Id, State).
 
+-spec flush_mailbox() -> ok.
 flush_mailbox() ->
     receive
         stop ->
