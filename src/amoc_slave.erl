@@ -78,6 +78,7 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+-spec handle_info(term(), state()) -> {noreply, state()}.
 handle_info(timeout, State) ->
     State1 = ping_slave_nodes(State),
     {noreply, State1};
