@@ -14,37 +14,43 @@
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
+-spec start_nodes() -> [ok].
 start_nodes() ->
     Hosts = application:get_env(amoc, hosts, []),
     Path = application:get_env(amoc, path, "/usr"),
     start_nodes(Hosts, Path).
 
+-spec do(amoc:scenario(), non_neg_integer(), non_neg_integer()) -> [any()].
 do(Scenario, Start, End) ->
     do(Scenario, Start, End, []).
 
+-spec do(amoc:scenario(), non_neg_integer(), non_neg_integer(), amoc:do_opts()) -> [any()].
 do(Scenario, Start, End, Opts) ->
     Nodes = proplists:get_value(nodes, Opts, nodes()),
-    Comment = proplists:get_value(comment, Opts, "none"),
 
-    InterArrival = proplists:get_value(interarrival, Opts, 75),
-    RepeatTimeout = proplists:get_value(repeat, Opts, 75),
-    Step = proplists:get_value(step, Opts, 1),
+    _InterArrival = proplists:get_value(interarrival, Opts, 75),
+    _RepeatTimeout = proplists:get_value(repeat, Opts, 75),
+    _Step = proplists:get_value(step, Opts, 1),
 
-    amoc_event:notify({dist_do, Scenario, Start, End, Nodes, Comment}),
+    amoc_event:notify({dist_do, Scenario, Start, End, Opts}),
     Count = length(Nodes),
     [ amoc_controller:do(Node, Scenario, Start, End, Count, Id, Opts) ||
       {Id, Node} <- lists:zip(lists:seq(1, Count), Nodes) ].
 
+-spec add(non_neg_integer()) -> [ok].
 add(Count) ->
     add(Count, nodes()).
 
+-spec add(non_neg_integer(), [node()]) -> [ok].
 add(Count, Nodes) ->
     amoc_event:notify({dist_add, Count}),
     [ amoc_controller:add(Node, Count) || Node <- Nodes ].
 
+-spec remove(non_neg_integer(), amoc:remove_opts()) -> [ok].
 remove(Count, Opts) ->
     remove(Count, Opts, nodes()).
 
+-spec remove(non_neg_integer(), amoc:remove_opts(), [node()]) -> [ok].
 remove(Count, Opts, Nodes) ->
     amoc_event:notify({dist_remove, Count, Opts}),
     CountPerNode = ceil(Count / length(Nodes)),
@@ -53,13 +59,10 @@ remove(Count, Opts, Nodes) ->
 %% ------------------------------------------------------------------
 %% Local functions
 %% ------------------------------------------------------------------
+-spec start_nodes([string()], file:filename()) -> [ok].
 start_nodes(Hosts, Path) ->
     [ amoc_slave:start(Host, Path) || Host <- Hosts ].
 
+-spec ceil(float()) -> integer().
 ceil(Number) ->
-    case erlang:round(Number) of
-        Lower when Lower<Number ->
-            Lower+1;
-        Greater ->
-            Greater
-    end.
+    erlang:round(Number+0.5).

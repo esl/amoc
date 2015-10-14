@@ -26,7 +26,11 @@ start_link() ->
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
--spec init(term()) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
+-spec init(term()) ->
+        {ok, {SupFlags :: {RestartStrategy :: supervisor:strategy(),
+                       MaxR :: non_neg_integer(), MaxT :: non_neg_integer()},
+          [ChildSpec :: supervisor:child_spec()]
+         }}.
 init([]) ->
     amoc_users = start_users_ets(),
     {ok, { {one_for_one, 5, 10},
@@ -37,7 +41,7 @@ init([]) ->
             ?CHILD(amoc_slave, worker)
            ]} }.
 
--spec start_users_ets() -> tid() | atom().
+-spec start_users_ets() -> ets:tid() | atom().
 start_users_ets() ->
     ets:new(amoc_users, [named_table,
                          ordered_set,

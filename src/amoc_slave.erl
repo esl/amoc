@@ -23,12 +23,12 @@
          terminate/2,
          code_change/3]).
 
--record(state, {to_ack :: [node()],
+-record(state, {to_ack :: [{node(), non_neg_integer()}],
                 master :: node()}).
 -define(DEFAULT_RETRIES, 10).
 
 -type state() :: #state{}.
--type command() :: {start, string(), filelib:dirname()} | {monitor_master, node()}.
+-type command() :: {start, string(), file:filename()} | {monitor_master, node()}.
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -46,7 +46,7 @@ ping(Node) ->
               pang
     end.
 
--spec start(string(), filelib:dirname()) -> ok.
+-spec start(string(), file:filename()) -> ok.
 start(Host, Directory) ->
     gen_server:call(?SERVER, {start, Host, Directory}).
 
@@ -62,7 +62,7 @@ init([]) ->
     schedule_timer(),
     {ok, #state{to_ack = []}}.
 
--spec handle_call(command(), pid(), state()) -> {reply, ok | pong, state()}.
+-spec handle_call(command(), {pid(), any()}, state()) -> {reply, ok | pong, state()}.
 handle_call({start, Host, Directory}, _From, State) ->
     State1 = handle_start(Host, Directory, State),
     {reply, ok, State1};
@@ -103,14 +103,14 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
--spec handle_start(string(), filelib:dirname(), state()) -> state().
+-spec handle_start(string(), file:filename(), state()) -> state().
 handle_start(Host, Directory, #state{to_ack=Ack}=State) ->
     _Port = start_slave_node(Host, Directory),
     Node = node_name(Host),
     Ack1 = [{Node, ?DEFAULT_RETRIES} | Ack],
     State#state{to_ack = Ack1}.
 
--spec start_slave_node(string(), filelib:dirname()) -> port().
+-spec start_slave_node(string(), file:filename()) -> port().
 start_slave_node(Host, Directory) ->
     Cmd = "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "
           ++ Host ++ " " ++ Directory ++ "/bin/amoc start",

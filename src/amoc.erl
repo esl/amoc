@@ -9,14 +9,25 @@
 
 -export([do/1]).
 
--export_type([scenario/0]).
+-export_type([
+              scenario/0,
+              do_opts/0,
+              remove_opts/0
+             ]).
 
 -type scenario() :: module().
+
+-type do_opt() :: {nodes, [node()]} | {comment, string()} | {repeat, timeout()} |
+                  {interarrival, timeout()}.
+-type do_opts() :: [do_opt()].
+
+-type remove_opt() :: {force, boolean()}.
+-type remove_opts() :: [remove_opt()].
 
 %% ------------------------------------------------------------------
 %% Start scenario via shell script (run.sh)
 %% ------------------------------------------------------------------
--spec do([amoc_controller:scenario() | integer(), ...]) -> ok | no_return().
+-spec do([scenario() | integer(), ...]) -> ok | no_return().
 do([Scenario, Count]) ->
     do([Scenario, '1', Count]);
 do([Scenario, Start, End]) ->

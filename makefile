@@ -23,7 +23,7 @@ prepare:
 dialyzer/erlang.plt:
 	@mkdir -p dialyzer
 	@dialyzer --build_plt --output_plt dialyzer/erlang.plt \
-		-o dialyzer/erlang.log --apps kernel stdlib erts; \
+		-o dialyzer/erlang.log --apps kernel stdlib erts crypto compiler; \
 		status=$$? ; if [ $$status -ne 2 ]; then exit $$status; else exit 0; fi
 
 dialyzer/deps.plt:

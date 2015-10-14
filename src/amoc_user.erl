@@ -19,7 +19,7 @@
 start_link(Scenario, Id, State) ->
     proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
 
--spec init(pid(), amoc:sceanario(), amoc_scenario:user_id(), state()) -> no_return().
+-spec init(pid(), amoc:scenario(), amoc_scenario:user_id(), state()) -> no_return().
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     ets:insert(amoc_users, {Id, self()}),

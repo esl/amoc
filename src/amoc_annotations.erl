@@ -18,9 +18,10 @@
 
 -type tag() :: binary().
 -type state() :: #state{}.
--type command() :: {dist_do, amoc_controller:scenario(), non_neg_integer(), non_neg_integer(), amoc_controller:nodes(), any()} |
+
+-type command() :: {dist_do, amoc:scenario(), non_neg_integer(), non_neg_integer(), amoc:do_opts()} |
                    {dist_add, non_neg_integer()} |
-                   {dist_remove, non_neg_integer(), list(amoc_controller:option())}.
+                   {dist_remove, non_neg_integer(), amoc:remove_opts()}.
 
 
 %% ------------------------------------------------------------------
@@ -75,7 +76,9 @@ annotate(Tags, Format, Args) ->
     end.
 
 -spec annotation(command()) -> {tag(), list(), list()}  | ignore.
-annotation({dist_do, Scenario, Start, End, Nodes, Comment}) ->
+annotation({dist_do, Scenario, Start, End, Opts}) ->
+    Nodes = proplists:get_value(nodes, Opts, nodes()),
+    Comment = proplists:get_value(comment, Opts, "none"),
     {<<"amoc start">>, "Scenario: ~p. comment: ~p Start: ~p. End: ~p. Nodes: ~p.",
      [Scenario, Comment, Start, End, length(Nodes)]};
 annotation({dist_add, Count}) ->
