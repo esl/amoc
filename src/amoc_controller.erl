@@ -11,11 +11,12 @@
 -define(TABLE, amoc_users).
 -record(state, {scenario :: amoc:scenario(),
                 scenario_state :: any(),
-                nodes ::  any(),
-                node_id :: any()}).
+                nodes ::  non_neg_integer(),
+                node_id :: node_id()}).
 
 
 -type state() :: #state{}.
+-type node_id() :: non_neg_integer().
 
 %% ------------------------------------------------------------------
 %% Types Exports
@@ -50,13 +51,13 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec do(amoc:scenario(), non_neg_integer(), non_neg_integer()) ->
+-spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     ok | {error, term()}.
 do(Scenario, Start, End) ->
     gen_server:call(?SERVER, {do, Scenario, Start, End}).
 
--spec do(node(), amoc:scenario(), non_neg_integer(), non_neg_integer(),
-         non_neg_integer(), non_neg_integer(), amoc:do_opts()) -> ok | {error, term()}.
+-spec do(node(), amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(),
+         non_neg_integer(), node_id(), amoc:do_opts()) -> ok | {error, term()}.
 do(Node, Scenario, Start, End, NodesCount, NodeId, Opts) ->
     gen_server:call({?SERVER, Node}, {do, Scenario, Start, End, NodesCount, NodeId, Opts}).
 
@@ -153,21 +154,21 @@ handle_remove(Count, Opts, _State) when
     Users = last_users(Count),
     stop_users(Users, ForceRemove).
 
--spec handle_local_do(amoc:scenario(), non_neg_integer(), non_neg_integer(), state())->
+-spec handle_local_do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(), state())->
     {reply, ok | {error, term()}, state()}.
 handle_local_do(Scenario, Start, End, State) ->
     handle_do(Scenario, lists:seq(Start, End), State).
 
--spec handle_dist_do(amoc:scenario(), non_neg_integer(), non_neg_integer(),
-                    non_neg_integer(), non_neg_integer(), amoc:do_opts(), state())->
+-spec handle_dist_do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(),
+                    non_neg_integer(), node_id(), amoc:do_opts(), state())->
     {reply, ok | {error, term()}, state()}.
-handle_dist_do(Scenario, Start, End, Nodes, NodeId, _Opts, State) ->
-    UserIds = node_userids(Start, End, Nodes, NodeId),
-    State1 = State#state{nodes = Nodes,
+handle_dist_do(Scenario, Start, End, NodesCount, NodeId, _Opts, State) ->
+    UserIds = node_userids(Start, End, NodesCount, NodeId),
+    State1 = State#state{nodes = NodesCount,
                          node_id = NodeId},
     handle_do(Scenario, UserIds, State1).
 
--spec handle_do(amoc:scenario(), [non_neg_integer()], state()) ->
+-spec handle_do(amoc:scenario(), [amoc_scenario:user_id()], state()) ->
     {reply, ok | {error, term()}, state()}.
 handle_do(Scenario, UserIds, State) ->
     case code:ensure_loaded(Scenario) of
@@ -240,8 +241,8 @@ last_users(Count, Current, Acc) ->
     [User] = ets:lookup(?TABLE, Current),
     last_users(Count-1, Prev, [ User | Acc ]).
 
--spec node_userids(non_neg_integer(), non_neg_integer(), non_neg_integer(),
-                   non_neg_integer()) ->[non_neg_integer()].
+-spec node_userids(amoc_scenario:user_id(), amoc_scenario:user_id(),
+                   non_neg_integer(), node_id()) ->[non_neg_integer()].
 node_userids(Start, End, Nodes, NodeId) ->
     F = fun(Id) when Id rem Nodes + 1 =:= NodeId ->
                 true;

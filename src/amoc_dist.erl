@@ -20,11 +20,11 @@ start_nodes() ->
     Path = application:get_env(amoc, path, "/usr"),
     start_nodes(Hosts, Path).
 
--spec do(amoc:scenario(), non_neg_integer(), non_neg_integer()) -> [any()].
+-spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) -> [any()].
 do(Scenario, Start, End) ->
     do(Scenario, Start, End, []).
 
--spec do(amoc:scenario(), non_neg_integer(), non_neg_integer(), amoc:do_opts()) -> [any()].
+-spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(), amoc:do_opts()) -> [any()].
 do(Scenario, Start, End, Opts) ->
     Nodes = proplists:get_value(nodes, Opts, nodes()),
 

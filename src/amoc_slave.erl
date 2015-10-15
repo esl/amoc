@@ -23,12 +23,13 @@
          terminate/2,
          code_change/3]).
 
--record(state, {to_ack :: [{node(), non_neg_integer()}],
+-record(state, {to_ack :: [{node(), no_retries()}],
                 master :: node()}).
 -define(DEFAULT_RETRIES, 10).
 
 -type state() :: #state{}.
 -type command() :: {start, string(), file:filename()} | {monitor_master, node()}.
+-type no_retries() :: non_neg_integer().
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -125,7 +126,7 @@ ping_slave_nodes(#state{to_ack=Ack}=State) ->
     end,
     State#state{to_ack=Ack1}.
 
--spec ping_slave_node({node(), non_neg_integer()}) -> false | {true, {node(), non_neg_integer()}}.
+-spec ping_slave_node({node(), no_retries()}) -> false | {true, {node(), no_retries()}}.
 ping_slave_node({Node, 0}) ->
     lager:error("Limit of retries exceeded for node ~p", [Node]),
     false;

@@ -10,7 +10,8 @@
 %% ------------------------------------------------------------------
 %% API
 %% ----------------------------------------------------------------
- -spec do(module(), non_neg_integer(), non_neg_integer()) -> ok | {error, term()}.
+ -spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) ->
+     ok | {error, term()}.
 do(Scenario, Start, End) ->
     amoc_controller:do(Scenario, Start, End).
 
@@ -18,6 +19,6 @@ do(Scenario, Start, End) ->
 add(Count) ->
     amoc_controller:add(Count).
 
--spec remove(non_neg_integer(), list(term())) -> ok.
+-spec remove(non_neg_integer(), amoc:remove_opts()) -> ok.
 remove(Count, Opts) ->
     amoc_controller:remove(Count, Opts).

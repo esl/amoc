@@ -19,7 +19,7 @@
 -type tag() :: binary().
 -type state() :: #state{}.
 
--type command() :: {dist_do, amoc:scenario(), non_neg_integer(), non_neg_integer(), amoc:do_opts()} |
+-type command() :: {dist_do, amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(), amoc:do_opts()} |
                    {dist_add, non_neg_integer()} |
                    {dist_remove, non_neg_integer(), amoc:remove_opts()}.
 
