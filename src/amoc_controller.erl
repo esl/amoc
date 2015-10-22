@@ -17,6 +17,7 @@
 
 -type state() :: #state{}.
 -type node_id() :: non_neg_integer().
+-type handle_call_resp() :: ok | {ok, term()} | {error, term()}.
 
 %% ------------------------------------------------------------------
 %% Types Exports
@@ -83,7 +84,8 @@ remove(Node, Count, Opts) ->
 
 -spec users() -> [proplists:property()].
 users() ->
-    gen_server:call(?SERVER, users).
+    {ok, U} = gen_server:call(?SERVER, users),
+    U.
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -94,6 +96,7 @@ init([]) ->
     State = #state{scenario = undefined},
     {ok, State}.
 
+-spec handle_call(any(), any(), state()) -> {reply, handle_call_resp(), state()}.
 handle_call({do, Scenario, Start, End}, _From, State) ->
     handle_local_do(Scenario, Start, End, State);
 handle_call({do, Scenario, Start, End, Nodes, NodeId, Opts}, _From, State) ->
@@ -101,10 +104,11 @@ handle_call({do, Scenario, Start, End, Nodes, NodeId, Opts}, _From, State) ->
 handle_call(users, _From, State) ->
     Reply = [{count, ets:info(?TABLE, size)},
              {last, ets:last(?TABLE)}],
-    {reply, Reply, State};
+    {reply, {ok, Reply}, State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
+-spec handle_cast(any(), state()) -> {noreply, state()}.
 handle_cast({add, Count}, State) ->
     handle_add(Count, State),
     {noreply, State};
@@ -114,6 +118,7 @@ handle_cast({remove, Count, Opts}, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+-spec handle_info(any(), state()) -> {noreply, state()}.
 handle_info({start_scenario, Scenario, UserIds, ScenarioState}, State) ->
     start_scenario(Scenario, UserIds, ScenarioState),
     {noreply, State};

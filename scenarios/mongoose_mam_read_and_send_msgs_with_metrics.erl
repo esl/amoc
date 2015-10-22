@@ -124,7 +124,7 @@ read_archive(Client) ->
         fun(Stanza) -> escalus_pred:is_iq(<<"result">>, MamNS, Stanza) end),
     escalus_connection:send(Client, Query),
     Start = os:timestamp(),
-    IQResult = escalus_connection:get_stanza(Client, mam_result, 30000),
+    _IQResult = escalus_connection:get_stanza(Client, mam_result, 30000),
     Diff = timer:now_diff(os:timestamp(), Start),
     exometer:update(?MAM_READ_CT, Diff).
 

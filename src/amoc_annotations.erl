@@ -75,7 +75,7 @@ annotate(Tags, Format, Args) ->
             ok
     end.
 
--spec annotation(command()) -> {tag(), list(), list()}  | ignore.
+-spec annotation(command()) -> {tag(), io:format(), list()}  | ignore.
 annotation({dist_do, Scenario, Start, End, Opts}) ->
     Nodes = proplists:get_value(nodes, Opts, nodes()),
     Comment = proplists:get_value(comment, Opts, "none"),

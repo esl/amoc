@@ -21,20 +21,23 @@ start() ->
 stop() ->
     stop_fusco().
 
--spec request(fusco:host(), string(), fusco:method(), iodata()) -> fusco:result().
+-spec request(fusco:host(), binary(), fusco:method(), iodata()) -> fusco:result().
 request(Host, Path, Method, Body) ->
     fusco_request(Host, Path, Method, [], Body, ?TIMEOUT).
 
--spec post_request(fusco:host(), string(), iodata()) -> fusco:result().
+-spec post_request(fusco:host(), binary(), iodata()) -> fusco:result().
 post_request(Host, Path, PostBody) ->
     post_request(Host, Path, [], PostBody).
 
+-spec post_request(fusco:host(), binary(), fusco:headers(), iodata()) -> fusco:result().
 post_request(Host, Path, Headers, PostBody) ->
     fusco_request(Host, Path, <<"POST">>, Headers, PostBody, ?TIMEOUT).
 
--spec get_request(fusco:host(), string()) -> fusco:result().
+-spec get_request(fusco:host(), binary()) -> fusco:result().
 get_request(Host, Path) ->
-    get_request(Host, [], Path).
+    get_request(Host, Path, []).
+
+-spec get_request(fusco:host(), binary(), fusco:headers()) -> fusco:result().
 get_request(Host, Path, Headers) ->
     fusco_request(Host, Path, <<"GET">>, Headers, [], ?TIMEOUT).
 
@@ -57,7 +60,8 @@ stop_fusco() ->
     [ok,ok,ok,ok,ok] = lists:map(fun application:stop/1,
                                  [fusco,ssl,public_key,crypto,asn1]).
 
--spec fusco_request(fusco:host(), string(), fusco:method(), fusco:headers(), iodata(), fusco:pos_timeout()) -> fusco:result().
+-spec fusco_request(fusco:host(), binary(), fusco:method(), fusco:headers(),
+                    iodata(), fusco:pos_timeout()) -> fusco:result().
 fusco_request(URL, Path, Method, Hdrs, Body, Timeout) ->
     {ok, P}=fusco:start(URL,[]),
     ok = fusco:connect(P),
