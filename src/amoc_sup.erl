@@ -32,7 +32,7 @@ start_link() ->
           [ChildSpec :: supervisor:child_spec()]
          }}.
 init([]) ->
-    amoc_users = start_users_ets(),
+    amoc_users_registry:create_ets(),
     {ok, { {one_for_one, 5, 10},
            [
             ?CHILD(amoc_event, worker),
@@ -40,11 +40,3 @@ init([]) ->
             ?CHILD(amoc_controller, worker),
             ?CHILD(amoc_slave, worker)
            ]} }.
-
--spec start_users_ets() -> ets:tid() | atom().
-start_users_ets() ->
-    ets:new(amoc_users, [named_table,
-                         ordered_set,
-                         public,
-                         {write_concurrency, true},
-                         {read_concurrency, true}]).

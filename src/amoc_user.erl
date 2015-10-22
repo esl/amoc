@@ -24,7 +24,7 @@ start_link(Scenario, Id, State) ->
     no_return().
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
-    ets:insert(amoc_users, {Id, self()}),
+    amoc_users_registry:add(Id, self()),
     R = try
             forever(Scenario, Id, State),
             normal
@@ -36,7 +36,7 @@ init(Parent, Scenario, Id, State) ->
             E:Reason ->
                 {E, {abnormal_exit, Reason}, erlang:get_stacktrace()}
         after
-            ets:delete(amoc_users, Id)
+            amoc_users:remove(Id)
         end,
     exit(R).
 

@@ -1,4 +1,7 @@
-.PHONY: all rel compile deploy prepare deps
+.PHONY: all rel compile deploy prepare eunit
+
+EUNIT_INDEX=./.eunit/index.html
+REBAR=rebar
 
 all: rel deploy
 
@@ -19,6 +22,12 @@ deploy: rel
 
 prepare:
 	ansible-playbook -i hosts ansible/amoc-prepare.yml $(ARGS)
+
+eunit: compile
+	-@rm -rf $(EUNIT_INDEX)
+	@if [ $$SUITE ]; then $(REBAR) skip_deps=true eunit suite=$$SUITE; \
+                         else $(REBAR) skip_deps=true eunit; fi
+test: compile eunit
 
 dialyzer/erlang.plt:
 	@mkdir -p dialyzer

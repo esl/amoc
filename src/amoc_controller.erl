@@ -8,7 +8,6 @@
 -define(INTERARRIVAL_DEFAULT, 50).
 -define(INTERARRIVAL,
         application:get_env(amoc, interarrival, ?INTERARRIVAL_DEFAULT)).
--define(TABLE, amoc_users).
 -record(state, {scenario :: amoc:scenario(),
                 scenario_state :: any(),
                 nodes ::  non_neg_integer(),
@@ -104,8 +103,8 @@ handle_call({do, Scenario, Start, End}, _From, State) ->
 handle_call({do, Scenario, Start, End, Nodes, NodeId, Opts}, _From, State) ->
     handle_dist_do(Scenario, Start, End, Nodes, NodeId, Opts, State);
 handle_call(users, _From, State) ->
-    Reply = [{count, ets:info(?TABLE, size)},
-             {last, ets:last(?TABLE)}],
+    Reply = [{count, amoc_user_registry:count()},
+             {last,  amoc_user_registry:last_id()}],
     {reply, {ok, Reply}, State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
@@ -145,10 +144,7 @@ handle_add(Count, #state{scenario=Scenario,
                          nodes = Nodes,
                          node_id = NodeId}) when
       is_integer(Count), Count > 0 ->
-    Last = case ets:last(?TABLE) of
-               '$end_of_table' -> 0;
-               Other -> Other
-           end,
+    Last = amoc_user_registry:last_id(),
     UserIds = node_userids(Last+1, Last+Count, Nodes, NodeId),
     start_users(Scenario, UserIds, State).
 
@@ -158,7 +154,7 @@ handle_remove(_Count, _Opts, #state{scenario=undefined}) ->
 handle_remove(Count, Opts, _State) when
       is_integer(Count), Count > 0 ->
     ForceRemove = proplists:get_value(force, Opts, false),
-    Users = last_users(Count),
+    Users = amoc_user_registry:last_users(Count),
     stop_users(Users, ForceRemove).
 
 -spec handle_local_do(amoc:scenario(), amoc_scenario:user_id(),
@@ -231,27 +227,11 @@ start_user(Scenario, Id, State) ->
 -spec stop_users([amoc_scenario:user_id()], boolean()) -> [true | stop].
 stop_users(Users, _ForceRemove=true) ->
     [ begin
-          ets:delete(?TABLE, Id),
+          amoc_user_registry:delete(Id),
           exit(Pid, shutdown)
       end || {Id, Pid} <- Users ];
 stop_users(Users, _ForceRemove=false) ->
     [ Pid ! stop || {_, Pid} <- Users ].
-
--spec last_users(non_neg_integer()) -> [{amoc_scenario:user_id(), pid()}].
-last_users(Count) ->
-    [ User || User <- last_users(Count, ets:last(?TABLE), []) ].
-
--spec last_users(non_neg_integer(), amoc_scenario:user_id() | '$end_of_table',
-                 [{amoc_scenario:user_id(), pid()}]) ->
-    [{amoc_scenario:user_id(), pid()}].
-last_users(0, _, Acc) ->
-    Acc;
-last_users(_, '$end_of_table', Acc) ->
-    Acc;
-last_users(Count, Current, Acc) ->
-    Prev = ets:prev(?TABLE, Current),
-    [User] = ets:lookup(?TABLE, Current),
-    last_users(Count-1, Prev, [ User | Acc ]).
 
 -spec node_userids(amoc_scenario:user_id(), amoc_scenario:user_id(),
                    non_neg_integer(), node_id()) ->[non_neg_integer()].
