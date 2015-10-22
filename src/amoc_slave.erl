@@ -28,7 +28,8 @@
 -define(DEFAULT_RETRIES, 10).
 
 -type state() :: #state{}.
--type command() :: {start, string(), file:filename()} | {monitor_master, node()}.
+-type command() :: {start, string(), file:filename()} |
+                   {monitor_master, node()}.
 -type no_retries() :: non_neg_integer().
 
 %% ------------------------------------------------------------------
@@ -63,7 +64,8 @@ init([]) ->
     schedule_timer(),
     {ok, #state{to_ack = []}}.
 
--spec handle_call(command(), {pid(), any()}, state()) -> {reply, ok | pong, state()}.
+-spec handle_call(command(), {pid(), any()}, state()) -> {reply, ok |
+                                                          pong, state()}.
 handle_call({start, Host, Directory}, _From, State) ->
     State1 = handle_start(Host, Directory, State),
     {reply, ok, State1};
@@ -126,7 +128,8 @@ ping_slave_nodes(#state{to_ack=Ack}=State) ->
     end,
     State#state{to_ack=Ack1}.
 
--spec ping_slave_node({node(), no_retries()}) -> false | {true, {node(), no_retries()}}.
+-spec ping_slave_node({node(), no_retries()}) -> false |
+                                                 {true, {node(), no_retries()}}.
 ping_slave_node({Node, 0}) ->
     lager:error("Limit of retries exceeded for node ~p", [Node]),
     false;

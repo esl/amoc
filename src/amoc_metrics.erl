@@ -14,7 +14,8 @@ new_histogram(Name) when is_atom(Name) ->
 new_histogram(Name, Opts) when is_atom(Name) ->
     ExName = [amoc, histograms, Name],
     {Reporter, Interval} = reporter_and_interval(Opts),
-    ReportProps = proplists:get_value(report, Opts, [mean, min, max, median, 95, 99, 999]),
+    HistProps = [mean, min, max, median, 95, 99, 999],
+    ReportProps = proplists:get_value(report, Opts, HistProps),
     ok = exometer:new(ExName, histogram),
     ok = exometer_report:subscribe(Reporter, ExName, ReportProps, Interval).
 
@@ -57,7 +58,8 @@ update_counter(Name, Value) when is_atom(Name) ->
     ExName = [amoc, counters, Name],
     exometer:update(ExName, Value).
 
--spec reporter_and_interval([proplists:property()]) -> {module(), non_neg_integer()}.
+-spec reporter_and_interval([proplists:property()]) ->
+    {module(), non_neg_integer()}.
 reporter_and_interval(Opts) ->
     Reporter = proplists:get_value(reporter, Opts, exometer_report_graphite),
     Interval = proplists:get_value(interval, Opts, 5000),

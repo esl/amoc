@@ -21,7 +21,8 @@ start() ->
 stop() ->
     stop_fusco().
 
--spec request(fusco:host(), binary(), fusco:method(), iodata()) -> fusco:result().
+-spec request(fusco:host(), binary(), fusco:method(), iodata()) ->
+    fusco:result().
 request(Host, Path, Method, Body) ->
     fusco_request(Host, Path, Method, [], Body, ?TIMEOUT).
 
@@ -29,7 +30,8 @@ request(Host, Path, Method, Body) ->
 post_request(Host, Path, PostBody) ->
     post_request(Host, Path, [], PostBody).
 
--spec post_request(fusco:host(), binary(), fusco:headers(), iodata()) -> fusco:result().
+-spec post_request(fusco:host(), binary(), fusco:headers(), iodata()) ->
+    fusco:result().
 post_request(Host, Path, Headers, PostBody) ->
     fusco_request(Host, Path, <<"POST">>, Headers, PostBody, ?TIMEOUT).
 
@@ -37,7 +39,8 @@ post_request(Host, Path, Headers, PostBody) ->
 get_request(Host, Path) ->
     get_request(Host, Path, []).
 
--spec get_request(fusco:host(), binary(), fusco:headers()) -> fusco:result().
+-spec get_request(fusco:host(), binary(), fusco:headers()) ->
+    fusco:result().
 get_request(Host, Path, Headers) ->
     fusco_request(Host, Path, <<"GET">>, Headers, [], ?TIMEOUT).
 

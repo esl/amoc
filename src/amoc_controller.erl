@@ -17,7 +17,7 @@
 
 -type state() :: #state{}.
 -type node_id() :: non_neg_integer().
--type handle_call_resp() :: ok | {ok, term()} | {error, term()}.
+-type handle_call_res() :: ok | {ok, term()} | {error, term()}.
 
 %% ------------------------------------------------------------------
 %% Types Exports
@@ -57,10 +57,12 @@ start_link() ->
 do(Scenario, Start, End) ->
     gen_server:call(?SERVER, {do, Scenario, Start, End}).
 
--spec do(node(), amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(),
-         non_neg_integer(), node_id(), amoc:do_opts()) -> ok | {error, term()}.
+-spec do(node(), amoc:scenario(), amoc_scenario:user_id(),
+         amoc_scenario:user_id(), non_neg_integer(), node_id(),
+         amoc:do_opts()) -> ok | {error, term()}.
 do(Node, Scenario, Start, End, NodesCount, NodeId, Opts) ->
-    gen_server:call({?SERVER, Node}, {do, Scenario, Start, End, NodesCount, NodeId, Opts}).
+    Req = {do, Scenario, Start, End, NodesCount, NodeId, Opts},
+    gen_server:call({?SERVER, Node}, Req).
 
 -spec add(non_neg_integer()) -> ok.
 add(Count) ->
@@ -96,7 +98,7 @@ init([]) ->
     State = #state{scenario = undefined},
     {ok, State}.
 
--spec handle_call(any(), any(), state()) -> {reply, handle_call_resp(), state()}.
+-spec handle_call(any(), any(), state()) -> {reply, handle_call_res(), state()}.
 handle_call({do, Scenario, Start, End}, _From, State) ->
     handle_local_do(Scenario, Start, End, State);
 handle_call({do, Scenario, Start, End, Nodes, NodeId, Opts}, _From, State) ->
@@ -159,13 +161,15 @@ handle_remove(Count, Opts, _State) when
     Users = last_users(Count),
     stop_users(Users, ForceRemove).
 
--spec handle_local_do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(), state())->
+-spec handle_local_do(amoc:scenario(), amoc_scenario:user_id(),
+                      amoc_scenario:user_id(), state()) ->
     {reply, ok | {error, term()}, state()}.
 handle_local_do(Scenario, Start, End, State) ->
     handle_do(Scenario, lists:seq(Start, End), State).
 
--spec handle_dist_do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(),
-                    non_neg_integer(), node_id(), amoc:do_opts(), state())->
+-spec handle_dist_do(amoc:scenario(), amoc_scenario:user_id(),
+                     amoc_scenario:user_id(), non_neg_integer(),
+                     node_id(), amoc:do_opts(), state())->
     {reply, ok | {error, term()}, state()}.
 handle_dist_do(Scenario, Start, End, NodesCount, NodeId, _Opts, State) ->
     UserIds = node_userids(Start, End, NodesCount, NodeId),
@@ -193,7 +197,8 @@ handle_do(Scenario, UserIds, State) ->
 %% helpers
 %% ------------------------------------------------------------------
 
--spec start_scenario(amoc:scenario(), [amoc_scenario:user_id()], state()) -> [term()].
+-spec start_scenario(amoc:scenario(), [amoc_scenario:user_id()], state()) ->
+    [term()].
 start_scenario(Scenario, UserIds, State) ->
     Start = lists:min(UserIds),
     End = lists:max(UserIds),
@@ -211,7 +216,8 @@ init_scenario(Scenario) ->
             skip
     end.
 
--spec start_users(amoc:scenario(), [amoc_scenario:user_id()], state()) -> [term()].
+-spec start_users(amoc:scenario(), [amoc_scenario:user_id()], state()) ->
+    [term()].
 start_users(Scenario, UserIds, State) ->
     [ start_user(Scenario, Id, State) || Id <- UserIds ].
 
@@ -236,7 +242,8 @@ last_users(Count) ->
     [ User || User <- last_users(Count, ets:last(?TABLE), []) ].
 
 -spec last_users(non_neg_integer(), amoc_scenario:user_id() | '$end_of_table',
-                 [{amoc_scenario:user_id(), pid()}]) -> [{amoc_scenario:user_id(), pid()}].
+                 [{amoc_scenario:user_id(), pid()}]) ->
+    [{amoc_scenario:user_id(), pid()}].
 last_users(0, _, Acc) ->
     Acc;
 last_users(_, '$end_of_table', Acc) ->

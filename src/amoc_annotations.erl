@@ -19,7 +19,8 @@
 -type tag() :: binary().
 -type state() :: #state{}.
 
--type command() :: {dist_do, amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(), amoc:do_opts()} |
+-type command() :: {dist_do, amoc:scenario(), amoc_scenario:user_id(),
+                    amoc_scenario:user_id(), amoc:do_opts()} |
                    {dist_add, non_neg_integer()} |
                    {dist_remove, non_neg_integer(), amoc:remove_opts()}.
 
@@ -79,8 +80,8 @@ annotate(Tags, Format, Args) ->
 annotation({dist_do, Scenario, Start, End, Opts}) ->
     Nodes = proplists:get_value(nodes, Opts, nodes()),
     Comment = proplists:get_value(comment, Opts, "none"),
-    {<<"amoc start">>, "Scenario: ~p. comment: ~p Start: ~p. End: ~p. Nodes: ~p.",
-     [Scenario, Comment, Start, End, length(Nodes)]};
+    Format = "Scenario: ~p. comment: ~p Start: ~p. End: ~p. Nodes: ~p.",
+    {<<"amoc start">>, Format, [Scenario, Comment, Start, End, length(Nodes)]};
 annotation({dist_add, Count}) ->
     {<<"amoc add">>, "Added ~p users", [Count]};
 annotation({dist_remove, Count, Opts}) ->

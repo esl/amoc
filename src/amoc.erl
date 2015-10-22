@@ -17,8 +17,8 @@
 
 -type scenario() :: module().
 
--type do_opt() :: {nodes, [node()]} | {comment, string()} | {repeat, timeout()} |
-                  {interarrival, timeout()}.
+-type do_opt() :: {nodes, [node()]} | {comment, string()} | {repeat, timeout()}
+                  | {interarrival, timeout()}.
 -type do_opts() :: [do_opt()].
 
 -type remove_opt() :: {force, boolean()}.
