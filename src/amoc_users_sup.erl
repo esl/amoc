@@ -10,16 +10,15 @@
 -export([init/1]).
 -define(SERVER, ?MODULE).
 
--spec(start_link() -> {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
+-spec start_link() -> {ok, Pid :: pid()}.
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
--spec(init(Args :: term()) ->
+-spec init(term()) ->
     {ok, {SupFlags :: {RestartStrategy :: supervisor:strategy(),
-        MaxR :: non_neg_integer(), MaxT :: non_neg_integer()},
-        [ChildSpec :: supervisor:child_spec()]
-    }} | ignore | {error, Reason :: term()}).
-
+                       MaxR :: non_neg_integer(), MaxT :: non_neg_integer()},
+          [ChildSpec :: supervisor:child_spec()]
+         }}.
 init([]) ->
     process_flag(priority, max),
 

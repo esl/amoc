@@ -4,7 +4,6 @@
 %%==============================================================================
 -module(amoc_annotations).
 -behaviour(gen_event).
-
 %% ------------------------------------------------------------------
 %% gen_event Function Exports
 %% ------------------------------------------------------------------
@@ -17,12 +16,23 @@
 
 -record(state, {}).
 
+-type tag() :: binary().
+-type state() :: #state{}.
+
+-type command() :: {dist_do, amoc:scenario(), amoc_scenario:user_id(),
+                    amoc_scenario:user_id(), amoc:do_opts()} |
+                   {dist_add, non_neg_integer()} |
+                   {dist_remove, non_neg_integer(), amoc:remove_opts()}.
+
+
 %% ------------------------------------------------------------------
 %% gen_event Function Definitions
 %% ------------------------------------------------------------------
+-spec init([]) -> {ok, state()}.
 init([]) ->
     {ok, #state{}}.
 
+-spec handle_event(command(), state()) ->{ok, state()}.
 handle_event(Event, State) ->
     case annotation(Event) of
         {Tags, Format, Args} ->
@@ -32,22 +42,26 @@ handle_event(Event, State) ->
     end,
     {ok, State}.
 
+-spec handle_call(any(), state()) -> {ok, ok, state()}.
 handle_call(_Request, State) ->
-    Reply = ok,
-    {ok, Reply, State}.
+    {ok, ok, State}.
 
+-spec handle_info(any(), state()) -> {ok, state()}.
 handle_info(_Info, State) ->
     {ok, State}.
 
+-spec terminate(any(), any()) -> ok.
 terminate(_Reason, _State) ->
     ok.
 
+-spec code_change(any(), any(), any()) -> {ok, state()}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
+-spec annotate(tag(), list(), list(any())) -> {error, no_graphite} | ok.
 annotate(Tags, Format, Args) ->
     case application:get_env(amoc, graphite_endpoint) of
         undefined ->
@@ -62,9 +76,12 @@ annotate(Tags, Format, Args) ->
             ok
     end.
 
-annotation({dist_do, Scenario, Start, End, Nodes, Comment}) ->
-    {<<"amoc start">>, "Scenario: ~p. comment: ~p Start: ~p. End: ~p. Nodes: ~p.",
-     [Scenario, Comment, Start, End, length(Nodes)]};
+-spec annotation(command()) -> {tag(), io:format(), list()}  | ignore.
+annotation({dist_do, Scenario, Start, End, Opts}) ->
+    Nodes = proplists:get_value(nodes, Opts, nodes()),
+    Comment = proplists:get_value(comment, Opts, "none"),
+    Format = "Scenario: ~p. comment: ~p Start: ~p. End: ~p. Nodes: ~p.",
+    {<<"amoc start">>, Format, [Scenario, Comment, Start, End, length(Nodes)]};
 annotation({dist_add, Count}) ->
     {<<"amoc add">>, "Added ~p users", [Count]};
 annotation({dist_remove, Count, Opts}) ->

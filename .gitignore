@@ -2,4 +2,7 @@
 deps
 ebin
 log/
+dialyzer/
+_rel/
+_build/
 scenarios/rebar.config
