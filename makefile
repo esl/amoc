@@ -1,4 +1,4 @@
-.PHONY: all rel compile deploy prepare deps
+.PHONY: all rel compile deploy prepare deps test ct
 
 all: rel deploy
 
@@ -19,6 +19,12 @@ deploy: rel
 
 prepare:
 	ansible-playbook -i hosts ansible/amoc-prepare.yml $(ARGS)
+
+ct:
+	@if [ $$SUITE ]; then ./rebar skip_deps=true -v ct suite=$$SUITE; \
+		else ./rebar skip_deps=true -v ct; fi
+
+test: compile ct
 
 dialyzer/erlang.plt:
 	@mkdir -p dialyzer

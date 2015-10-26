@@ -1,0 +1,12 @@
+sudo: false
+
+language: erlang
+otp_release: 17.5
+
+addons:
+    apt:
+        packages:
+            - libexpat1-dev
+
+install: make compile
+script: make test
