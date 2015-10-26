@@ -29,29 +29,30 @@ init_per_testcase(_TestCase, Config) ->
 end_per_testcase(_TestCase, Config) ->
     Config.
 
-run_dialyzer(_Config) ->
-    build_or_check_plts(),
-    dialyze().
+run_dialyzer(Config) ->
+    build_or_check_plts(Config),
+    dialyze(Config).
 
-dialyze() ->
+dialyze(Config) ->
     ct:pal("Running analysis"),
+    Plts = ["erlang.plt", "deps.plt", "amoc.plt"],
     run([{analysis_type, succ_typings},
-         {plts, [file("erlang.plt"), file("deps.plt"), file("amoc.plt")]},
+         {plts, [ plt_file(Plt) || Plt <- Plts ]},
          {files_rec, [ebin_dir()]},
          {check_plt, false},
          {get_warnings, true},
-         {output_file, file("error.log")}]).
+         {output_file, log_file(Config, "error.log")}]).
 
-build_or_check_plts() ->
-    build_or_check_plt(file("erlang.plt"),
+build_or_check_plts(Config) ->
+    build_or_check_plt(plt_file("erlang.plt"),
                        [{apps, [kernel, stdlib, erts, crypto, compiler]},
-                        {output_file, file("erlang.log")}]),
-    build_or_check_plt(file("deps.plt"),
+                        {output_file, log_file(Config, "erlang.log")}]),
+    build_or_check_plt(plt_file("deps.plt"),
                        [{files_rec, deps_dirs()},
-                        {output_file, file("deps.log")}]),
-    build_or_check_plt(file("amoc.plt"),
+                        {output_file, log_file(Config, "deps.log")}]),
+    build_or_check_plt(plt_file("amoc.plt"),
                        [{files_rec, [ebin_dir()]},
-                        {output_file, file("amoc.log")}]),
+                        {output_file, log_file(Config, "amoc.log")}]),
     ok.
 
 build_or_check_plt(File, Opts) ->
@@ -73,7 +74,10 @@ run(Opts) ->
             ct:fail({dialyzer_returned_errors, Result})
     end.
 
-file(Filename) ->
+log_file(Config, Filename) ->
+    filename:join(?config(priv_dir, Config), Filename).
+
+plt_file(Filename) ->
     filename:join(dialyzer_dir(), Filename).
 
 deps_dirs() ->

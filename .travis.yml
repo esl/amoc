@@ -14,3 +14,7 @@ addons:
 
 install: make compile
 script: make test
+
+cache:
+    directories:
+        - dialyzer
