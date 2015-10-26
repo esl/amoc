@@ -3,6 +3,10 @@ sudo: false
 language: erlang
 otp_release: 17.5
 
+branches:
+    only:
+        - master
+
 addons:
     apt:
         packages:
