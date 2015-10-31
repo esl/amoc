@@ -28,7 +28,7 @@ do(Scenario, Start, End) ->
 -spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(),
          amoc:do_opts()) -> [any()].
 do(Scenario, Start, End, Opts) ->
-    Nodes = proplists:get_value(nodes, Opts, nodes()),
+    Nodes = proplists:get_value(nodes, Opts, amoc_nodes()),
 
     _InterArrival = proplists:get_value(interarrival, Opts, 75),
     _RepeatTimeout = proplists:get_value(repeat, Opts, 75),
@@ -41,7 +41,7 @@ do(Scenario, Start, End, Opts) ->
 
 -spec add(non_neg_integer()) -> [ok].
 add(Count) ->
-    add(Count, nodes()).
+    add(Count, amoc_nodes()).
 
 -spec add(non_neg_integer(), [node()]) -> [ok].
 add(Count, Nodes) ->
@@ -50,7 +50,7 @@ add(Count, Nodes) ->
 
 -spec remove(non_neg_integer(), amoc:remove_opts()) -> [ok].
 remove(Count, Opts) ->
-    remove(Count, Opts, nodes()).
+    remove(Count, Opts, amoc_nodes()).
 
 -spec remove(non_neg_integer(), amoc:remove_opts(), [node()]) -> [ok].
 remove(Count, Opts, Nodes) ->
@@ -65,6 +65,31 @@ remove(Count, Opts, Nodes) ->
 start_nodes(Hosts, Path) ->
     [ amoc_slave:start(Host, Path) || Host <- Hosts ].
 
+-spec amoc_nodes() -> [node()].
+amoc_nodes() ->
+    [ Node || Node <- erlang:nodes(), not is_remsh_node(Node) ].
+
+-spec is_remsh_node(node()) -> boolean().
+is_remsh_node(Node) ->
+    case atom_to_list(Node) of
+        "remsh" ++ _ -> true;
+        _            -> false
+    end.
+
 -spec ceil(float()) -> integer().
 ceil(Number) ->
     erlang:round(Number+0.5).
+
+%% ------------------------------------------------------------------
+%% Unit tests
+%% ------------------------------------------------------------------
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+is_remsh_node_test_() ->
+    [
+     ?_assertEqual(false, is_remsh_node('amoc@localhost')),
+     ?_assertEqual(false, is_remsh_node('amoc_master@10.100.0.70')),
+     ?_assertEqual(true, is_remsh_node('remsh46465bec-amoc_master@10.100.0.70'))
+    ].
+-endif.
