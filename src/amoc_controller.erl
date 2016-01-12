@@ -254,8 +254,14 @@ last_users(Count, Current, Acc) ->
     last_users(Count-1, Prev, [ User | Acc ]).
 
 -spec node_userids(amoc_scenario:user_id(), amoc_scenario:user_id(),
-                   non_neg_integer(), node_id()) ->[non_neg_integer()].
-node_userids(Start, End, Nodes, NodeId) ->
+                   undefined | non_neg_integer(),
+                   undefined | node_id()) ->[non_neg_integer()].
+%% amoc_local
+node_userids(Start, End, undefined, undefined) ->
+    lists:seq(Start, End);
+%% amoc_dist
+node_userids(Start, End, Nodes, NodeId) when is_integer(Nodes), Nodes > 0,
+                                             is_integer(NodeId), NodeId > 0 ->
     F = fun(Id) when Id rem Nodes + 1 =:= NodeId ->
                 true;
            (_) ->
