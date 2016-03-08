@@ -28,6 +28,7 @@ RUN apt-get update && \
 
 RUN mkdir /etc/service/amoc
 ADD amoc.sh /etc/service/amoc/run
+ADD config/vm.args /home/amoc/amoc/releases/0.9/vm.args
 
 EXPOSE 4369 5000-5030
 
