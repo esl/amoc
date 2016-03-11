@@ -28,6 +28,8 @@ RUN apt-get update && \
 
 RUN mkdir /etc/service/amoc
 ADD amoc.sh /etc/service/amoc/run
-ADD config/vm.args /home/amoc/amoc/releases/0.9/vm.args
+ADD config/vm.args /home/amoc/amoc/releases/0.9
+ADD config/sys.config.template /
+ADD run.sh /
 
-CMD ["/sbin/my_init"]
+CMD ["/run.sh"]
