@@ -1,7 +1,7 @@
 [
  {amoc, [{interarrival, 75},
          {path, "/home/amoc/amoc"},
-         {hosts, "AMOC_HOSTS"}]},
+         {hosts, [AMOC_HOSTS]}]},
  {exometer, [
     {predefined, [
         {[erlang, system_info],
