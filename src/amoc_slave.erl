@@ -10,6 +10,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 -export([start_link/0,
+         ping/1,
          start/2,
          monitor_master/1,
          node_name/1]).
