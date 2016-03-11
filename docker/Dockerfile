@@ -1,7 +1,7 @@
 FROM phusion/baseimage
 MAINTAINER Rafał Studnicki <rafal.studnicki@erlang-solutions.com>
 
-ENV AMOC_VSN master
+ENV AMOC_VSN docker
 
 RUN useradd -ms /bin/bash amoc
 
