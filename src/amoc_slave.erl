@@ -11,7 +11,8 @@
 %% ------------------------------------------------------------------
 -export([start_link/0,
          start/2,
-         monitor_master/1]).
+         monitor_master/1,
+         node_name/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -55,6 +56,10 @@ start(Host, Directory) ->
 -spec monitor_master(node()) -> ok.
 monitor_master(Node) ->
     gen_server:call({?SERVER, Node}, {monitor_master, node()}).
+
+-spec node_name(string()) -> node().
+node_name(Host) ->
+    list_to_atom("amoc@" ++ Host).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -143,10 +148,6 @@ ping_slave_node({Node, Retries}) ->
         pang ->
             {true, {Node, Retries-1}}
     end.
-
--spec node_name(string()) -> node().
-node_name(Host) ->
-    list_to_atom("amoc@" ++ Host).
 
 -spec schedule_timer() -> reference().
 schedule_timer() ->
