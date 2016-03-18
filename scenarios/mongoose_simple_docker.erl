@@ -170,7 +170,8 @@ pick_server() ->
 
 -spec env_servers() -> {binary()}.
 env_servers() ->
-    List = re:split(os:getenv("AMOC_XMPP_SERVERS"), "\s", [{return, binary}]),
+    List = re:split(os:getenv("AMOC_XMPP_SERVERS"), "\s",
+                    [{return, binary}, trim]),
     list_to_tuple(List).
 
 -spec set_env_interarrival() -> ok.
