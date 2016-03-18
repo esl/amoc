@@ -175,7 +175,7 @@ env_servers() ->
 
 -spec set_env_interarrival() -> ok.
 set_env_interarrival() ->
-    Interarrival = case os:get_env("AMOC_INTERARRIVAL") of
+    Interarrival = case os:getenv("AMOC_INTERARRIVAL") of
                        false -> 100;
                        List -> list_to_integer(List)
                    end,
