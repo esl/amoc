@@ -9,6 +9,10 @@
 -define(REPEAT_INTERVAL,
     application:get_env(amoc, repeat_interval, ?REPEAT_INTERVAL_DEFAULT)).
 
+-define(REPEAT_NUM_DEFAULT, infinity).
+-define(REPEAT_NUM,
+    application:get_env(amoc, repeat_num, ?REPEAT_NUM_DEFAULT)).
+
 %% API
 -export([start_link/3]).
 -export([init/4]).
@@ -26,7 +30,7 @@ init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     ets:insert(amoc_users, {Id, self()}),
     R = try
-            forever(Scenario, Id, State),
+            repeat(Scenario, Id, State, ?REPEAT_NUM),
             normal
         catch
             throw:stop ->
@@ -40,8 +44,9 @@ init(Parent, Scenario, Id, State) ->
         end,
     exit(R).
 
--spec forever(amoc:scenario(), amoc_scenario:user_id(), state()) -> no_return().
-forever(Scenario, Id, State) ->
+-spec repeat(amoc:scenario(), amoc_scenario:user_id(), state(),
+             infinity | pos_integer()) -> ok.
+repeat(Scenario, Id, State, Repetitions) ->
     case erlang:function_exported(Scenario, start, 2) of
         true ->
             Scenario:start(Id, State);
@@ -49,8 +54,16 @@ forever(Scenario, Id, State) ->
             Scenario:start(Id)
     end,
     flush_mailbox(),
+    perform_next_repetition(Scenario, Id, State, Repetitions).
+
+perform_next_repetition(_Scenario, _Id, _State, 1) ->
+    ok;
+perform_next_repetition(Scenario, Id, State, infinity) ->
     timer:sleep(?REPEAT_INTERVAL),
-    forever(Scenario, Id, State).
+    repeat(Scenario, Id, State, infinity);
+perform_next_repetition(Scenario, Id, State, N) when N > 0 ->
+    timer:sleep(?REPEAT_INTERVAL),
+    repeat(Scenario, Id, State, N - 1).
 
 -spec flush_mailbox() -> ok.
 flush_mailbox() ->
