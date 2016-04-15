@@ -28,8 +28,8 @@ start_link() ->
 %% ===================================================================
 -spec init(term()) ->
         {ok, {SupFlags :: {RestartStrategy :: supervisor:strategy(),
-                       MaxR :: non_neg_integer(), MaxT :: non_neg_integer()},
-          [ChildSpec :: supervisor:child_spec()]
+                           MaxR :: non_neg_integer(), MaxT :: pos_integer()},
+              [ChildSpec :: supervisor:child_spec()]
          }}.
 init([]) ->
     amoc_users = start_users_ets(),

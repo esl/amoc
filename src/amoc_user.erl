@@ -4,14 +4,9 @@
 %%==============================================================================
 -module(amoc_user).
 
-%% time between sceanario restarts
--define(REPEAT_INTERVAL_DEFAULT, 60000). % 60s
--define(REPEAT_INTERVAL,
-    application:get_env(amoc, repeat_interval, ?REPEAT_INTERVAL_DEFAULT)).
-
--define(REPEAT_NUM_DEFAULT, infinity).
--define(REPEAT_NUM,
-    application:get_env(amoc, repeat_num, ?REPEAT_NUM_DEFAULT)).
+%% defaults
+-define(REPEAT_INTERVAL, 60000). % time between sceanario restarts (60s)
+-define(REPEAT_NUM, infinity). % number of scenario repetitions
 
 %% API
 -export([start_link/3]).
@@ -29,8 +24,12 @@ start_link(Scenario, Id, State) ->
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     ets:insert(amoc_users, {Id, self()}),
+    F = fun() -> perform_scenario(Scenario, Id, State) end,
     R = try
-            repeat(Scenario, Id, State, ?REPEAT_NUM),
+            case repeat_num() of
+                infinity -> repeat(F);
+                N -> repeat(F, N)
+            end,
             normal
         catch
             throw:stop ->
@@ -44,26 +43,15 @@ init(Parent, Scenario, Id, State) ->
         end,
     exit(R).
 
--spec repeat(amoc:scenario(), amoc_scenario:user_id(), state(),
-             infinity | pos_integer()) -> ok.
-repeat(Scenario, Id, State, Repetitions) ->
+-spec perform_scenario(amoc:scenario(), amoc_scenario:user_id(), state()) -> ok.
+perform_scenario(Scenario, Id, State) ->
     case erlang:function_exported(Scenario, start, 2) of
         true ->
             Scenario:start(Id, State);
         false ->
             Scenario:start(Id)
     end,
-    flush_mailbox(),
-    perform_next_repetition(Scenario, Id, State, Repetitions).
-
-perform_next_repetition(_Scenario, _Id, _State, 1) ->
-    ok;
-perform_next_repetition(Scenario, Id, State, infinity) ->
-    timer:sleep(?REPEAT_INTERVAL),
-    repeat(Scenario, Id, State, infinity);
-perform_next_repetition(Scenario, Id, State, N) when N > 0 ->
-    timer:sleep(?REPEAT_INTERVAL),
-    repeat(Scenario, Id, State, N - 1).
+    flush_mailbox().
 
 -spec flush_mailbox() -> ok.
 flush_mailbox() ->
@@ -75,3 +63,21 @@ flush_mailbox() ->
     after 0 ->
         ok
     end.
+
+repeat(F) ->
+    F(),
+    timer:sleep(repeat_interval()),
+    repeat(F).
+
+repeat(F, N) when N > 1 ->
+    F(),
+    timer:sleep(repeat_interval()),
+    repeat(F, N - 1);
+repeat(F, 1) ->
+    F().
+
+repeat_interval() ->
+    application:get_env(amoc, repeat_interval, ?REPEAT_INTERVAL).
+
+repeat_num() ->
+    application:get_env(amoc, repeat_num, ?REPEAT_NUM).
