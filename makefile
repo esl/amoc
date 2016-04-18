@@ -1,4 +1,4 @@
-.PHONY: all rel compile deploy prepare deps test ct
+.PHONY: all rel compile deploy prepare deps test ct eunit
 
 all: rel deploy
 
@@ -24,7 +24,11 @@ ct:
 	@if [ $$SUITE ]; then ./rebar skip_deps=true -v ct suite=$$SUITE; \
 		else ./rebar skip_deps=true -v ct; fi
 
-test: compile ct
+eunit:
+	@if [ $$SUITE ]; then ./rebar skip_deps=true eunit suite=$$SUITE; \
+		else ./rebar skip_deps=true eunit; fi
+
+test: compile eunit ct
 
 dialyzer/erlang.plt:
 	@mkdir -p dialyzer
