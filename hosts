@@ -18,32 +18,31 @@ host4 graphite_prefix=amoc_4 node_name="amoc@192.168.0.5"
 amoc-master
 amoc-slave
 
-
 ;; Allow to setup variables for all hosts in one place
 
 [amoc:vars]
 ;; ssh user
-;user=vagrant
+user=vagrant
 
 ;; ssh password if it is required (no public key auth)
 ;ansible_ssh_pass=root
 
 ;; sname|name - which one amoc should use
-;node_name_type=sname
+node_name_type=name
 
 ;; specify if ansible should use sudo
 ;ansible_sudo=false
 
 ;; graphite ip address
-;graphite_ip="172.17.0.38"
+graphite_ip="172.17.0.38"
 
 ;; graphite port used for annotations
-;graphite_http_port="80"
+graphite_http_port="80"
 
 ;; where to install the amoc release on the master node
 ;; make it distinct from slave_install_dir if you want to run master
 ;; and slave side by side on one node
-;master_install_dir="/root/amoc_master"
+master_install_dir="/home/{{user}}/amoc_master"
 
 ;; where to install the amoc release on the slave nodes
-;slave_install_dir="/root/amoc"
+slave_install_dir="/home/{{user}}/amoc"
