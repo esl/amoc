@@ -46,3 +46,6 @@ master_install_dir="/home/{{user}}/amoc_master"
 
 ;; where to install the amoc release on the slave nodes
 slave_install_dir="/home/{{user}}/amoc"
+
+;; number of new filedescriptor limit
+fileno=500000
