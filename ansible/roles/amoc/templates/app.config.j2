@@ -1,8 +1,9 @@
 [
  {amoc, [{hosts, [{% if 'amoc-master' in group_names %}{% for h in amoc_slaves %} "{{h}}" {% if not loop.last %},{% endif %}{% endfor %}{% endif %}] },
          {path, "{{ slave_install_dir }}" },
-         {interarrival, 75},
-         {graphite_endpoint, "{{ graphite_ip }}:{{ graphite_http_port }}"}]},
+         {graphite_endpoint, "{{ graphite_ip }}:{{ graphite_http_port }}"}
+         {% for key, value in amoc.iteritems() %},{ {{ key }}, {{ value }} }{% endfor %}
+        ]},
  {exometer, [
     {predefined, [
         {[erlang, system_info],
