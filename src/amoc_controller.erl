@@ -4,11 +4,11 @@
 %%==============================================================================
 -module(amoc_controller).
 -behaviour(gen_server).
+
 -define(SERVER, ?MODULE).
 -define(INTERARRIVAL_DEFAULT, 50).
--define(INTERARRIVAL,
-        application:get_env(amoc, interarrival, ?INTERARRIVAL_DEFAULT)).
 -define(TABLE, amoc_users).
+
 -record(state, {scenario :: amoc:scenario(),
                 scenario_state :: any(),
                 nodes ::  non_neg_integer(),
@@ -225,7 +225,7 @@ start_users(Scenario, UserIds, State) ->
     supervisor:startchild_ret().
 start_user(Scenario, Id, State) ->
     R = supervisor:start_child(amoc_users_sup, [Scenario, Id, State]),
-    timer:sleep(?INTERARRIVAL),
+    timer:sleep(interarrival()),
     R.
 
 -spec stop_users([amoc_scenario:user_id()], boolean()) -> [true | stop].
@@ -268,3 +268,7 @@ node_userids(Start, End, Nodes, NodeId) when is_integer(Nodes), Nodes > 0,
                 false
         end,
     lists:filter(F, lists:seq(Start, End)).
+
+-spec interarrival() -> integer().
+interarrival() ->
+    amoc_config:get(interarrival, ?INTERARRIVAL_DEFAULT).
