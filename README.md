@@ -143,3 +143,51 @@ To prevent that start the amoc node in the background using `bin/amoc start`.
 Now you can run commands by attaching to the amoc's node with `bin/amoc attach`,
 typing a command and then pressing Ctrl+D to exit the shell.
 After that the scenario will keep running.
+
+## Configuration
+
+amoc is configured through OTP application environmental variables that
+are loaded from the configuration file
+
+Internally, amoc is using the following settings:
+
+- ``interarrival`` - a delay in ms, for each node, between creating process
+  for two consecutive users. Defaults to 50 ms.
+- ``repeat_interval`` - a delay in ms, for each user process that it waits
+  before starting the same scenario again. Defaults to 1 minute.
+- ``repeat_num`` - number of scenario repetitions for each process.
+  Defaults to ``infinity``.
+
+You can also define your own entries that you might later use in your
+scenarios.
+
+The ``amoc_config`` module, that is essentially a wrapper around functions
+manipulation the application's environment in the ``application`` module.
+
+``amoc_config`` provides the following functions:
+
+- ``get(Name)`` and ``get(Name, Default)`` - return the value for the
+  given config entry, all values defined in the config file are available
+- ``set(Name, Value)`` - sets the new value for the given entry. You might
+  use it inside your scenario to make scenario more dynamic.
+
+### Locally (without ansible)
+
+If you are not using ansible, just modify the ``priv/app.config`` file.
+It will later be added to your local release.
+
+### Distributed (with ansible)
+
+During the ansible deployment the following file is used as a template:
+``ansible/roles/amoc/templates/app.config.j2``.
+
+As long as you need to set only the amoc application variables (including
+your scenario-specific settings), you can do
+it in the ``ansible/group_vars/amoc`` file.
+
+A separate file is required for this
+since dictionaries are not supported in the inventory file.
+
+### Docker
+
+TODO
