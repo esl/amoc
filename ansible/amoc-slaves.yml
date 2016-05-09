@@ -1,7 +1,7 @@
 ---
 - hosts: amoc-slave
   remote_user: "{{user}}"
-  sudo: no
+  become: no
   vars:
     - amoc_slaves: []
     - install_dir: "{{ slave_install_dir }}"

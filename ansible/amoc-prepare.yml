@@ -1,7 +1,7 @@
 ---
 - hosts: amoc-slave
   remote_user: "{{user}}"
-  sudo: yes
+  become: yes
   roles:
     - prepare
   vars:
