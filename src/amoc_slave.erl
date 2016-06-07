@@ -108,6 +108,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 -spec handle_start(string(), file:filename(), state()) -> state().
 handle_start(Host, Directory, #state{to_ack=Ack}=State) ->
+    maybe_create_status_file(<<"connecting">>),
     _Port = start_slave_node(Host, Directory),
     Node = node_name(Host),
     Ack1 = [{Node, ?DEFAULT_RETRIES} | Ack],
@@ -123,7 +124,7 @@ start_slave_node(Host, Directory) ->
 ping_slave_nodes(#state{to_ack=Ack}=State) ->
     Ack1 = lists:filtermap(fun ping_slave_node/1, Ack),
     case Ack1 of
-        []  -> ok;
+        []  -> maybe_create_status_file(<<"ready">>);
         _   -> schedule_timer()
     end,
     State#state{to_ack=Ack1}.
@@ -151,3 +152,12 @@ node_name(Host) ->
 -spec schedule_timer() -> reference().
 schedule_timer() ->
     erlang:send_after(1000, self(), timeout).
+
+-spec maybe_create_status_file(binary()) -> ok.
+maybe_create_status_file(Status) ->
+    case application:get_env(amoc, status_file) of
+        undefined ->
+            ok;
+        {ok, StatusFile} ->
+            ok = file:write_file(StatusFile, Status)
+    end.
