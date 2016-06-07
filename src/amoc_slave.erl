@@ -155,6 +155,5 @@ schedule_timer() ->
 
 -spec create_status_file(binary()) -> ok.
 create_status_file(Status) ->
-    DefaultPath = filename:join(code:lib_dir(amoc), ".amoc.status"),
-    Path = application:get_env(amoc, status_file, DefaultPath),
+    Path = application:get_env(amoc, status_file, ".amoc.status"),
     ok = file:write_file(Path, Status).
