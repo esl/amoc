@@ -2,6 +2,7 @@
  {amoc, [{hosts, [{% if 'amoc-master' in group_names %}{% for h in amoc_slaves %} "{{h}}" {% if not loop.last %},{% endif %}{% endfor %}{% endif %}] },
          {path, "{{ slave_install_dir }}" },
          {graphite_endpoint, "{{ graphite_ip }}:{{ graphite_http_port }}"}
+         {% if 'amoc-slave' in group_names %},{api_port, 4001}{% endif %}
          {% for key, value in amoc.iteritems() %},{ {{ key }}, {{ value }} }{% endfor %}
         ]},
  {exometer, [
