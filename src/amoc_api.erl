@@ -14,5 +14,6 @@ start_listener() ->
 routes() ->
     [{'_',
       [{"/start", amoc_api_handler, [start]},
-       {"/stop", amoc_api_handler, [stop]}]
+       {"/stop", amoc_api_handler, [stop]},
+       {"/status", amoc_api_handler, [status]}]
      }].
