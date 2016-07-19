@@ -20,7 +20,7 @@ init({tcp, http}, _Req, _Opts) ->
 rest_init(Req, [Action]) ->
     {ok, Req, #state{action = Action}}.
 
--spec allowed_methods(cowboy:req(), #state{}) -> {[tuple()], cowboy:req(), #state{}}.
+-spec allowed_methods(cowboy:req(), #state{}) -> {[binary()], cowboy:req(), #state{}}.
 allowed_methods(Req, State) ->
     {[<<"POST">>, <<"GET">>], Req, State}.
 

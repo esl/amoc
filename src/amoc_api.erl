@@ -1,6 +1,6 @@
 -module(amoc_api).
 
--export([start_listener/0]).
+-export([start_listener/0, stop/0]).
 
 -spec start_listener() -> {ok, pid()}.
 start_listener() ->
@@ -9,6 +9,10 @@ start_listener() ->
     {ok, _Pid} = cowboy:start_http(amoc_api, 10, [{port, Port}],
                                    [{env, [{dispatch, Dispatch}]}]
                                   ).
+
+-spec stop() -> ok | {error, not_found}.
+stop() ->
+	cowboy:stop_listener(amoc_api).
 
 -spec routes() -> cowboy_router:routes().
 routes() ->
