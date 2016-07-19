@@ -13,7 +13,9 @@ start_listener() ->
 -spec routes() -> cowboy_router:routes().
 routes() ->
     [{'_',
-      [{"/start", amoc_api_handler, [start]},
-       {"/stop", amoc_api_handler, [stop]},
+      [{"/start", amoc_api_scenario_handler, [start]},
+       {"/stop", amoc_api_scenario_handler, [stop]},
+       {"/list", amoc_api_scenario_handler, [list]},
+       {"/load", amoc_api_scenario_handler, [load]},
        {"/status", amoc_api_handler, [status]}]
      }].
