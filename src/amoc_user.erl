@@ -39,8 +39,10 @@ init(Parent, Scenario, Id, State) ->
             E:Reason ->
                 {E, {abnormal_exit, Reason}, erlang:get_stacktrace()}
         after
-            ets:delete(amoc_users, Id)
+            ets:delete(amoc_users, Id),
+			amoc_event:notify({test_end, Scenario:module_info(module)})
         end,
+    amoc_event:notify({test_begin, Scenario:module_info(module)}),
     exit(R).
 
 -spec perform_scenario(amoc:scenario(), amoc_scenario:user_id(), state()) -> ok.
