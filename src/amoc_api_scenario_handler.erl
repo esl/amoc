@@ -28,9 +28,10 @@ from_json(Req0, State) ->
     {ok, Data, Req1} = cowboy_req:body(Req0),
     try
         Term = jsx:decode(Data),
-        {Status,Reply} = process_json(Term, State),
+        {Status, Reply} = process_json(Term, State),
         lager:info(Reply),
-        {ok,Req2} = cowboy_req:reply(Status, [], Reply, Req1),
+        ContentType = {<<"content-type">>, <<"application/json">>},
+        {ok,Req2} = cowboy_req:reply(Status,[ContentType], Reply, Req1),
         {halt, Req2, State}
     catch A:B ->
         {ok,ReqE} = cowboy_req:reply(500, Req1),
