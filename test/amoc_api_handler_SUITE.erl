@@ -21,12 +21,15 @@ all() ->
 
 init_per_testcase(test_load_good, Config) ->
         file:make_dir("scenarios"),
+        file:make_dir("ebin"),
         Config;
 
 init_per_testcase(test_start_success, Config) ->
         file:make_dir("scenarios"),
-        file:make_dir("ebin"),
         file:write_file("scenarios/mongoose_simple.erl", get_scenario(), [write]),
+        file:make_dir("ebin"),
+        compile:file("scenarios/mongoose_simple.erl",[{outdir,"ebin"}]),
+        code:purge(mongoose_simple),
         Config;
 
 init_per_testcase(_, Config) ->
@@ -36,6 +39,7 @@ init_per_testcase(_, Config) ->
 end_per_testcase(test_load_good, Config) ->
         file:delete("scenarios/mongoose_simple.erl"),
         file:del_dir("scenarios"),
+        file:del_dir("ebin"),
 	Config;
 
 end_per_testcase(test_start_success, Config) ->
@@ -70,67 +74,60 @@ test_fail(_Config) ->
 	503 = CodeHtml.
 
 test_list(_Config) ->
-        %% given
         given_applications_started(),
         meck:new(file, [unstick, passthrough]),
         Fun = fun(_) -> {ok, ["scenario.erl"]} end,
         meck:expect(file, list_dir, Fun),
         
-        %% when
-        Result = amoc_api_scenario_handler:process_json(dd,#state{action = list}),
-        {CodeHtml,JSON} = Result,
-        [ {AtomB, FilenamesB} ] = jsx:decode(JSON),
+        {CodeHtml, JSON} = amoc_api_scenario_handler:process_json(dd,#state{action = list}),
         meck:unload(file),
-        
-        %% then
-        200 = CodeHtml,
-        <<"scenarios">> = AtomB,
-        true = is_list(FilenamesB).
+        [ {AtomB, FilenamesB} ] = jsx:decode(JSON),
+        ?assertEqual(200, CodeHtml),
+        ?assertEqual(<<"scenarios">>, AtomB),
+        ?assertEqual(true, is_list(FilenamesB)).
         
 test_start_fail_no_scenario(_Config) ->
-        %% given
         given_applications_started(),
         Term = [ 
                 {<<"scenario">>,<<"no_exist">>},
                 {<<"users">>,<<"10">>}
               ],
-        %% when
-        %% then
-        ?assertError({badmatch,error},
-        amoc_api_scenario_handler:process_json(Term,#state{action = start})).
+        {CodeHtml, JSON} = amoc_api_scenario_handler:process_json(Term,#state{action = start}),
+        [ {Error, Reason} ] = jsx:decode(JSON),
+        ?assertEqual(500, CodeHtml),
+        ?assertEqual(<<"error">>, Error),
+        ?assertEqual(<<"module_not_exists">>, Reason).
                   
 test_start_success(_Config) ->
-        %%given
         given_applications_started(),
         Term = [ 
                 {<<"scenario">>,<<"mongoose_simple">>},
-                {<<"users">>,<<"10">>}
-              ],
-        %% when
+                {<<"users">>,10}
+               ],
+        meck:new(amoc_dist, [unstick]),
+        Fun = fun(_,1,_) -> ok end,
+        meck:expect(amoc_dist, do, Fun),
         Result = amoc_api_scenario_handler:process_json(Term,#state{action = start}),
-        %% then
-        {200,JSON} = Result,
-        [ {<<"mongoose_simple">>,<< "ok">>} ] = jsx:decode(JSON).
+        meck:wait(amoc_dist, do, ['mongoose_simple',1,10], 1000),
+        meck:unload(amoc_dist),
+        {CodeHtml,JSON} = Result,
+        ?assertEqual(200, CodeHtml),
+        ?assertEqual([ {<<"mongoose_simple">>,<< "ok">>} ], jsx:decode(JSON)).
 
 test_load_good(_Config) ->
-        %% given
         given_applications_started(),
-
-       %% when
         Term = [ 
                 {<<"scenario">>,<<"mongoose_simple">>},
                 {<<"module_bin">>,get_scenario()},
-                {<<"overwrite">>,<<"true">>}
+                {<<"overwrite">>,true}
               ],
-
-        %% when
         Result = amoc_api_scenario_handler:process_json(Term,#state{action = load}),
-        %% then
         {200,JSON} = Result,
-        [ {<<"mongoose_simple">>,<< "loaded">>} ] = jsx:decode(JSON).
+        ?assertEqual(
+                    [{<<"mongoose_simple">>,<< "loaded">>}],
+                    jsx:decode(JSON)).
 
 test_load_already_exists(_Config) ->
-        %% given
         given_applications_started(),
         meck:new(file, [unstick, passthrough]),
         Fun1 = fun(_,_) -> {ok, pid} end,
@@ -140,15 +137,15 @@ test_load_already_exists(_Config) ->
         Term = [ 
                 {<<"scenario">>,<<"mongoose_simple">>},
                 {<<"module_bin">>,<<"sth">>},
-                {<<"overwrite">>,<<"false">>}
+                {<<"overwrite">>,false}
               ],
-
-        %% when
+        
         Result = amoc_api_scenario_handler:process_json(Term,#state{action = load}),
         meck:unload(file),
-        %% then
         {501,JSON} = Result,
-        [ {<<"mongoose_simple">>,<< "already_exists">>} ] = jsx:decode(JSON).
+        ?assertEqual(
+                    [{<<"mongoose_simple">>,<< "already_exists">>}],
+                    jsx:decode(JSON)).
 
 
 given_applications_started() ->
