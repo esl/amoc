@@ -5,7 +5,7 @@
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 -export([test_success/1, test_fail/1, test_list/1,
          test_start_fail_no_scenario/1, test_start_success/1,
-         test_load_good/1, test_load_already_exists/1]).
+         test_load_good/1, test_load_already_exists/1, test_get_test_result/1, test_get_tests_results/1]).
 
 -record(state, {action}).
 
@@ -16,7 +16,9 @@ all() ->
         test_start_fail_no_scenario,
         test_start_success,
         test_load_good,
-        test_load_already_exists
+        test_load_already_exists,
+		test_get_test_result,
+		test_get_tests_results
         ].
 
 init_per_testcase(test_load_good, Config) ->
@@ -147,7 +149,53 @@ test_load_already_exists(_Config) ->
                     [{<<"mongoose_simple">>,<< "already_exists">>}],
                     jsx:decode(JSON)).
 
+test_get_tests_results(_) ->
+	%% given
+    meck:new(amoc_test_event, [unstick, passthrough]),
+	TestResFun = fun(_, _) -> {ok, [{foo,test_begin}], [{foo, test_begin}]} end,
+	meck:expect(amoc_test_event, handle_call, TestResFun),
+	given_applications_started(),
+	%% when
+	Result = httpc:request("http://localhost:4000/test_status"),
+	{ok, {{_HttpVsn, CodeHtml, _Status}, _, Body}} = Result,
+	ct:log("Body: ~p", [Body]),
+	ct:log("Result: ~p", [Result]),
+	BodyToParse = case erlang:is_bitstring(Body) of
+					true ->
+						Body;
+					false ->
+						erlang:list_to_bitstring(Body)
+				  end, 
+	[{Key, Value}] = jsx:decode(BodyToParse),
+	%% then
+	test_begin = erlang:binary_to_existing_atom(Value, utf8),
+	foo = erlang:binary_to_existing_atom(Key, utf8),
+	200 = CodeHtml.
 
+test_get_test_result(_) ->
+	%% given
+    meck:new(amoc_test_event, [unstick, passthrough]),
+	TestResFun = fun(_, _) -> {ok, [{foo,test_begin}], [{foo, test_begin}]} end,
+	meck:expect(amoc_test_event, handle_call, TestResFun),
+	given_applications_started(),
+	%% when
+	Result = httpc:request("http://localhost:4000/test_status"),
+	{ok, {{_HttpVsn, CodeHtml, _Status}, _, Body}} = Result,
+	ct:log("Body: ~p", [Body]),
+	ct:log("Result: ~p", [Result]),
+	BodyToParse = case erlang:is_bitstring(Body) of
+					true ->
+						Body;
+					false ->
+						erlang:list_to_bitstring(Body)
+				  end, 
+	[{Key, Value}] = jsx:decode(BodyToParse),
+	%% then
+	test_begin = erlang:binary_to_existing_atom(Value, utf8),
+	foo = erlang:binary_to_existing_atom(Key, utf8),
+	200 = CodeHtml
+
+%% Helpers
 given_applications_started() ->
 	application:ensure_all_started(amoc).
 
