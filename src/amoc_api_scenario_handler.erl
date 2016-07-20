@@ -33,7 +33,7 @@ from_json(Req0, State) ->
         ContentType = {<<"content-type">>, <<"application/json">>},
         {ok,Req2} = cowboy_req:reply(Status,[ContentType], Reply, Req1),
         {halt, Req2, State}
-    catch A:B ->
+    catch _:_ ->
         {ok,ReqE} = cowboy_req:reply(500, Req1),
         {false, ReqE, State}
     end.
@@ -44,7 +44,7 @@ from_json(Req0, State) ->
 
 process_json(Term, #state{action = start}) ->
     {<<"scenario">>, ScenarioB} = lists:keyfind(<<"scenario">>, 1, Term),
-    {<<"users">>, Users} = lists:keyfind(<<"users">>, 1, Term),
+    {<<"users">>, _Users} = lists:keyfind(<<"users">>, 1, Term),
     
     Scenario = erlang:binary_to_atom(ScenarioB, utf8),
     ScenarioPath = "scenarios/" ++ erlang:atom_to_list(Scenario) ++ ".erl",

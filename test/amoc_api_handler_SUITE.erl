@@ -5,7 +5,7 @@
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 -export([test_success/1, test_fail/1, test_list/1,
          test_start_fail_no_scenario/1, test_start_success/1,
-         test_load_good/1, test_load_already_exists/1, test_get_test_result/1, test_get_tests_results/1]).
+         test_load_good/1, test_load_already_exists/1, test_get_test_result/1, test_get_tests_results/1, test_get_wrong_test_result/1]).
 
 -record(state, {action}).
 
@@ -18,6 +18,7 @@ all() ->
         test_load_good,
         test_load_already_exists,
 		test_get_test_result,
+		test_get_wrong_test_result,
 		test_get_tests_results
         ].
 
@@ -58,18 +59,18 @@ test_success(_Config) ->
 	given_applications_started(),
 	%% when
 	Result = httpc:request("http://localhost:4000/status"),
-	{ok, {{_HttpVsn, CodeHtml, _Status}, _, _}} = Result,
+	{ok, {{_HttpVsn, CodeHttp, _Status}, _, _}} = Result,
     %% then
-	200 = CodeHtml.	
+	200 = CodeHttp.	
 
 test_fail(_Config) ->
 	%% given
 	given_http_api_started(),
 	%% when
 	Result = httpc:request("http://localhost:4000/status"),
-	{ok, {{_HttpVsn, CodeHtml, _Status}, _, _}} = Result, 
+	{ok, {{_HttpVsn, CodeHttp, _Status}, _, _}} = Result, 
 	%% then
-	503 = CodeHtml.
+	503 = CodeHttp.
 
 test_list(_Config) ->
         %% given
@@ -80,12 +81,12 @@ test_list(_Config) ->
         
         %% when
         Result = amoc_api_scenario_handler:process_json(dd,#state{action = list}),
-        {CodeHtml,JSON} = Result,
+        {CodeHttp,JSON} = Result,
         [ {AtomB, FilenamesB} ] = jsx:decode(JSON),
         meck:unload(file),
         
         %% then
-        200 = CodeHtml,
+        200 = CodeHttp,
         <<"scenarios">> = AtomB,
         true = is_list(FilenamesB).
         
@@ -160,9 +161,8 @@ test_get_tests_results(_) ->
 	given_applications_started(),
 	%% when
 	Result = httpc:request("http://localhost:4000/test_status"),
-	{ok, {{_HttpVsn, CodeHtml, _Status}, _, Body}} = Result,
-	ct:log("Body: ~p", [Body]),
-	ct:log("Result: ~p", [Result]),
+	{ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result,
+	meck:unload(amoc_test_event),
 	BodyToParse = case erlang:is_bitstring(Body) of
 					true ->
 						Body;
@@ -173,30 +173,40 @@ test_get_tests_results(_) ->
 	%% then
 	test_begin = erlang:binary_to_existing_atom(Value, utf8),
 	foo = erlang:binary_to_existing_atom(Key, utf8),
-	200 = CodeHtml.
+	200 = CodeHttp.
 
+test_get_wrong_test_result(_) ->
+	%% given
+	given_applications_started(),
+	%% when
+	Result = httpc:request(post,{"http://localhost:4000/test_status", [], "application/json", "{\"name\": \"foo\"}"}, [], []),
+	{ok, {{_HttpVsn, CodeHttp, _Status}, _, _}} = Result,
+	%% then
+	500 = CodeHttp.
+	
 test_get_test_result(_) ->
 	%% given
     meck:new(amoc_test_event, [unstick, passthrough]),
-	TestResFun = fun(_, _) -> {ok, [{foo,test_begin}], [{foo, test_begin}]} end,
+	TestResFun = fun(_, _) -> {ok, test_crashed, [{foo, test_crashed}]} end,
 	meck:expect(amoc_test_event, handle_call, TestResFun),
 	given_applications_started(),
 	%% when
-	Result = httpc:request("http://localhost:4000/test_status"),
-	{ok, {{_HttpVsn, CodeHtml, _Status}, _, Body}} = Result,
+	Result = httpc:request(post,{"http://localhost:4000/test_status", [], "application/json", "{\"name\": \"foo\"}"}, [], []),
+	{ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result,
 	ct:log("Body: ~p", [Body]),
 	ct:log("Result: ~p", [Result]),
+	meck:unload(amoc_test_event), 
 	BodyToParse = case erlang:is_bitstring(Body) of
 					true ->
 						Body;
 					false ->
 						erlang:list_to_bitstring(Body)
-				  end, 
+				  end,
 	[{Key, Value}] = jsx:decode(BodyToParse),
 	%% then
-	test_begin = erlang:binary_to_existing_atom(Value, utf8),
+	test_crashed = erlang:binary_to_existing_atom(Value, utf8),
 	foo = erlang:binary_to_existing_atom(Key, utf8),
-	200 = CodeHtml
+	200 = CodeHttp.
 
 %% Helpers
 given_applications_started() ->
