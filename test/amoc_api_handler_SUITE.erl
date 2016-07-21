@@ -3,9 +3,16 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
--export([test_success/1, test_fail/1, test_list/1,
-         test_start_fail_no_scenario/1, test_start_success/1,
-         test_load_good/1, test_load_already_exists/1, test_get_test_result/1, test_get_tests_results/1]).
+-export([test_success/1,
+         test_fail/1,
+         test_list/1,
+         test_start_fail_no_scenario/1,
+         test_start_success/1,
+         test_load_good/1,
+         test_load_compilation_err/1,
+         test_ping_nodes/1,
+         test_get_test_result/1,
+         test_get_tests_results/1]).
 
 -record(state, {action}).
 
@@ -16,14 +23,19 @@ all() ->
         test_start_fail_no_scenario,
         test_start_success,
         test_load_good,
-        test_load_already_exists,
-		test_get_test_result,
-		test_get_tests_results
+        test_load_compilation_err,
+        test_ping_nodes,
+	test_get_test_result,
+        test_get_tests_results
         ].
 
 init_per_testcase(test_load_good, Config) ->
         file:make_dir("scenarios"),
         file:make_dir("ebin"),
+        Config;
+        
+init_per_testcase(test_load_compilation_err, Config) ->
+        file:make_dir("scenarios"),
         Config;
 
 init_per_testcase(test_start_success, Config) ->
@@ -43,6 +55,10 @@ end_per_testcase(test_load_good, Config) ->
         file:del_dir("scenarios"),
         file:del_dir("ebin"),
 	Config;
+
+end_per_testcase(test_load_compilation_err, Config) ->
+        file:del_dir("scenarios"),
+        Config;
 
 end_per_testcase(test_start_success, Config) ->
         file:delete("scenarios/mongoose_simple.erl"),
@@ -64,7 +80,7 @@ test_success(_Config) ->
 	Result = httpc:request("http://localhost:4000/status"),
 	{ok, {{_HttpVsn, CodeHtml, _Status}, _, _}} = Result,
     %% then
-	200 = CodeHtml.	
+	?assertEqual(200, CodeHtml).
 
 test_fail(_Config) ->
 	%% given
@@ -73,7 +89,7 @@ test_fail(_Config) ->
 	Result = httpc:request("http://localhost:4000/status"),
 	{ok, {{_HttpVsn, CodeHtml, _Status}, _, _}} = Result, 
 	%% then
-	503 = CodeHtml.
+	?assertEqual(503, CodeHtml).
 
 test_list(_Config) ->
         given_applications_started(),
@@ -91,45 +107,47 @@ test_list(_Config) ->
 test_start_fail_no_scenario(_Config) ->
         given_applications_started(),
         Term = [ 
-                {<<"scenario">>,<<"no_exist">>},
-                {<<"users">>,<<"10">>}
+                {<<"scenario">>, <<"no_exist">>},
+                {<<"users">>, <<"10">>}
               ],
         {CodeHtml, JSON} = amoc_api_scenario_handler:process_json(Term,#state{action = start}),
-        [ {Error, Reason} ] = jsx:decode(JSON),
         ?assertEqual(500, CodeHtml),
-        ?assertEqual(<<"error">>, Error),
-        ?assertEqual(<<"module_not_exists">>, Reason).
+        ?assertEqual(
+                    [{<<"error">>, <<"module_not_exists">>}],
+                    jsx:decode(JSON)).
                   
 test_start_success(_Config) ->
         given_applications_started(),
         Term = [ 
-                {<<"scenario">>,<<"mongoose_simple">>},
-                {<<"users">>,10}
+                {<<"scenario">>, <<"mongoose_simple">>},
+                {<<"users">>, 10}
                ],
         meck:new(amoc_dist, [unstick]),
         Fun = fun(_,1,_) -> ok end,
         meck:expect(amoc_dist, do, Fun),
         Result = amoc_api_scenario_handler:process_json(Term,#state{action = start}),
-        meck:wait(amoc_dist, do, ['mongoose_simple',1,10], 1000),
+        meck:wait(amoc_dist, do, ['mongoose_simple', 1, 10], 1000),
         meck:unload(amoc_dist),
         {CodeHtml,JSON} = Result,
         ?assertEqual(200, CodeHtml),
-        ?assertEqual([ {<<"mongoose_simple">>,<< "ok">>} ], jsx:decode(JSON)).
+        ?assertEqual(
+                    [{<<"mongoose_simple">>, << "ok">>}],
+                    jsx:decode(JSON)).
 
 test_load_good(_Config) ->
         given_applications_started(),
         Term = [ 
-                {<<"scenario">>,<<"mongoose_simple">>},
-                {<<"module_bin">>,get_scenario()},
-                {<<"overwrite">>,true}
+                {<<"scenario">>, <<"mongoose_simple">>},
+                {<<"module_source">>, get_scenario()}
               ],
         Result = amoc_api_scenario_handler:process_json(Term,#state{action = load}),
-        {200,JSON} = Result,
+        {CodeHtml,JSON} = Result,
+        ?assertEqual(200, CodeHtml),
         ?assertEqual(
-                    [{<<"mongoose_simple">>,<< "loaded">>}],
+                    [{<<"mongoose_simple">>, <<"loaded">>}],
                     jsx:decode(JSON)).
 
-test_load_already_exists(_Config) ->
+test_load_compilation_err(_Config) ->
         given_applications_started(),
         meck:new(file, [unstick, passthrough]),
         Fun1 = fun(_,_) -> {ok, pid} end,
@@ -137,17 +155,28 @@ test_load_already_exists(_Config) ->
         meck:expect(file, open, Fun1),
         meck:expect(file, close, Fun2),
         Term = [ 
-                {<<"scenario">>,<<"mongoose_simple">>},
-                {<<"module_bin">>,<<"sth">>},
-                {<<"overwrite">>,false}
+                {<<"scenario">>, <<"mongoose_simple">>},
+                {<<"module_source">>, <<"sth">>}
               ],
         
         Result = amoc_api_scenario_handler:process_json(Term,#state{action = load}),
         meck:unload(file),
-        {501,JSON} = Result,
+        {CodeHtml,JSON} = Result,
+        ?assertEqual(500, CodeHtml),
         ?assertEqual(
-                    [{<<"mongoose_simple">>,<< "already_exists">>}],
+                    [{<<"error">>, <<"compilation_error">>}],
                     jsx:decode(JSON)).
+
+test_ping_nodes(_Config) ->
+        given_applications_started(),
+        Term = [],
+        Result = amoc_api_scenario_handler:process_json(Term,#state{action = ping_nodes}),
+        {CodeHtml,JSON} = Result,
+        [{Answer,List}] = jsx:decode(JSON),
+        ?assertEqual(200, CodeHtml),
+        ?assertEqual(<<"nodes">>, Answer),
+        ?assertEqual(true, is_list(List)).
+
 
 test_get_tests_results(_) ->
 	%% given
@@ -167,6 +196,7 @@ test_get_tests_results(_) ->
 						erlang:list_to_bitstring(Body)
 				  end, 
 	[{Key, Value}] = jsx:decode(BodyToParse),
+        meck:unload(amoc_test_event),
 	%% then
 	test_begin = erlang:binary_to_existing_atom(Value, utf8),
 	foo = erlang:binary_to_existing_atom(Key, utf8),
@@ -190,10 +220,11 @@ test_get_test_result(_) ->
 						erlang:list_to_bitstring(Body)
 				  end, 
 	[{Key, Value}] = jsx:decode(BodyToParse),
+        meck:unload(amoc_test_event),
 	%% then
 	test_begin = erlang:binary_to_existing_atom(Value, utf8),
 	foo = erlang:binary_to_existing_atom(Key, utf8),
-	200 = CodeHtml
+	200 = CodeHtml.
 
 %% Helpers
 given_applications_started() ->
