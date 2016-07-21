@@ -4,8 +4,9 @@
 
 -export([rest_init/2,
          allowed_methods/2,
+         content_types_provided/2,
          content_types_accepted/2,
-         from_json/2,
+         process_request/2,
          process_json/2]).
 
 -record(state, {action}).
@@ -17,18 +18,22 @@ rest_init(Req, [Action]) ->
     {ok, Req, #state{action = Action}}.
 
 allowed_methods(Req, State) ->
-    {[<<"POST">>], Req, State}.
+    {[<<"POST">>, <<"GET">>], Req, State}.
+
+content_types_provided(Req, State) ->
+    {[{<<"application/json">>, process_request}], Req, State}.
 
 content_types_accepted(Req, State) ->
-    {[
-        {<<"application/json">>, from_json}
-    ],Req, State}.
+    {[{<<"application/json">>, process_request}], Req, State}.
 
-from_json(Req0, State) ->
+process_request(Req0, State) ->
     {ok, Data, Req1} = cowboy_req:body(Req0),
     ContentType = {<<"content-type">>, <<"application/json">>},
     try
-        Term = jsx:decode(Data),
+        Term = case jsx:is_json(Data) of
+            true -> jsx:decode(Data);
+            false -> undef
+        end,
         {Status, Reply} = process_json(Term, State),
         lager:info(Reply),
         {ok, Req2} = cowboy_req:reply(Status, [ContentType], Reply, Req1),
@@ -44,8 +49,7 @@ from_json(Req0, State) ->
 %%%%%%%%%%%%%%
 
 process_json(Term, #state{action = start}) ->
-
-    ScenarioB = proplists:get_value(<<"scenario">>, Term),
+   ScenarioB = proplists:get_value(<<"scenario">>, Term),
     Users = proplists:get_value(<<"users">>, Term),
     
     Scenario = erlang:binary_to_atom(ScenarioB, utf8),
