@@ -21,6 +21,7 @@ routes() ->
        {"/stop", amoc_api_scenario_handler, [stop]},
        {"/list", amoc_api_scenario_handler, [list]},
        {"/load", amoc_api_scenario_handler, [load]},
+       {"/ping_nodes", amoc_api_scenario_handler, [ping_nodes]},
        {"/status", amoc_api_handler, [status]},
 	     {"/test_status", amoc_api_test_handler, [test]}]
      }].

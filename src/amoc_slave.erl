@@ -11,7 +11,9 @@
 %% ------------------------------------------------------------------
 -export([start_link/0,
          start/2,
-         monitor_master/1]).
+         monitor_master/1,
+		 ping/1,
+		 node_name/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports

@@ -26,16 +26,17 @@ content_types_accepted(Req, State) ->
 
 from_json(Req0, State) ->
     {ok, Data, Req1} = cowboy_req:body(Req0),
+    ContentType = {<<"content-type">>, <<"application/json">>},
     try
         Term = jsx:decode(Data),
         {Status, Reply} = process_json(Term, State),
         lager:info(Reply),
-        ContentType = {<<"content-type">>, <<"application/json">>},
         {ok,Req2} = cowboy_req:reply(Status,[ContentType], Reply, Req1),
         {halt, Req2, State}
     catch _:_ ->
-        {ok,ReqE} = cowboy_req:reply(500, Req1),
-        {false, ReqE, State}
+        ReplyE = jsx:encode([{<<"error">>,<<"unknown">>}]),
+        {ok,ReqE} = cowboy_req:reply(500, [ContentType], ReplyE, Req1),
+        {halt, ReqE, State}
     end.
 
 %%%%%%%%%%%%%%
@@ -43,38 +44,40 @@ from_json(Req0, State) ->
 %%%%%%%%%%%%%%
 
 process_json(Term, #state{action = start}) ->
-    {<<"scenario">>, ScenarioB} = lists:keyfind(<<"scenario">>, 1, Term),
-    {<<"users">>, _Users} = lists:keyfind(<<"users">>, 1, Term),
+
+    ScenarioB = proplists:get_value(<<"scenario">>, Term),
+    Users = proplists:get_value(<<"users">>, Term),
     
     Scenario = erlang:binary_to_atom(ScenarioB, utf8),
-    ScenarioPath = "scenarios/" ++ erlang:atom_to_list(Scenario) ++ ".erl",
     
-    {ok, Scenario} = compile:file(ScenarioPath,[{outdir,"ebin"}]),
-    code:purge(Scenario),
-    {module, Scenario} = code:load_file(Scenario),
-    
-    % _ = amoc_dist:do(Scenario, 1, Users),
-    {200, jsx:encode([{ScenarioB,<<"ok">>}])};
+    case code:load_file(Scenario) of
+        {error,nofile} ->
+            {500, jsx:encode([{<<"error">>,<<"module_not_exists">>}])};
+        {module, Scenario} -> 
+            _ = amoc_dist:do(Scenario, 1, Users),
+            {200, jsx:encode([{ScenarioB,<<"ok">>}])}
+    end;
 
 process_json(_Term, #state{action = stop}) ->
     {200, jsx:encode("ok")};
 
 process_json(Term, #state{action = load}) ->
-    {<<"scenario">>, ScenarioB} = lists:keyfind(<<"scenario">>, 1, Term),
-    {<<"module_bin">>, ModuleB} = lists:keyfind(<<"module_bin">>, 1, Term),
-    {<<"overwrite">>, OverwriteB} = lists:keyfind(<<"overwrite">>, 1, Term),
+    ScenarioB = proplists:get_value(<<"scenario">>, Term),
+    ModuleB = proplists:get_value(<<"module_source">>, Term),
     Scenario = erlang:binary_to_atom(ScenarioB, utf8),
-    Overwrite = erlang:binary_to_atom(OverwriteB, utf8),
     ScenarioPath = "scenarios/" ++ erlang:atom_to_list(Scenario) ++ ".erl",
-    
-    case {file:open(ScenarioPath, [read]), Overwrite} of
-        {_, true} -> 
-            ok = file:write_file(ScenarioPath, ModuleB, [write]),
+    ok = file:write_file(ScenarioPath, ModuleB, [write]),
+    case compile:file(ScenarioPath,[{outdir,"ebin"}]) of
+        {ok, Scenario} ->
+            code:purge(Scenario),
             {200, jsx:encode([{ScenarioB, <<"loaded">>}])};
-        {{ok, Pid}, _} ->
-            file:close(Pid),
-            {501, jsx:encode([{ScenarioB, <<"already_exists">>}])}
+        error ->
+            {500, jsx:encode([{<<"error">>, <<"compilation_error">>}])}
     end;
+
+process_json(_Term, #state{action = ping_nodes}) ->
+    Nodes = amoc_dist:ping_nodes(),
+    {200, jsx:encode([{<<"nodes">>, Nodes}])};
 
 process_json(_Term, #state{action = list}) ->
     {ok, Filenames} = file:list_dir("scenarios"),
