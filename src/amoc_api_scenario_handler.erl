@@ -49,7 +49,8 @@ process_request(Req0, State) ->
 %%%%%%%%%%%%%%
 
 process_json(Term, #state{action = start}) ->
-   ScenarioB = proplists:get_value(<<"scenario">>, Term),
+
+    ScenarioB = proplists:get_value(<<"scenario">>, Term),
     Users = proplists:get_value(<<"users">>, Term),
     
     Scenario = erlang:binary_to_atom(ScenarioB, utf8),
