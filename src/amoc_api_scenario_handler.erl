@@ -31,11 +31,11 @@ from_json(Req0, State) ->
         Term = jsx:decode(Data),
         {Status, Reply} = process_json(Term, State),
         lager:info(Reply),
-        {ok,Req2} = cowboy_req:reply(Status,[ContentType], Reply, Req1),
+        {ok, Req2} = cowboy_req:reply(Status, [ContentType], Reply, Req1),
         {halt, Req2, State}
     catch _:_ ->
-        ReplyE = jsx:encode([{<<"error">>,<<"unknown">>}]),
-        {ok,ReqE} = cowboy_req:reply(500, [ContentType], ReplyE, Req1),
+        ReplyE = jsx:encode([{<<"error">>, <<"unknown">>}]),
+        {ok, ReqE} = cowboy_req:reply(500, [ContentType], ReplyE, Req1),
         {halt, ReqE, State}
     end.
 
@@ -52,10 +52,10 @@ process_json(Term, #state{action = start}) ->
     
     case code:load_file(Scenario) of
         {error,nofile} ->
-            {500, jsx:encode([{<<"error">>,<<"module_not_exists">>}])};
+            {500, jsx:encode([{<<"error">>, <<"module_not_exists">>}])};
         {module, Scenario} -> 
             _ = amoc_dist:do(Scenario, 1, Users),
-            {200, jsx:encode([{ScenarioB,<<"ok">>}])}
+            {200, jsx:encode([{ScenarioB, <<"ok">>}])}
     end;
 
 process_json(_Term, #state{action = stop}) ->
@@ -67,7 +67,7 @@ process_json(Term, #state{action = load}) ->
     Scenario = erlang:binary_to_atom(ScenarioB, utf8),
     ScenarioPath = "scenarios/" ++ erlang:atom_to_list(Scenario) ++ ".erl",
     ok = file:write_file(ScenarioPath, ModuleB, [write]),
-    case compile:file(ScenarioPath,[{outdir,"ebin"}]) of
+    case compile:file(ScenarioPath, [{outdir, "ebin"}]) of
         {ok, Scenario} ->
             code:purge(Scenario),
             {200, jsx:encode([{ScenarioB, <<"loaded">>}])};

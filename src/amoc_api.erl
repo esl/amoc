@@ -12,7 +12,7 @@ start_listener() ->
 
 -spec stop() -> ok | {error, not_found}.
 stop() ->
-	cowboy:stop_listener(amoc_api).
+    cowboy:stop_listener(amoc_api).
 
 -spec routes() -> cowboy_router:routes().
 routes() ->
@@ -23,5 +23,5 @@ routes() ->
        {"/load", amoc_api_scenario_handler, [load]},
        {"/ping_nodes", amoc_api_scenario_handler, [ping_nodes]},
        {"/status", amoc_api_handler, [status]},
-	     {"/test_status", amoc_api_test_handler, [test]}]
+         {"/test_status", amoc_api_test_handler, [test]}]
      }].
