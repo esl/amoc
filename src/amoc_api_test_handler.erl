@@ -9,25 +9,36 @@
          to_json/2,
          from_json/2]).
 
+-type state() :: list().
+
+-spec init(tuple(), cowboy:req(), state()) -> {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_rest}.
 
+-spec rest_init(cowboy:req(), [atom()]) -> {ok, cowboy:req(), state()}.
 rest_init(Req, _) ->
     {ok, Req, []}.
 
+-spec allowed_methods(cowboy:req(), state()) -> 
+        {[binary()], cowboy:req(), state()}.
 allowed_methods(Req, State) ->
     {[<<"GET">>, <<"POST">>], Req, State}.
 
+-spec content_types_accepted(cowboy:req(), state()) -> 
+        {[tuple()], cowboy:req(), state()}.
 content_types_accepted(Req, State) ->
     {[
         {<<"application/json">>, from_json}
     ], Req, State}.
 
+-spec content_types_provided(cowboy:req(), state()) -> 
+        {[tuple()], cowboy:req(), state()}.
 content_types_provided(Req, State) ->
     {[
         {<<"application/json">>, to_json}
     ], Req, State}.
 
+-spec from_json(cowboy:req(), state()) -> {halt | false, cowboy:req(), state()}.
 from_json(Req0, State) ->
     {ok, Data, Req1} = cowboy_req:body(Req0),
     [{<<"name">>, ScenarioName}] = jsx:decode(Data),
@@ -45,6 +56,7 @@ from_json(Req0, State) ->
         {false, ReqE, State}
     end.
 
+-spec to_json(cowboy:req(), state()) -> {halt, cowboy:req(), state()}.
 to_json(Req0, State) ->
     ResultErl = gen_event:call(amoc_event, amoc_test_event, get_all_tests),
     Response = jsx:encode(ResultErl),
