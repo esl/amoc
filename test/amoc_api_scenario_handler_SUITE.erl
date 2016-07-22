@@ -1,4 +1,4 @@
--module(amoc_api_handler_SUITE).
+-module(amoc_api_scenario_handler_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").

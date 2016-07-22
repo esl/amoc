@@ -1,4 +1,4 @@
--module(amoc_api_scenario_handler).
+-module(amoc_api_status_handler).
 
 -behavior(trails_handler).
 
@@ -21,17 +21,12 @@
 trails() ->
     Metadata =
         #{get =>
-          #{tags => ["scenario"],
-            description => "Gets scenario status",
-            produces => ["application/json"]
-          },
-          patch =>
-          #{tags => ["scenario"],
-            description => "Starts scenario",
+          #{tags => ["status"],
+            description => "Gets AMOC status, whether it is running or not",
             produces => ["application/json"]
           }
     },
-    [trails:trail("/scenarios/:id", amoc_api_scenario_handler, [], Metadata)].
+    [trails:trail("/status", amoc_api_status_handler, [], Metadata)].
 
 -spec init(tuple(), cowboy:req(), state()) -> {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _Req, _Opts) ->
@@ -44,7 +39,7 @@ rest_init(Req, [Action]) ->
 -spec allowed_methods(cowboy:req(), state()) -> 
         {[binary()], cowboy:req(), state()}.
 allowed_methods(Req, State) ->
-    {[<<"PATCH">>, <<"GET">>], Req, State}.
+    {[<<"POST">>, <<"GET">>], Req, State}.
 
 -spec content_types_provided(cowboy:req(), state()) -> 
         {[tuple()], cowboy:req(), state()}.

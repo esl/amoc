@@ -6,3 +6,4 @@ dialyzer/
 _rel/
 _build/
 scenarios/rebar.config
+test/*.beam

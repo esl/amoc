@@ -11,7 +11,9 @@
                   lhttpc,
                   ssl,
                   cowboy,
-                  jsx
+                  jsx,
+                  trails,
+                  cowboy_swagger
                  ]},
   {mod, { amoc_app, []}},
   {env, [{repeat_interval, 60000},

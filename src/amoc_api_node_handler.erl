@@ -1,4 +1,8 @@
--module(amoc_api_handler).
+-module(amoc_api_node_handler).
+
+-behavior(trails_handler).
+
+-export([trails/0]).
 
 -export([init/3]).
 
@@ -14,6 +18,17 @@
 
 -type state() :: #state{}.
 
+-spec trails() -> [tuple()] .
+trails() ->
+    Metadata =
+        #{get =>
+          #{tags => ["node"],
+            description => "Pings AMOC nodes from master node",
+            produces => ["application/json"]
+          }
+    },
+    [trails:trail("/nodes", amoc_api_node_handler, [], Metadata)].
+
 -spec init(tuple(), cowboy:req(), state()) -> {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_rest}.
@@ -25,7 +40,7 @@ rest_init(Req, [Action]) ->
 -spec allowed_methods(cowboy:req(), state()) -> 
         {[binary()], cowboy:req(), state()}.
 allowed_methods(Req, State) ->
-    {[<<"POST">>, <<"GET">>], Req, State}.
+    {[<<"GET">>], Req, State}.
 
 -spec content_types_provided(cowboy:req(), state()) -> 
         {[tuple()], cowboy:req(), state()}.
@@ -34,30 +49,7 @@ content_types_provided(Req, State) ->
       {<<"text/plain">>, status_response},
       {<<"text/html">>, status_response}], Req, State}.
 
--spec content_types_accepted(cowboy:req(), state()) -> 
-        {[tuple()], cowboy:req(), state()}.
-content_types_accepted(Req, State) ->
-    {[{{<<"application">>, <<"json">>, []}, from_json}], Req, State}.
-
--spec from_json(cowboy:req(), state()) -> {true | false, cowboy:req(), state()}.
-from_json(Req0, State) ->
-    {ok, Data, Req1} = cowboy_req:body(Req0),
-    try
-        Term = jsx:decode(Data),
-        ok = process_json(Term, State),
-        {true, Req1, State}
-    catch _:_ ->
-        {false, Req1, State}
-    end.
-
--spec process_json(term(), state()) -> ok.
-process_json(Term, #state{action = start}) ->
-    {<<"scenario">>, ScenarioB} = lists:keyfind(<<"scenario">>, 1, Term),
-    {<<"users">>, Users} = lists:keyfind(<<"users">>, 1, Term),
-    Scenario = erlang:binary_to_existing_atom(ScenarioB, utf8),
-    _ = amoc_dist:do(Scenario, 1, Users),
-    ok.
-
+%% TODO: do NOT use cowboy_req, let cowboy handle this
 -spec status_response(cowboy:req(), state()) -> {atom(), cowboy:req(), state()}.
 status_response(Req, State) ->
     Status = get_status(),
