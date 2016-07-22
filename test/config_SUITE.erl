@@ -13,7 +13,11 @@ groups() -> [].
 
 all() ->
     [config_osenv_test,
-     config_prop_test].
+     config_prop_test,
+     config_appenv_test,
+     config_none_test,
+     config_osappenv_test,
+     config_osenv_dynamic_test].
 
 init_per_suite(Config) ->
     Config.
@@ -62,13 +66,48 @@ config_prop() ->
 key() ->
     oneof([a, b, c, d, e, f, g]).
 
+config_appenv_test(_) ->
+    %% given
+    given_amoc_started(),
+    %% when
+    application:set_env(amoc, foo, bar),
+    %% then
+    ?assertEqual(bar, amoc_config:get(foo)).
+
+config_none_test(_) ->
+    %% when
+    application:unset_env(amoc, foo),
+    %% then
+    ?assertEqual(undefined, amoc_config:get(foo)).
+
+config_osappenv_test(_) ->
+    %% given
+    given_amoc_started(),
+    %% when
+    os:putenv("AMOC_foo", "bar"),
+    application:set_env(amoc, foo, baz),
+    %% then
+    ?assertEqual(bar, amoc_config:get(foo)).
+
+config_osenv_dynamic_test(_) ->
+    %% given
+    given_amoc_started(),
+    %% when
+    os:putenv("AMOC_foo", "bar"),
+    %% then
+    ?assertEqual(bar, amoc_config:get(foo)),
+    %% when
+    os:putenv("AMOC_foo", "baz"),
+    %% then
+    ?assertEqual(baz, amoc_config:get(foo)).
+
 %% Abstract state machine
 initial_state() ->
     #{vars => [], envs => []}.
 
 command(_S) ->
     oneof([
-           {call, amoc_config, set, [key(), any()]},
+           {call, ?MODULE, set_app_env_variable, [key(), any()]},
            {call, amoc_config, get, [key()]},
            {call, amoc_config, get, [key(), any()]},
            {call, ?MODULE, set_env_variable, [key(), any()]},
@@ -80,8 +119,15 @@ precondition(_S, _) ->
     true.
 
 %%
-next_state(S=#{vars := Vars}, _Res, {call, amoc_config, set, [Key, Value]}) ->
-    S#{vars := lists:keystore(Key, 1, Vars, {Key, Value})};
+next_state(S=#{vars := Vars}, _Res, {call, ?MODULE, set_app_env_variable, 
+                                        [Key, Value]}) ->
+    ConvertedKey = lists:flatten(io_lib:format("~p", [Key])),
+    case os:getenv("AMOC_" ++ ConvertedKey) of
+        false ->
+            S#{vars := lists:keystore(Key, 1, Vars, {Key, Value})};
+        ValueOther ->
+            S
+    end;
 
 next_state(S=#{vars := Vars, envs := Envs}, _Res,
            {call, ?MODULE, set_env_variable, [Key, Value]}) ->
@@ -113,8 +159,10 @@ postcondition(_S, {call, _, _, _}, _Res) ->
 set_env_variable(Name, Value) ->
     EnvName = "AMOC_" ++ atom_to_list(Name),
     true = os:putenv(EnvName, lists:flatten(io_lib:format("~p", [Value]))),
-    %% Reset only this env variable in the application
-    ok = amoc_config:set_env_variables(os:getenv(), fun(N) -> N =:= Name end).
+    ok.
+
+set_app_env_variable(Name, Value) ->
+    ok = application:set_env(amoc, Name, Value).
 
 safe_fetch(Name) ->
     catch amoc_config:fetch(Name).

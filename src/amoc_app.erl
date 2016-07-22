@@ -15,7 +15,6 @@
 
 -spec start(application:start_type(), term()) -> {ok, pid()}.
 start(_StartType, _StartArgs) ->
-    ok = amoc_config:start(),
     Ret = amoc_sup:start_link(),
     amoc_dist:start_nodes(),
     ok = amoc_event:add_handler(amoc_annotations, []),
