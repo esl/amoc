@@ -27,7 +27,7 @@ trails() ->
           },
           post =>
           #{tags => ["scenarios"],
-            description => "Adds new scenario"
+            description => "Adds new scenario",
             produces => ["application/json"]
           }
     },

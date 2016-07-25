@@ -10,112 +10,106 @@
          allowed_methods/2,
          content_types_provided/2,
          content_types_accepted/2,
-         process_request/2,
-         process_json/2]).
+         handle_get/2,
+         handle_patch/2]).
 
--record(state, {action}).
+
+-record(state, {resource}).
 
 -type state() :: #state{}.
 
 -spec trails() -> [tuple()] .
 trails() ->
     Metadata =
-        #{get =>
-          #{tags => ["scenario"],
-            description => "Gets scenario status",
-            produces => ["application/json"]
-          },
-          patch =>
-          #{tags => ["scenario"],
-            description => "Starts scenario",
-            produces => ["application/json"]
-          }
-    },
-    [trails:trail("/scenarios/:id", amoc_api_scenario_handler, [], Metadata)].
+    #{get =>
+      #{tags => ["scenario"],
+        description => "Gets scenario status",
+        produces => ["application/json"]
+       },
+      patch =>
+      #{tags => ["scenario"],
+        description => "Starts scenario",
+        produces => ["application/json"]
+       }
+     },
+    [trails:trail("/scenarios/:id", ?MODULE, [], Metadata)].
 
 -spec init(tuple(), cowboy:req(), state()) -> {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_rest}.
 
 -spec rest_init(cowboy:req(), [atom()]) -> {ok, cowboy:req(), state()}.
-rest_init(Req, [Action]) ->
-    {ok, Req, #state{action = Action}}.
+rest_init(Req, _Opts) ->
+    {PathB,Req2} = cowboy_req:path(Req),
+    Resource = get_resource_string(PathB),
+    {ok, Req2, #state{resource = Resource}}.
 
 -spec allowed_methods(cowboy:req(), state()) -> 
-        {[binary()], cowboy:req(), state()}.
+    {[binary()], cowboy:req(), state()}.
 allowed_methods(Req, State) ->
     {[<<"PATCH">>, <<"GET">>], Req, State}.
 
 -spec content_types_provided(cowboy:req(), state()) -> 
-        {[tuple()], cowboy:req(), state()}.
+    {[tuple()], cowboy:req(), state()}.
 content_types_provided(Req, State) ->
-    {[{<<"application/json">>, process_request}], Req, State}.
+    {[{<<"application/json">>, handle_get}], Req, State}.
 
 -spec content_types_accepted(cowboy:req(), state()) -> 
-        {[tuple()], cowboy:req(), state()}.
+    {[tuple()], cowboy:req(), state()}.
 content_types_accepted(Req, State) ->
-    {[{<<"application/json">>, process_request}], Req, State}.
+    {[{<<"application/json">>, handle_patch}], Req, State}.
 
--spec process_request(cowboy:req(), state()) -> 
-    {halt, cowboy:req(), state()}.
-process_request(Req0, State) ->
-    {ok, Data, Req1} = cowboy_req:body(Req0),
-    ContentType = {<<"content-type">>, <<"application/json">>},
-    try
-        Term = case jsx:is_json(Data) of
-            true -> jsx:decode(Data);
-            false -> undef
-        end,
-        {Status, Reply} = process_json(Term, State),
-        lager:info(Reply),
-        {ok, Req2} = cowboy_req:reply(Status, [ContentType], Reply, Req1),
-        {halt, Req2, State}
-    catch _:_ ->
-        ReplyE = jsx:encode([{<<"error">>, <<"unknown">>}]),
-        {ok, ReqE} = cowboy_req:reply(500, [ContentType], ReplyE, Req1),
-        {halt, ReqE, State}
+%% Request processing functions
+
+-spec handle_get(cowboy:req(), state()) -> 
+    {string() | halt, cowboy:req(), state()}.
+handle_get(Req0, State = #state{resource = Resource}) ->
+    lager:info("GET"),
+
+    {ok, Files} = file:list_dir("scenarios/"),
+    Pred = fun (File) -> File == Resource ++ ".erl" end,
+
+    case lists:filter(Pred, Files) of
+        [] ->
+            {halt, Req0, State};
+        [File] ->
+            %% Need to retrive state of module here
+            Reply = "{ module : " ++ File ++ " }",
+            {Reply, Req0, State}
     end.
 
-%%%%%%%%%%%%%%
-% Request processing functions
-%%%%%%%%%%%%%%
--spec process_json(jsx:json_term(), state()) -> {integer(), jsx:json_text()}.
-process_json(Term, #state{action = start}) ->
-   ScenarioB = proplists:get_value(<<"scenario">>, Term),
-    Users = proplists:get_value(<<"users">>, Term),
-    
-    Scenario = erlang:binary_to_atom(ScenarioB, utf8),
-    
-    case code:load_file(Scenario) of
-        {error, nofile} ->
-            {500, jsx:encode([{<<"error">>, <<"module_not_exists">>}])};
-        {module, Scenario} -> 
+
+-spec handle_patch(cowboy:req(), state()) ->
+    {string() | halt | ok, cowboy:req(), state()}.
+handle_patch(Req0, State = #state{resource = Resource}) ->
+    lager:info("PATCH"),
+
+    {ok, Data, Req1} = cowboy_req:body(Req0),
+    JSON = jsx:decode(Data),
+
+    {ok, Files} = file:list_dir("scenarios/"),
+    Pred = fun (File) -> File == Resource ++ ".erl" end,
+    ScenarioFile = lists:filter(Pred, Files),
+
+    case ScenarioFile  of
+        [] ->
+            {halt, Req1, State};
+        [_File] ->
+            Scenario = erlang:list_to_atom(Resource),
+            Users = proplists:get_value(<<"users">>, JSON),
+
+            Result = code:load_file(Scenario),
             _ = amoc_dist:do(Scenario, 1, Users),
-            {200, jsx:encode([{ScenarioB, <<"ok">>}])}
-    end;
 
-process_json(_Term, #state{action = stop}) ->
-    {200, jsx:encode("ok")};
+            Reply = jsx:encode([Result]),
+            Req2 = cowboy_req:set_resp_body(Reply, Req1),
+            {true, Req2, State}
+    end.
 
-process_json(Term, #state{action = load}) ->
-    ScenarioB = proplists:get_value(<<"scenario">>, Term),
-    ModuleB = proplists:get_value(<<"module_source">>, Term),
-    Scenario = erlang:binary_to_atom(ScenarioB, utf8),
-    ScenarioPath = "scenarios/" ++ erlang:atom_to_list(Scenario) ++ ".erl",
-    ok = file:write_file(ScenarioPath, ModuleB, [write]),
-    case compile:file(ScenarioPath, [{outdir, "ebin"}]) of
-        {ok, Scenario} ->
-            code:purge(Scenario),
-            {200, jsx:encode([{ScenarioB, <<"loaded">>}])};
-        error ->
-            {500, jsx:encode([{<<"error">>, <<"compilation_error">>}])}
-    end;
+%% Internal
+-spec get_resource_string(binary()) -> string().
+get_resource_string(PathBinary) ->
+    PathList = binary_to_list(PathBinary),
+    PathSplit = string:tokens(PathList,"/"),
+    lists:last(PathSplit).
 
-process_json(_Term, #state{action = ping_nodes}) ->
-    Nodes = amoc_dist:ping_nodes(),
-    {200, jsx:encode([{<<"nodes">>, Nodes}])};
-
-process_json(_Term, #state{action = list}) ->
-    {ok, Filenames} = file:list_dir("scenarios"),
-    FilenamesB = [ list_to_binary(X) || X <- Filenames ],
-    {200, jsx:encode([{<<"scenarios">>, FilenamesB}])}.

@@ -10,8 +10,6 @@
          allowed_methods/2,
          content_types_accepted/2,
          content_types_provided/2,
-         from_json/2,
-         process_json/2,
          status_response/2]).
 
 -record(state, {action}).
@@ -48,6 +46,13 @@ content_types_provided(Req, State) ->
     {[{<<"application/json">>, status_response}, 
       {<<"text/plain">>, status_response},
       {<<"text/html">>, status_response}], Req, State}.
+
+
+-spec content_types_accepted(cowboy:req(), state()) ->
+    {[tuple()], cowboy:req(), state()}.
+content_types_accepted(Req, State) ->
+    {[{<<"application/json">>, process_request}], Req, State}.
+
 
 %% TODO: do NOT use cowboy_req, let cowboy handle this
 -spec status_response(cowboy:req(), state()) -> {atom(), cowboy:req(), state()}.
