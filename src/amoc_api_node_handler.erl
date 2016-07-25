@@ -8,10 +8,7 @@
 
 -export([rest_init/2,
          allowed_methods/2,
-         content_types_accepted/2,
          content_types_provided/2,
-         from_json/2,
-         process_json/2,
          status_response/2]).
 
 -record(state, {action}).

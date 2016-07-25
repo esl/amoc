@@ -11,7 +11,7 @@ start_listener() ->
                 amoc_api_status_handler,
                 cowboy_swagger_handler],
     Trails = trails:trails(Handlers),
-    trails:store(Trails)
+    trails:store(Trails),
     Dispatch = trails:single_host_compile(Trails),
     %% Dispatch = cowboy_router:compile(routes()),
     {ok, _Pid} = cowboy:start_http(amoc_api, 10, [{port, Port}],
