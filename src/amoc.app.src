@@ -10,9 +10,9 @@
                   exometer,
                   lhttpc,
                   ssl,
-                  cowboy,
                   jsx,
                   trails,
+                  cowboy,
                   cowboy_swagger
                  ]},
   {mod, { amoc_app, []}},
