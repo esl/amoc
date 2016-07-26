@@ -163,7 +163,7 @@ You can also define your own entries that you might later use in your
 scenarios.
 
 The ``amoc_config`` is a module for getting environment variables. For each time
-we ask for a variable, ``amoc config`` firstly looks into OS environment variables
+we ask for a variable, ``amoc_config`` firstly looks into OS environment variables
 (with ``AMOC_`` prefix e.g. if we want set ``interarrival`` we should set OS 
 environment variable ``AMOC_interarrival``), and if it doesn't find it gets value
 from Erlang application environment variables. What's more we can set variables 
@@ -189,7 +189,7 @@ As long as you need to set only the amoc application variables (including
 your scenario-specific settings), you can do
 it in the ``ansible/group_vars/amoc`` file. You can also do it later in Erlang
 console (``application:set_env/3``) or set OS environment variable (with prefix
-``AMOC_``).
+``AMOC_``). Remember that OS environment variable will be taken if present even if you set it by ``application:set_env/3``.
 
 A separate file is required for this
 since dictionaries are not supported in the inventory file.
