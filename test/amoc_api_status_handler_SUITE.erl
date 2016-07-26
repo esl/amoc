@@ -4,16 +4,14 @@
 -include_lib("eunit/include/eunit.hrl").
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
--export([works_when_amoc_running_offline/1,
-         works_when_amoc_running_online/1,
+-export([returns_true_when_amoc_up_offline/1,
+         returns_true_when_amoc_up_online/1,
          returns_false_when_api_up_and_amoc_down_offline/1,
          returns_false_when_api_up_and_amoc_down_online/1]).
 
--record(state, {action}).
-
 all() ->
-    [works_when_amoc_running_offline,
-     works_when_amoc_running_online,
+    [returns_true_when_amoc_up_offline,
+     returns_true_when_amoc_up_online,
      returns_false_when_api_up_and_amoc_down_offline,
      returns_false_when_api_up_and_amoc_down_online].
 
@@ -26,7 +24,7 @@ end_per_testcase(_, _Config) ->
     application:stop(amoc),
     amoc_api:stop().
 
-works_when_amoc_running_offline(_Config) ->
+returns_true_when_amoc_up_offline(_Config) ->
     %% given
     given_applications_started(),
     %% when
@@ -34,16 +32,14 @@ works_when_amoc_running_offline(_Config) ->
     %% then
     ?assert(Status).
 
-works_when_amoc_running_online(_Config) ->
+returns_true_when_amoc_up_online(_Config) ->
     %% given
     given_applications_started(),
     %% when
-    Result = httpc:request(get, {get_url() ++  "/status", [{"Accept", "application/json"}]}, [], []),
-    {ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result,
-    BodyErl = jsx:decode(erlang:list_to_bitstring(Body)),
+    {CodeHttp, Body} = send_request(),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"result">>, true}], BodyErl).
+    ?assertMatch([{<<"result">>, true}], Body).
 
 
 returns_false_when_api_up_and_amoc_down_offline(_Config) ->
@@ -58,22 +54,30 @@ returns_false_when_api_up_and_amoc_down_online(_Config) ->
     %% given
     given_http_api_started(),
     %% when
-    Result = httpc:request(get_url() ++ "/status"),
-    {ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result, 
-    BodyErl = jsx:decode(erlang:list_to_bitstring(Body)),
+    {CodeHttp, Body} = send_request(),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"result">>, false}], BodyErl).
+    ?assertMatch([{<<"result">>, false}], Body).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% HELPERS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec given_applications_started() -> {ok, [atom()]} | {error, term()}.
 given_applications_started() ->
     application:ensure_all_started(amoc).
 
+-spec given_http_api_started() -> {ok, pid()}.
 given_http_api_started() ->
     amoc_api:start_listener().
 
+-spec get_url() -> string().
 get_url() ->
     Port = amoc_config:get(api_port, 4000),
     "http://localhost:" ++ erlang:integer_to_list(Port).
+
+-spec send_request() -> {integer(), jsx:json_term()}.
+send_request() ->
+    Result = httpc:request(get_url() ++ "/status"),
+    {ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result, 
+    BodyErl = jsx:decode(erlang:list_to_bitstring(Body)),
+    {CodeHttp, BodyErl}.
