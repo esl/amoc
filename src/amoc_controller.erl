@@ -34,7 +34,8 @@
          remove/1,
          remove/2,
          remove/3,
-         users/0]).
+         users/0,
+         test_status/1]).
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
@@ -89,6 +90,11 @@ users() ->
     {ok, U} = gen_server:call(?SERVER, users),
     U.
 
+-spec test_status(atom()) -> boolean().  
+test_status(ScenarioName) ->
+    {ok, Res} = gen_server:call(?SERVER, {status, ScenarioName}),
+    Res.
+
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -107,6 +113,8 @@ handle_call(users, _From, State) ->
     Reply = [{count, ets:info(?TABLE, size)},
              {last, ets:last(?TABLE)}],
     {reply, {ok, Reply}, State};
+handle_call({status, Scenario}, _From, State) ->
+    {reply, get_test_status(Scenario), State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
@@ -272,3 +280,10 @@ node_userids(Start, End, Nodes, NodeId) when is_integer(Nodes), Nodes > 0,
 -spec interarrival() -> integer().
 interarrival() ->
     amoc_config:get(interarrival, ?INTERARRIVAL_DEFAULT).
+
+-spec get_test_status(atom()) -> boolean().
+get_test_status(_Scenario) ->
+    case supervisor:which_children(amoc_users_sup) of
+        [] -> true;
+        _Children -> false
+    end.
