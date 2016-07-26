@@ -24,6 +24,11 @@ ct:
 	@if [ $$SUITE ]; then ./rebar skip_deps=true -v ct suite=$$SUITE; \
 		else ./rebar skip_deps=true -v ct; fi
 
+prop_files := $(shell ls test/ | grep 'prop_.*\.erl')
+
+prop:
+	@ct_run -pa ebin/ -pa deps/*/ebin/ -suite $(prop_files); fi
+
 eunit:
 	@if [ $$SUITE ]; then ./rebar skip_deps=true eunit suite=$$SUITE; \
 		else ./rebar skip_deps=true eunit; fi
