@@ -10,11 +10,13 @@
          allowed_methods/2,
          content_types_provided/2,
          content_types_accepted/2,
+         malformed_request/2,
+         resource_exists/2,
          handle_get/2,
          handle_patch/2]).
 
 
--record(state, {resource}).
+-record(state, {resource, users}).
 
 -type state() :: #state{}.
 
@@ -59,52 +61,69 @@ content_types_provided(Req, State) ->
 content_types_accepted(Req, State) ->
     {[{<<"application/json">>, handle_patch}], Req, State}.
 
+-spec malformed_request(cowboy:req(), state()) ->
+    {boolean(), cowboy:req(), state()}.
+malformed_request(Req, State) ->
+    {Method, Req2} = cowboy_req:method(Req),
+    malformed_request(Method, Req2, State).
+
+malformed_request(<<"PATCH">>, Req, State) ->
+    {ok, Body, Req2} = cowboy_req:body(Req),
+    case jsx:is_json(Body) of
+        false ->
+            {true, Req2, State};
+        true ->
+            JSON = jsx:decode(Body),
+            ContainUsers = proplists:is_defined(<<"users">>, JSON),
+            case ContainUsers of
+                true ->
+                    Users = proplists:get_value(<<"users">>, JSON),
+                    State2 = State#state{users = Users},                    
+                    {false, Req2, State2};
+                false ->
+                    {true, Req2, State}
+            end
+    end;
+
+malformed_request(_, Req, State) ->
+    {false, Req, State}.
+
+-spec resource_exists(cowboy:req(), state()) ->
+    {boolean(), cowboy:req(), state()}.
+resource_exists(Req, State = #state{resource = Resource}) ->
+    {ok, Files} = file:list_dir("scenarios/"),
+    Pred = fun (File) -> File == Resource ++ ".erl" end,
+    case lists:filter(Pred, Files) of
+        [] ->
+            {false, Req, State};
+        [_File] ->
+            {true, Req, State}
+    end.
+
+
+
 %% Request processing functions
 
 -spec handle_get(cowboy:req(), state()) -> 
     {string() | halt, cowboy:req(), state()}.
 handle_get(Req0, State = #state{resource = Resource}) ->
-    lager:info("GET"),
-
-    {ok, Files} = file:list_dir("scenarios/"),
-    Pred = fun (File) -> File == Resource ++ ".erl" end,
-
-    case lists:filter(Pred, Files) of
-        [] ->
-            {halt, Req0, State};
-        [File] ->
-            %% Need to retrive state of module here
-            Reply = "{ module : " ++ File ++ " }",
-            {Reply, Req0, State}
-    end.
+    %% Need to retrive state of module here
+    Reply = "{ module : " ++ Resource ++ " }",
+    {Reply, Req0, State}.
 
 
 -spec handle_patch(cowboy:req(), state()) ->
     {string() | halt | ok, cowboy:req(), state()}.
-handle_patch(Req0, State = #state{resource = Resource}) ->
-    lager:info("PATCH"),
+handle_patch(Req0, State = #state{resource = Resource, users = Users}) ->
+    Scenario = erlang:list_to_atom(Resource),
+    code:purge(Scenario),
+    Result = code:load_file(Scenario),
 
-    {ok, Data, Req1} = cowboy_req:body(Req0),
-    JSON = jsx:decode(Data),
+    _ = amoc_dist:do(Scenario, 1, Users),
 
-    {ok, Files} = file:list_dir("scenarios/"),
-    Pred = fun (File) -> File == Resource ++ ".erl" end,
-    ScenarioFile = lists:filter(Pred, Files),
-
-    case ScenarioFile  of
-        [] ->
-            {halt, Req1, State};
-        [_File] ->
-            Scenario = erlang:list_to_atom(Resource),
-            Users = proplists:get_value(<<"users">>, JSON),
-
-            Result = code:load_file(Scenario),
-            _ = amoc_dist:do(Scenario, 1, Users),
-
-            Reply = jsx:encode([Result]),
-            Req2 = cowboy_req:set_resp_body(Reply, Req1),
-            {true, Req2, State}
-    end.
+    Reply = jsx:encode([Result]),
+    Req1 = cowboy_req:set_resp_body(Reply, Req0),
+    {true, Req1, State}.
 
 %% Internal
 -spec get_resource_string(binary()) -> string().
