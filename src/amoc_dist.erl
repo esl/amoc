@@ -23,7 +23,7 @@ start_nodes() ->
 
 -spec ping_nodes() -> [pong|pang].
 ping_nodes() ->
-    Hosts = application:get_env(amoc, hosts, []),
+    Hosts = amoc_config:get(hosts, []),
     [ ping_node(amoc_slave:node_name(Host)) || Host <- Hosts ].
 
 -spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) ->
