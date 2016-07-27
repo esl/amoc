@@ -29,7 +29,8 @@ user_spec(ProfileId, XMPPToken, Res) ->
       {resource, Res}
     ].
 
--spec make_user_cfg(amoc_scenario:user_id(), binary()) -> escalus_users:user_spec().
+-spec make_user_cfg(amoc_scenario:user_id(), binary()) ->
+    escalus_users:user_spec().
 make_user_cfg(GeriId, R) ->
     BinId = integer_to_binary(GeriId),
     ProfileId = <<"user_", BinId/binary>>,
@@ -53,7 +54,7 @@ start(MyId) ->
     lager:info("presence resp ~p", [escalus_client:wait_for_stanza(Client)]),
     timer:sleep(5000),
 
-    NeighbourIds = lists:delete(MyId, lists:seq(max(1,MyId-4),MyId+4)),
+    NeighbourIds = lists:delete(MyId, lists:seq(max(1, MyId-4), MyId+4)),
     send_messages_many_times(Client, 20000, NeighbourIds),
 
     timer:sleep(10*1000),
@@ -73,13 +74,16 @@ send_presence_unavailable(Client) ->
 -spec send_messages_many_times(escalus:client(), timeout(), [binjid()]) -> ok.
 send_messages_many_times(Client, MessageInterval, NeighbourIds) ->
     S = fun(_) ->
-                send_messages_to_neighbors(Client, NeighbourIds, MessageInterval)
+                send_messages_to_neighbors(Client,
+                                           NeighbourIds,
+                                           MessageInterval)
         end,
     lists:foreach(S, lists:seq(1, 5)).
 
 
--spec send_messages_to_neighbors(escalus:client(), [binjid()], timeout()) -> list().
-send_messages_to_neighbors(Client,TargetIds, SleepTime) ->
+-spec send_messages_to_neighbors(escalus:client(), [binjid()], timeout()) ->
+    list().
+send_messages_to_neighbors(Client, TargetIds, SleepTime) ->
     [send_message(Client, make_jid(TargetId), SleepTime)
      || TargetId <- TargetIds].
 

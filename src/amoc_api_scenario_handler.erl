@@ -42,7 +42,7 @@ init({tcp, http}, _Req, _Opts) ->
 
 -spec rest_init(cowboy:req(), [atom()]) -> {ok, cowboy:req(), state()}.
 rest_init(Req, _Opts) ->
-    {PathB,Req2} = cowboy_req:path(Req),
+    {PathB, Req2} = cowboy_req:path(Req),
     Resource = get_resource_string(PathB),
     {ok, Req2, #state{resource = Resource}}.
 
@@ -129,6 +129,6 @@ handle_patch(Req0, State = #state{resource = Resource, users = Users}) ->
 -spec get_resource_string(binary()) -> string().
 get_resource_string(PathBinary) ->
     PathList = binary_to_list(PathBinary),
-    PathSplit = string:tokens(PathList,"/"),
+    PathSplit = string:tokens(PathList, "/"),
     lists:last(PathSplit).
 
