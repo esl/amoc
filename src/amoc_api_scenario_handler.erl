@@ -108,7 +108,7 @@ resource_exists(Req, State = #state{resource = Resource}) ->
     {string() | halt, cowboy:req(), state()}.
 handle_get(Req0, State = #state{resource = Resource}) ->
     %% Need to retrive state of module here
-    Reply = "{ module : " ++ Resource ++ " }",
+    Reply = jsx:encode([{module, Resource}]),
     {Reply, Req0, State}.
 
 
