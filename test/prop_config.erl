@@ -48,7 +48,7 @@ next_state(S=#{vars := Vars}, _Res, {call, ?MODULE, set_app_env_variable,
     case os:getenv("AMOC_" ++ ConvertedKey) of
         false ->
             S#{vars := lists:keystore(Key, 1, Vars, {Key, Value})};
-        ValueOther ->
+        _ ->
             S
     end;
 
