@@ -4,7 +4,7 @@
 
 -spec start_listener() -> {ok, pid()}.
 start_listener() ->
-    Port = amoc_api:get(api_port, 4000),
+    Port = amoc_config:get(api_port, 4000),
     Handlers = [amoc_api_scenarios_handler,
                 amoc_api_scenario_handler,
                 amoc_api_node_handler,
@@ -32,5 +32,5 @@ routes() ->
        {"/load", amoc_api_scenario_handler, [load]},
        {"/ping_nodes", amoc_api_scenario_handler, [ping_nodes]},
        {"/status", amoc_api_handler, [status]},
-         {"/test_status", amoc_api_test_handler, [test]}]
+       {"/test_status", amoc_api_test_handler, [test]}]
      }].

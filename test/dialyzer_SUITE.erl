@@ -3,30 +3,11 @@
 
 -compile(export_all).
 
-suite() -> [].
-
-groups() -> [].
-
 all() ->
     [run_dialyzer].
 
 init_per_suite(Config) ->
     ok = filelib:ensure_dir(filename:join(dialyzer_dir(), ".file")),
-    Config.
-
-end_per_suite(_Config) ->
-    ok.
-
-init_per_group(_group, Config) ->
-    Config.
-
-end_per_group(_group, Config) ->
-    Config.
-
-init_per_testcase(_TestCase, Config) ->
-    Config.
-
-end_per_testcase(_TestCase, Config) ->
     Config.
 
 run_dialyzer(Config) ->
