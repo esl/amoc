@@ -27,7 +27,7 @@ ct:
 prop_files := $(shell ls test/ | grep 'prop_.*\.erl')
 
 prop:
-	@if [ $$PROP ]; then ct_run -pa ebin/ -pa deps/*/ebin/ -suite $$PROP; \
+	@if [ $$PROP ]; then ct_run -logdir logs -pa ebin/ -pa deps/*/ebin/ -suite $$PROP; \
 		else ct_run -pa ebin/ -pa deps/*/ebin/ -suite $(prop_files); fi
 
 eunit:
