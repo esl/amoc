@@ -1,4 +1,4 @@
-.PHONY: all rel compile deploy prepare deps test ct eunit
+.PHONY: all rel compile deploy prepare deps test ct eunit prop
 
 all: rel deploy
 
@@ -24,11 +24,17 @@ ct:
 	@if [ $$SUITE ]; then ./rebar skip_deps=true -v ct suite=$$SUITE; \
 		else ./rebar skip_deps=true -v ct; fi
 
+prop_files := $(shell ls test/ | grep 'prop_.*\.erl')
+
+prop:
+	@if [ $$PROP ]; then ct_run -pa ebin/ -pa deps/*/ebin/ -suite $$PROP; \
+		else ct_run -pa ebin/ -pa deps/*/ebin/ -suite $(prop_files); fi
+
 eunit:
 	@if [ $$SUITE ]; then ./rebar skip_deps=true eunit suite=$$SUITE; \
 		else ./rebar skip_deps=true eunit; fi
 
-test: compile eunit ct
+test: compile eunit ct prop
 
 dialyzer/erlang.plt:
 	@mkdir -p dialyzer
