@@ -23,12 +23,9 @@ returns_empty_list_when_amoc_up(_Config) ->
     given_applications_started(),
     %% when
     {CodeHttp,JSON} = send_request(),
-    [{Answer,List}] = JSON,
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertEqual(<<"nodes">>, Answer),
-    ?assert(is_list(List)),
-    ?assertEqual(0, erlang:length(List)).
+    ?assertMatch([{<<"nodes">>, []}], JSON).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% HELPERS
