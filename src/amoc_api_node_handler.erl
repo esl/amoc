@@ -22,7 +22,7 @@ trails() ->
             produces => ["application/json"]
           }
     },
-    [trails:trail("/nodes", amoc_api_node_handler, [], Metadata)].
+    [trails:trail("/nodes", ?MODULE, [], Metadata)].
 
 -spec init(tuple(), cowboy:req(), state()) -> {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _Req, _Opts) ->
