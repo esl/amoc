@@ -114,7 +114,10 @@ handle_call(users, _From, State) ->
              {last, ets:last(?TABLE)}],
     {reply, {ok, Reply}, State};
 handle_call({status, Scenario}, _From, State) ->
-    {reply, get_test_status(Scenario), State};
+    case Scenario =:= State#state.scenario of
+        true -> {reply, get_test_status(), State};
+        false -> {reply, undefined, State}
+    end;
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
@@ -281,8 +284,8 @@ node_userids(Start, End, Nodes, NodeId) when is_integer(Nodes), Nodes > 0,
 interarrival() ->
     amoc_config:get(interarrival, ?INTERARRIVAL_DEFAULT).
 
--spec get_test_status(atom()) -> boolean().
-get_test_status(_Scenario) ->
+-spec get_test_status() -> boolean().
+get_test_status() ->
     case supervisor:which_children(amoc_users_sup) of
         [] -> true;
         _Children -> false
