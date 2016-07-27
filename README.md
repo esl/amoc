@@ -148,13 +148,14 @@ After that the scenario will keep running.
 
 amoc is configured through OTP application environment variables that
 are loaded from the configuration file, operating system environment variables 
-(with prefix ``AMOC_``) and Erlang application environment variables.
+(with prefix ``AMOC_``) and Erlang application environment variables
+(`priv/app.config`).
 
 Internally, amoc is using the following settings:
 
 - ``interarrival`` - a delay in ms, for each node, between creating process
   for two consecutive users. Defaults to 50 ms.
-- ``repeat_interval`` - a delay in ms, each user process waits
+- ``repeat_interval`` - a delay in ms each user process waits
   before starting the same scenario again. Defaults to 1 minute.
 - ``repeat_num`` - number of scenario repetitions for each process.
   Defaults to ``infinity``.
@@ -162,18 +163,19 @@ Internally, amoc is using the following settings:
 You can also define your own entries that you might later use in your
 scenarios.
 
-The ``amoc_config`` is a module for getting environment variables. For each time
-we ask for a variable, ``amoc_config`` firstly looks into OS environment variables
-(with ``AMOC_`` prefix e.g. if we want set ``interarrival`` we should set OS 
-environment variable ``AMOC_interarrival``), and if it doesn't find it gets value
-from Erlang application environment variables. What's more we can set variables 
-dynamically (via set OS variable or ``application:set_env(amoc, VARIABLE_NAME,
-VARIABLE_VALUE)`` in Erlang).
+The ``amoc_config`` is a module for getting configuration. Every time we ask
+for a config value, ``amoc_config`` looks into OS environment variables first
+(with ``AMOC_`` prefix; e.g. if we want to set ``interarrival`` by this mechanism
+we should set OS environment variable ``AMOC_interarrival``), and if it doesn't
+find it there, it tries to get it from the Erlang application environment variables.
+If it cannot find it there either and the default value was not supplied, an error
+it thrown. What's more, we can set variables  dynamically (by setting OS variable or
+``application:set_env(amoc, VARIABLE_NAME, VARIABLE_VALUE)`` in Erlang).
 
 ``amoc_config`` provides the following function:
 
 - ``get(Name)`` and ``get(Name, Default)`` - return the value for the
-  given config entry, all values defined in the config file are available.
+  given config entry according to the aforementioned rules.
 
 ### Locally (without ansible)
 
