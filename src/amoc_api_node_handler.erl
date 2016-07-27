@@ -17,14 +17,15 @@
 trails() ->
     Metadata =
         #{get =>
-          #{tags => ["node"],
-            description => "Pings AMOC nodes from master node",
-            produces => ["application/json"]
-          }
-    },
+              #{tags => ["node"],
+                description => "Pings AMOC nodes from master node",
+                produces => ["application/json"]
+               }
+         },
     [trails:trail("/nodes", ?MODULE, [], Metadata)].
 
--spec init(tuple(), cowboy:req(), state()) -> {upgrade, protocol, cowboy_rest}.
+-spec init(tuple(), cowboy:req(), state()) ->
+                  {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_rest}.
 
@@ -33,16 +34,17 @@ rest_init(Req, _) ->
     {ok, Req, []}.
 
 -spec allowed_methods(cowboy:req(), state()) -> 
-        {[binary()], cowboy:req(), state()}.
+                             {[binary()], cowboy:req(), state()}.
 allowed_methods(Req, State) ->
     {[<<"GET">>], Req, State}.
 
 -spec content_types_provided(cowboy:req(), state()) ->
-         {[tuple()], cowboy:req(), state()}.
+                                    {[tuple()], cowboy:req(), state()}.
 content_types_provided(Req, State) ->
     {[{<<"application/json">>, to_json}], Req, State}.
 
--spec to_json(cowboy:req(), state()) -> {jsx:json_text(), cowboy:req(), state()}.
+-spec to_json(cowboy:req(), state()) ->
+                     {jsx:json_text(), cowboy:req(), state()}.
 to_json(Req, State) ->
     Nodes = amoc_dist:ping_nodes(),
     {jsx:encode([{<<"nodes">>, Nodes}]), Req, State}.
