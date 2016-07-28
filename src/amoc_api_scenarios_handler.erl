@@ -11,8 +11,8 @@
          content_types_provided/2,
          content_types_accepted/2,
          malformed_request/2,
-         handle_get/2,
-         handle_post/2]).
+         to_json/2,
+         from_json/2]).
 
 
 -record(state, {module_name, module_source}).
@@ -51,12 +51,12 @@ allowed_methods(Req, State) ->
 -spec content_types_provided(cowboy:req(), state()) -> 
     {[tuple()], cowboy:req(), state()}.
 content_types_provided(Req, State) ->
-    {[{<<"application/json">>, handle_get}], Req, State}.
+    {[{<<"application/json">>, to_json}], Req, State}.
 
 -spec content_types_accepted(cowboy:req(), state()) -> 
     {[tuple()], cowboy:req(), state()}.
 content_types_accepted(Req, State) ->
-    {[{<<"application/json">>, handle_post}], Req, State}.
+    {[{<<"application/json">>, from_json}], Req, State}.
 
 -spec malformed_request(cowboy:req(), state()) ->
     {boolean(), cowboy:req(), state()}.
@@ -102,9 +102,9 @@ malformed_request(_, Req, State) ->
 
 %% Request processing functions
 
--spec handle_get(cowboy:req(), state()) -> 
+-spec to_json(cowboy:req(), state()) -> 
     {string() | halt, cowboy:req(), state()}.
-handle_get(Req0, State = #state{}) ->
+to_json(Req0, State = #state{}) ->
     {ok, Filenames} = file:list_dir("scenarios"),
     Filenames2 =
         lists:filter(
@@ -119,9 +119,9 @@ handle_get(Req0, State = #state{}) ->
     {Reply, Req0, State}.
 
 
--spec handle_post(cowboy:req(), state()) ->
+-spec from_json(cowboy:req(), state()) ->
     {string() | halt | ok, cowboy:req(), state()}.
-handle_post(Req0, State = #state{
+from_json(Req0, State = #state{
                              module_name = ModuleName,
                              module_source = ModuleSource}) ->
     ScenarioPath = "scenarios/" ++ erlang:binary_to_list(ModuleName),
@@ -144,4 +144,3 @@ handle_post(Req0, State = #state{
     Reply = jsx:encode([{compile, Result}]),
     Req1 = cowboy_req:set_resp_body(Reply, Req0),
     {true, Req1, State}.
-
