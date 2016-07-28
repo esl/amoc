@@ -116,12 +116,8 @@ to_json(Req0, State = #state{resource = Resource}) ->
     {string() | halt | ok, cowboy:req(), state()}.
 from_json(Req0, State = #state{resource = Resource, users = Users}) ->
     Scenario = erlang:list_to_atom(Resource),
-    code:purge(Scenario),
-    Result = code:load_file(Scenario),
-
     _ = amoc_dist:do(Scenario, 1, Users),
-
-    Reply = jsx:encode([Result]),
+    Reply = jsx:encode([{scenario, started}]),
     Req1 = cowboy_req:set_resp_body(Reply, Req0),
     {true, Req1, State}.
 
