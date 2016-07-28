@@ -106,8 +106,8 @@ get_users_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:body(Req),
     try
         JSON = jsx:decode(Body),
-        UsersB = proplists:get_value(<<"users">>, JSON),
-        Users = binary_to_integer(UsersB),
+        Users = proplists:get_value(<<"users">>, JSON),
+        true = is_integer(Users),
         {ok, Users, Req2}
     catch _:_ ->
               {error, bad_request, Req2}
