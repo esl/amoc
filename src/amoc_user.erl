@@ -30,17 +30,21 @@ init(Parent, Scenario, Id, State) ->
                 infinity -> repeat(F);
                 N -> repeat(F, N)
             end,
+            amoc_event:notify({test_end, Scenario}),
             normal
         catch
             throw:stop ->
+                amoc_event:notify({test_end, Scenario}),
                 normal;
             %% {R, get_stack()} will result in a compact error message
             %% {E, R, get_stack()} will result in a full stack report
             E:Reason ->
+                amoc_event:notify({test_crashed, Scenario}),
                 {E, {abnormal_exit, Reason}, erlang:get_stacktrace()}
         after
             ets:delete(amoc_users, Id)
         end,
+    amoc_event:notify({test_begin, Scenario}),
     exit(R).
 
 -spec perform_scenario(amoc:scenario(), amoc_scenario:user_id(), state()) -> ok.
@@ -77,7 +81,7 @@ repeat(F, 1) ->
     F().
 
 repeat_interval() ->
-    application:get_env(amoc, repeat_interval, ?REPEAT_INTERVAL).
+    amoc_config:get(repeat_interval, ?REPEAT_INTERVAL).
 
 repeat_num() ->
-    application:get_env(amoc, repeat_num, ?REPEAT_NUM).
+    amoc_config:get(repeat_num, ?REPEAT_NUM).

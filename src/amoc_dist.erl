@@ -5,6 +5,7 @@
 -module(amoc_dist).
 
 -export([start_nodes/0,
+         ping_nodes/0,
          do/3,
          do/4,
          add/1,
@@ -16,9 +17,14 @@
 %% ------------------------------------------------------------------
 -spec start_nodes() -> [ok].
 start_nodes() ->
-    Hosts = application:get_env(amoc, hosts, []),
-    Path = application:get_env(amoc, path, "/usr"),
+    Hosts = amoc_config:get(hosts, []),
+    Path = amoc_config:get(path, "/usr"),
     start_nodes(Hosts, Path).
+
+-spec ping_nodes() -> [pong|pang].
+ping_nodes() ->
+    Hosts = application:get_env(amoc, hosts, []),
+    [ ping_node(amoc_slave:node_name(Host)) || Host <- Hosts ].
 
 -spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     [any()].
@@ -80,6 +86,15 @@ is_remsh_node(Node) ->
 ceil(Number) ->
     erlang:round(Number+0.5).
 
+-spec ping_node(node()) -> pong|pang.
+ping_node(Node) ->
+    case amoc_slave:ping(Node) of
+        pong ->
+              ok = amoc_slave:monitor_master(Node),
+              pong;
+        pang ->
+              pang
+    end.
 %% ------------------------------------------------------------------
 %% Unit tests
 %% ------------------------------------------------------------------
