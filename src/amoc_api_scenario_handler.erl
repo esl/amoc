@@ -12,8 +12,8 @@
          content_types_accepted/2,
          malformed_request/2,
          resource_exists/2,
-         handle_get/2,
-         handle_patch/2]).
+         to_json/2,
+         from_json/2]).
 
 
 -record(state, {resource, users}).
@@ -42,8 +42,8 @@ init({tcp, http}, _Req, _Opts) ->
 
 -spec rest_init(cowboy:req(), [atom()]) -> {ok, cowboy:req(), state()}.
 rest_init(Req, _Opts) ->
-    {PathB, Req2} = cowboy_req:path(Req),
-    Resource = get_resource_string(PathB),
+    {ResourceB, Req2} = cowboy_req:binding(id, Req),
+    Resource = erlang:binary_to_list(ResourceB),
     {ok, Req2, #state{resource = Resource}}.
 
 -spec allowed_methods(cowboy:req(), state()) -> 
@@ -54,12 +54,12 @@ allowed_methods(Req, State) ->
 -spec content_types_provided(cowboy:req(), state()) -> 
     {[tuple()], cowboy:req(), state()}.
 content_types_provided(Req, State) ->
-    {[{<<"application/json">>, handle_get}], Req, State}.
+    {[{<<"application/json">>, to_json}], Req, State}.
 
 -spec content_types_accepted(cowboy:req(), state()) -> 
     {[tuple()], cowboy:req(), state()}.
 content_types_accepted(Req, State) ->
-    {[{<<"application/json">>, handle_patch}], Req, State}.
+    {[{<<"application/json">>, from_json}], Req, State}.
 
 -spec malformed_request(cowboy:req(), state()) ->
     {boolean(), cowboy:req(), state()}.
@@ -104,17 +104,17 @@ resource_exists(Req, State = #state{resource = Resource}) ->
 
 %% Request processing functions
 
--spec handle_get(cowboy:req(), state()) -> 
+-spec to_json(cowboy:req(), state()) -> 
     {string() | halt, cowboy:req(), state()}.
-handle_get(Req0, State = #state{resource = Resource}) ->
+to_json(Req0, State = #state{resource = Resource}) ->
     %% Need to retrive state of module here
     Reply = jsx:encode([{module, Resource}]),
     {Reply, Req0, State}.
 
 
--spec handle_patch(cowboy:req(), state()) ->
+-spec from_json(cowboy:req(), state()) ->
     {string() | halt | ok, cowboy:req(), state()}.
-handle_patch(Req0, State = #state{resource = Resource, users = Users}) ->
+from_json(Req0, State = #state{resource = Resource, users = Users}) ->
     Scenario = erlang:list_to_atom(Resource),
     code:purge(Scenario),
     Result = code:load_file(Scenario),
@@ -124,11 +124,4 @@ handle_patch(Req0, State = #state{resource = Resource, users = Users}) ->
     Reply = jsx:encode([Result]),
     Req1 = cowboy_req:set_resp_body(Reply, Req0),
     {true, Req1, State}.
-
-%% Internal
--spec get_resource_string(binary()) -> string().
-get_resource_string(PathBinary) ->
-    PathList = binary_to_list(PathBinary),
-    PathSplit = string:tokens(PathList, "/"),
-    lists:last(PathSplit).
 
