@@ -71,13 +71,21 @@ malformed_request(<<"POST">>, Req, State) ->
             {true, Req2, State};
         true ->
             JSON = jsx:decode(Body),
-            ContainModuleName = proplists:is_defined(<<"scenario">>, JSON),
-            ContainModuleSource = proplists:is_defined(<<"module_source">>, JSON),
+            ContainModuleName = proplists:is_defined(
+                                  <<"scenario">>,
+                                  JSON),
+            ContainModuleSource = proplists:is_defined(
+                                    <<"module_source">>,
+                                    JSON),
 
             case ContainModuleName and ContainModuleSource of
                 true ->
-                    ModuleName = proplists:get_value(<<"scenario">>, JSON),
-                    ModuleSource = proplists:get_value(<<"module_source">>, JSON),
+                    ModuleName = proplists:get_value(
+                                   <<"scenario">>,
+                                   JSON),
+                    ModuleSource = proplists:get_value(
+                                     <<"module_source">>,
+                                     JSON),
                     State2 = State#state{
                                module_name = ModuleName,
                                module_source = ModuleSource
@@ -100,14 +108,14 @@ handle_get(Req0, State = #state{}) ->
     {ok, Filenames} = file:list_dir("scenarios"),
     Filenames2 =
         lists:filter(
-          fun(X) -> string:right(X,3) == "erl" end,
+          fun(X) -> string:right(X, 3) == "erl" end,
           Filenames),
 
     Scenarios = 
     [ erlang:list_to_binary(Y) ||  X <- Filenames2,
                                    Y <- string:tokens(X, "."),
                                    Y =/= "erl" ],
-    Reply = jsx:encode([{scenarios,Scenarios}]),
+    Reply = jsx:encode([{scenarios, Scenarios}]),
     {Reply, Req0, State}.
 
 
