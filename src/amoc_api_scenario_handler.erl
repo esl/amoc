@@ -19,7 +19,7 @@
 
 -type state() :: #state{}.
 
--spec trails() -> [tuple()] .
+-spec trails() -> [trails:trail()].
 trails() ->
     Metadata =
     #{get =>
@@ -77,7 +77,7 @@ resource_exists(Req, State = #state{resource = Resource}) ->
 %% Request processing functions
 
 -spec to_json(cowboy:req(), state()) -> 
-    {string() | halt, cowboy:req(), state()}.
+    {binary(), cowboy:req(), state()}.
 to_json(Req0, State = #state{resource = Resource}) ->
     %% Need to retrive state of module here
     Reply = jsx:encode([{module, Resource}]),
@@ -85,7 +85,7 @@ to_json(Req0, State = #state{resource = Resource}) ->
 
 
 -spec from_json(cowboy:req(), state()) ->
-    {string() | halt | ok, cowboy:req(), state()}.
+    {boolean(), cowboy:req(), state()}.
 from_json(Req, State = #state{resource = Resource}) ->
     case get_users_from_body(Req) of
         {ok, Users, Req2} ->
