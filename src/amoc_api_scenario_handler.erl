@@ -10,7 +10,6 @@
          allowed_methods/2,
          content_types_provided/2,
          content_types_accepted/2,
-         malformed_request/2,
          resource_exists/2,
          to_json/2,
          from_json/2]).
@@ -61,33 +60,6 @@ content_types_provided(Req, State) ->
 content_types_accepted(Req, State) ->
     {[{<<"application/json">>, from_json}], Req, State}.
 
--spec malformed_request(cowboy:req(), state()) ->
-    {boolean(), cowboy:req(), state()}.
-malformed_request(Req, State) ->
-    {Method, Req2} = cowboy_req:method(Req),
-    malformed_request(Method, Req2, State).
-
-malformed_request(<<"PATCH">>, Req, State) ->
-    {ok, Body, Req2} = cowboy_req:body(Req),
-    case jsx:is_json(Body) of
-        false ->
-            {true, Req2, State};
-        true ->
-            JSON = jsx:decode(Body),
-            ContainUsers = proplists:is_defined(<<"users">>, JSON),
-            case ContainUsers of
-                true ->
-                    Users = proplists:get_value(<<"users">>, JSON),
-                    State2 = State#state{users = Users},                    
-                    {false, Req2, State2};
-                false ->
-                    {true, Req2, State}
-            end
-    end;
-
-malformed_request(_, Req, State) ->
-    {false, Req, State}.
-
 -spec resource_exists(cowboy:req(), state()) ->
     {boolean(), cowboy:req(), state()}.
 resource_exists(Req, State = #state{resource = Resource}) ->
@@ -114,10 +86,30 @@ to_json(Req0, State = #state{resource = Resource}) ->
 
 -spec from_json(cowboy:req(), state()) ->
     {string() | halt | ok, cowboy:req(), state()}.
-from_json(Req0, State = #state{resource = Resource, users = Users}) ->
-    Scenario = erlang:list_to_atom(Resource),
-    _ = amoc_dist:do(Scenario, 1, Users),
-    Reply = jsx:encode([{scenario, started}]),
-    Req1 = cowboy_req:set_resp_body(Reply, Req0),
-    {true, Req1, State}.
+from_json(Req, State = #state{resource = Resource}) ->
+    case get_users_from_body(Req) of
+        {ok, Users, Req2} ->
+            Scenario = erlang:list_to_atom(Resource),
+            _ = amoc_dist:do(Scenario, 1, Users),
+            Reply = jsx:encode([{scenario, started}]),
+            Req3 = cowboy_req:set_resp_body(Reply, Req2),
+            {true, Req3, State};
+        {error, bad_request, Req2} ->
+            Reply = jsx:encode([{scenario, bad_request}]),
+            Req3 = cowboy_req:set_resp_body(Reply, Req2),
+            {false, Req3, State}
+    end.
+
+
+%% internal function
+get_users_from_body(Req) ->
+    {ok, Body, Req2} = cowboy_req:body(Req),
+    try
+        JSON = jsx:decode(Body),
+        UsersB = proplists:get_value(<<"users">>, JSON),
+        Users = binary_to_integer(UsersB),
+        {ok, Users, Req2}
+    catch _:_ ->
+              {error, bad_request, Req2}
+    end.
 
