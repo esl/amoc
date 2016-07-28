@@ -113,7 +113,9 @@ handle_get(Req0, State = #state{}) ->
 
 -spec handle_post(cowboy:req(), state()) ->
     {string() | halt | ok, cowboy:req(), state()}.
-handle_post(Req0, State = #state{module_name = ModuleName, module_source = ModuleSource}) ->
+handle_post(Req0, State = #state{
+                             module_name = ModuleName,
+                             module_source = ModuleSource}) ->
     ScenarioPath = "scenarios/" ++ erlang:binary_to_list(ModuleName),
 
     file:write_file(
@@ -127,11 +129,11 @@ handle_post(Req0, State = #state{module_name = ModuleName, module_source = Modul
         {ok, _} ->
             ok;
         error ->
-            file:delete(ScenarioPath++".erl"),
+            file:delete(ScenarioPath ++ ".erl"),
             error
     end,
 
-    Reply = jsx:encode([{compile,Result}]),
+    Reply = jsx:encode([{compile, Result}]),
     Req1 = cowboy_req:set_resp_body(Reply, Req0),
     {true, Req1, State}.
 
