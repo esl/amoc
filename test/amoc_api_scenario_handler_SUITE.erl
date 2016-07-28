@@ -78,7 +78,6 @@ patch_scenario_returns_400_when_malformed_request(_Config) ->
     RequestBody = jsx:encode([{bad_key, bad_value}]),
     %% when
     {CodeHttp, Body} = patch_request(URL, RequestBody),
-    ct:print("~n ~n CODE ~p, Body: ~p ~n ~n", [CodeHttp, RequestBody]),
     %% then
     %% Maybe check Body, as answer format will be ready
     ?assertEqual(400, CodeHttp).
