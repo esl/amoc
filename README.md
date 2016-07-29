@@ -146,14 +146,16 @@ After that the scenario will keep running.
 
 ## Configuration
 
-amoc is configured through OTP application environmental variables that
-are loaded from the configuration file
+amoc is configured through OTP application environment variables that
+are loaded from the configuration file, operating system environment variables 
+(with prefix ``AMOC_``) and Erlang application environment variables
+(`priv/app.config`).
 
 Internally, amoc is using the following settings:
 
 - ``interarrival`` - a delay in ms, for each node, between creating process
   for two consecutive users. Defaults to 50 ms.
-- ``repeat_interval`` - a delay in ms, for each user process that it waits
+- ``repeat_interval`` - a delay in ms each user process waits
   before starting the same scenario again. Defaults to 1 minute.
 - ``repeat_num`` - number of scenario repetitions for each process.
   Defaults to ``infinity``.
@@ -161,15 +163,19 @@ Internally, amoc is using the following settings:
 You can also define your own entries that you might later use in your
 scenarios.
 
-The ``amoc_config`` module, that is essentially a wrapper around functions
-manipulation the application's environment in the ``application`` module.
+The ``amoc_config`` is a module for getting configuration. Every time we ask
+for a config value, ``amoc_config`` looks into OS environment variables first
+(with ``AMOC_`` prefix; e.g. if we want to set ``interarrival`` by this mechanism
+we should set OS environment variable ``AMOC_interarrival``), and if it doesn't
+find it there, it tries to get it from the Erlang application environment variables.
+If it cannot find it there either and the default value was not supplied, an error
+it thrown. What's more, we can set variables  dynamically (by setting OS variable or
+``application:set_env(amoc, VARIABLE_NAME, VARIABLE_VALUE)`` in Erlang).
 
-``amoc_config`` provides the following functions:
+``amoc_config`` provides the following function:
 
 - ``get(Name)`` and ``get(Name, Default)`` - return the value for the
-  given config entry, all values defined in the config file are available
-- ``set(Name, Value)`` - sets the new value for the given entry. You might
-  use it inside your scenario to make scenario more dynamic.
+  given config entry according to the aforementioned rules.
 
 ### Locally (without ansible)
 
@@ -183,7 +189,9 @@ During the ansible deployment the following file is used as a template:
 
 As long as you need to set only the amoc application variables (including
 your scenario-specific settings), you can do
-it in the ``ansible/group_vars/amoc`` file.
+it in the ``ansible/group_vars/amoc`` file. You can also do it later in Erlang
+console (``application:set_env/3``) or set OS environment variable (with prefix
+``AMOC_``). Remember that OS environment variable will be taken if present even if you set it by ``application:set_env/3``.
 
 A separate file is required for this
 since dictionaries are not supported in the inventory file.
