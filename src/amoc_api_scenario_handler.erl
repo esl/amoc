@@ -19,7 +19,7 @@
 
 -type state() :: #state{}.
 
--spec trails() -> [trails:trail()].
+-spec trails() -> trails:trails().
 trails() ->
     Metadata =
     #{get =>
