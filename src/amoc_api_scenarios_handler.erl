@@ -10,7 +10,6 @@
          allowed_methods/2,
          content_types_provided/2,
          content_types_accepted/2,
-         malformed_request/2,
          to_json/2,
          from_json/2]).
 
@@ -58,48 +57,6 @@ content_types_provided(Req, State) ->
 content_types_accepted(Req, State) ->
     {[{<<"application/json">>, from_json}], Req, State}.
 
--spec malformed_request(cowboy:req(), state()) ->
-    {boolean(), cowboy:req(), state()}.
-malformed_request(Req, State) ->
-    {Method, Req2} = cowboy_req:method(Req),
-    malformed_request(Method, Req2, State).
-
-malformed_request(<<"POST">>, Req, State) ->
-    {ok, Body, Req2} = cowboy_req:body(Req),
-    case jsx:is_json(Body) of
-        false ->
-            {true, Req2, State};
-        true ->
-            JSON = jsx:decode(Body),
-            ContainModuleName = proplists:is_defined(
-                                  <<"scenario">>,
-                                  JSON),
-            ContainModuleSource = proplists:is_defined(
-                                    <<"module_source">>,
-                                    JSON),
-
-            case ContainModuleName and ContainModuleSource of
-                true ->
-                    ModuleName = proplists:get_value(
-                                   <<"scenario">>,
-                                   JSON),
-                    ModuleSource = proplists:get_value(
-                                     <<"module_source">>,
-                                     JSON),
-                    State2 = State#state{
-                               module_name = ModuleName,
-                               module_source = ModuleSource
-                               },
-                    {false, Req2, State2};
-                false ->
-                    {true, Req2, State}
-            end
-    end;
-
-malformed_request(_, Req, State) ->
-    {false, Req, State}.
-
-
 %% Request processing functions
 
 -spec to_json(cowboy:req(), state()) -> 
@@ -120,27 +77,62 @@ to_json(Req0, State = #state{}) ->
 
 
 -spec from_json(cowboy:req(), state()) ->
-    {string() | halt | ok, cowboy:req(), state()}.
-from_json(Req0, State = #state{
-                             module_name = ModuleName,
-                             module_source = ModuleSource}) ->
-    ScenarioPath = "scenarios/" ++ erlang:binary_to_list(ModuleName),
+    {boolean(), cowboy:req(), state()}.
+from_json(Req, #state{}) ->
+    case get_vars_from_body(Req) of
+        {ok, State, Req2} ->
+            ModuleName = State#state.module_name,
+            ModuleSource = State#state.module_source,
+            ScenarioPath = "scenarios/" ++ erlang:binary_to_list(ModuleName),
+            file:write_file(
+              ScenarioPath ++ ".erl",
+              ModuleSource,
+              [write]
+             ),
+            Result = compile_and_load_scenario(
+                       ModuleName,
+                       ScenarioPath),
+            Reply = jsx:encode([{compile, Result}]),
+            Req3 = cowboy_req:set_resp_body(Reply, Req2),
+            {true, Req3, State};
+        {error, bad_request, Req2} ->
+            Reply = jsx:encode([{error, bad_request}]),
+            Req3 = cowboy_req:set_resp_body(Reply, Req2),
+            {false, Req3, #state{}}
+    end.
 
-    file:write_file(
-      ScenarioPath ++ ".erl",
-      ModuleSource,
-      [write]
-     ),
-    
-    Result =
+%% internal function
+-spec get_vars_from_body(cowboy:req()) ->
+    {ok | error, state() | bad_request, cowboy:req()}.
+get_vars_from_body(Req) ->
+    {ok, Body, Req2} = cowboy_req:body(Req),
+    try
+        JSON = jsx:decode(Body),
+        ModuleName = proplists:get_value(<<"scenario">>, JSON),
+        ModuleSource = proplists:get_value(
+                         <<"module_source">>,
+                         JSON),
+        true = is_binary(ModuleName),
+        true = is_binary(ModuleSource),
+        State = #state{
+                   module_name = ModuleName,
+                   module_source = ModuleSource},
+        {ok, State, Req2}
+    catch _:_ ->
+              {error, bad_request, Req2}
+    end.
+
+-spec compile_and_load_scenario(binary(), string()) ->
+    ok | error.
+compile_and_load_scenario(BinModuleName, ScenarioPath) ->
     case compile:file(ScenarioPath, [{outdir, ebin}]) of
         {ok, _} ->
+            Module = erlang:binary_to_atom(BinModuleName, utf8),
+            code:load_file(Module),
             ok;
         error ->
             file:delete(ScenarioPath ++ ".erl"),
             error
-    end,
+    end.
 
-    Reply = jsx:encode([{compile, Result}]),
-    Req1 = cowboy_req:set_resp_body(Reply, Req0),
-    {true, Req1, State}.
+
