@@ -35,33 +35,35 @@ trails() ->
      },
     [trails:trail("/scenarios/:id", ?MODULE, [], Metadata)].
 
--spec init(tuple(), cowboy:req(), state()) -> {upgrade, protocol, cowboy_rest}.
+-spec init(tuple(), cowboy_req:req(), state()) ->
+    {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_rest}.
 
--spec rest_init(cowboy:req(), [atom()]) -> {ok, cowboy:req(), state()}.
+-spec rest_init(cowboy_req:req(), [atom()]) ->
+    {ok, cowboy_req:req(), state()}.
 rest_init(Req, _Opts) ->
     {ResourceB, Req2} = cowboy_req:binding(id, Req),
     Resource = erlang:binary_to_list(ResourceB),
     {ok, Req2, #state{resource = Resource}}.
 
--spec allowed_methods(cowboy:req(), state()) -> 
-    {[binary()], cowboy:req(), state()}.
+-spec allowed_methods(cowboy_req:req(), state()) -> 
+    {[binary()], cowboy_req:req(), state()}.
 allowed_methods(Req, State) ->
     {[<<"PATCH">>, <<"GET">>], Req, State}.
 
--spec content_types_provided(cowboy:req(), state()) -> 
-    {[tuple()], cowboy:req(), state()}.
+-spec content_types_provided(cowboy_req:req(), state()) -> 
+    {[tuple()], cowboy_req:req(), state()}.
 content_types_provided(Req, State) ->
     {[{<<"application/json">>, to_json}], Req, State}.
 
--spec content_types_accepted(cowboy:req(), state()) -> 
-    {[tuple()], cowboy:req(), state()}.
+-spec content_types_accepted(cowboy_req:req(), state()) -> 
+    {[tuple()], cowboy_req:req(), state()}.
 content_types_accepted(Req, State) ->
     {[{<<"application/json">>, from_json}], Req, State}.
 
--spec resource_exists(cowboy:req(), state()) ->
-    {boolean(), cowboy:req(), state()}.
+-spec resource_exists(cowboy_req:req(), state()) ->
+    {boolean(), cowboy_req:req(), state()}.
 resource_exists(Req, State = #state{resource = Resource}) ->
     {ok, Files} = file:list_dir("scenarios/"),
     Pred = fun (File) -> File == Resource ++ ".erl" end,
@@ -76,16 +78,16 @@ resource_exists(Req, State = #state{resource = Resource}) ->
 
 %% Request processing functions
 
--spec to_json(cowboy:req(), state()) -> 
-    {binary(), cowboy:req(), state()}.
+-spec to_json(cowboy_req:req(), state()) -> 
+    {jsx:json_text(), cowboy_req:req(), state()}.
 to_json(Req0, State = #state{resource = Resource}) ->
     %% Need to retrive state of module here
     Reply = jsx:encode([{module, Resource}]),
     {Reply, Req0, State}.
 
 
--spec from_json(cowboy:req(), state()) ->
-    {boolean(), cowboy:req(), state()}.
+-spec from_json(cowboy_req:req(), state()) ->
+    {boolean(), cowboy_req:req(), state()}.
 from_json(Req, State = #state{resource = Resource}) ->
     case get_users_from_body(Req) of
         {ok, Users, Req2} ->
