@@ -30,24 +30,24 @@ all() ->
 init_per_testcase(
   patch_scenario_returns_200_when_request_ok_and_module_exists,
   Config) ->
-    meck:new(amoc_dist, [unstick]),
+    ok = meck:new(amoc_dist, [unstick]),
     Fun = fun(_,1,_) -> ok end,
-    meck:expect(amoc_dist, do, Fun),
-    ok = create_env(Config),
+    ok = meck:expect(amoc_dist, do, Fun),
+    create_env(Config),
     Config;
 
 init_per_testcase(_, Config) ->
-    ok = create_env(Config),
+    create_env(Config),
     Config.
 
 end_per_testcase(
   patch_scenario_returns_200_when_request_ok_and_module_exists,
   _Config) ->
-    meck:unload(amoc_dist),
-    ok = destroy_env();
+    ok = meck:unload(amoc_dist),
+    destroy_env();
 
 end_per_testcase(_, _Config) ->
-    ok = destroy_env().
+    destroy_env().
 
 get_scenario_status_returns_200_when_scenario_exists(_Config) ->
     %% given
@@ -103,19 +103,20 @@ patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
 %% Helpers
 
 create_env(Config) ->
-    file:make_dir(?SCENARIOS_DIR_S),
+    ok = file:make_dir(?SCENARIOS_DIR_S),
     SampleScenario = filename:join([?SCENARIOS_DIR_S,
                                     ?SAMPLE_SCENARIO_S]),
     copy(data(Config, ?SAMPLE_SCENARIO_S), SampleScenario),
-    compile:file(SampleScenario),
-    code:load_file(?SAMPLE_SCENARIO_A),
+    {ok, _} = compile:file(SampleScenario),
+    {module, _} = code:load_file(?SAMPLE_SCENARIO_A),
     {ok, _} = application:ensure_all_started(inets),
     {ok, _} = application:ensure_all_started(amoc).
 
 destroy_env() ->
-    file:delete(filename:join([?SCENARIOS_DIR_S,
+    ok = file:delete(filename:join([?SCENARIOS_DIR_S,
                                ?SAMPLE_SCENARIO_S])),
-    file:del_dir(?SCENARIOS_DIR_S).
+    ok = file:del_dir(?SCENARIOS_DIR_S),
+    code:purge(?SAMPLE_SCENARIO_A).
 
 copy(Src, Dst) ->
     {ok, _} = file:copy(Src, Dst).
