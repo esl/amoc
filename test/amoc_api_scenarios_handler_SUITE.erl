@@ -2,6 +2,13 @@
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
+
+-define(SCENARIOS_URL_S, "/scenarios").
+-define(SCENARIOS_DIR_S, "scenarios").
+-define(SAMPLE_SCENARIO_S, "sample_test.erl").
+-define(SAMPLE_SCENARIO_BEAM_S, "sample_test.beam").
+-define(SAMPLE_SCENARIO_A, sample_test).
+
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
 -export([
@@ -22,30 +29,27 @@ all() ->
 
 
 init_per_testcase(_, Config) ->
-    file:make_dir("ebin"),
-    file:make_dir("scenarios"),
-    
-    application:ensure_all_started(inets),
-    application:ensure_all_started(amoc),
+    ok = file:make_dir("ebin"),
+    ok = file:make_dir(?SCENARIOS_DIR_S),
+    {ok, _} = application:ensure_all_started(inets),
+    {ok, _} = application:ensure_all_started(amoc),
     Config.
 
 end_per_testcase(post_scenarios_returns_200_and_when_scenario_valid, _Config) ->
-    file:delete("ebin/sample_test.beam"),
-    file:delete("scenarios/sample_test.erl"),
-    
-    file:del_dir("ebin"),
-    file:del_dir("scenarios"),
-
-    application:stop(inets),
-    application:stop(amoc);
+    ok = file:delete(filename:join(["ebin",
+                                    ?SAMPLE_SCENARIO_BEAM_S])),
+    ok = file:delete(filename:join([?SCENARIOS_DIR_S,
+                                    ?SAMPLE_SCENARIO_S])),
+    ok = file:del_dir("ebin"),
+    ok = file:del_dir(?SCENARIOS_DIR_S);
 
 end_per_testcase(_, _Config) ->
-    application:stop(inets),
-    application:stop(amoc).
+    ok = file:del_dir("ebin"),
+    ok = file:del_dir(?SCENARIOS_DIR_S).
 
 get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
     %% given
-    URL = get_url() ++ "/scenarios", 
+    URL = get_url() ++ ?SCENARIOS_URL_S,
     %% when
     {CodeHttp, Body} = get_request(URL),
     Scenarios = proplists:get_value(<<"scenarios">>, Body),
@@ -55,8 +59,8 @@ get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
 
 post_scenarios_returns_400_when_malformed_request(_Config) ->
     %% given
-    URL = get_url() ++ "/scenarios",
-    RequestBody = jsx:encode([{keyname_typo, sample_test}]),
+    URL = get_url() ++ ?SCENARIOS_URL_S,
+    RequestBody = jsx:encode([{keyname_typo, ?SAMPLE_SCENARIO_A}]),
     %% when
     {CodeHttp, Body} = post_request(URL, RequestBody),
     %% then
@@ -66,34 +70,40 @@ post_scenarios_returns_400_when_malformed_request(_Config) ->
 
 post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Config) ->
     %% given
-    URL = get_url() ++ "/scenarios",
+    URL = get_url() ++ ?SCENARIOS_URL_S,
     RequestBody = jsx:encode([
-                              {scenario, sample_test},
+                              {scenario, ?SAMPLE_SCENARIO_A},
                               {module_source, invalid_source}
                              ]),
     %% when
     {CodeHttp, Body} = post_request(URL, RequestBody),
+    ScenarioFileSource = filename:join([?SCENARIOS_DIR_S,
+                                        ?SAMPLE_SCENARIO_S]),
     %% then
-    ?assertNot(filelib:is_regular("scenarios/sample_test.erl")),
+    ?assertNot(filelib:is_regular(ScenarioFileSource)),
     ?assertEqual(200, CodeHttp),
     ?assertEqual([{<<"compile">>, <<"error">>}],
                  Body).
 
 post_scenarios_returns_200_and_when_scenario_valid(Config) ->
     %% given
-    URL = get_url() ++ "/scenarios",
-    ScenarioFile = data(Config, "sample_test.erl"),
+    URL = get_url() ++ ?SCENARIOS_URL_S,
+    ScenarioFile = data(Config, ?SAMPLE_SCENARIO_S),
     {ok, ScenarioContent} = file:read_file(ScenarioFile),
     RequestBody = jsx:encode([
-                              {scenario, sample_test},
+                              {scenario, ?SAMPLE_SCENARIO_A},
                               {module_source, ScenarioContent}
                              ]),
     %% when
     {CodeHttp, Body} = post_request(URL, RequestBody),
+    ScenarioFileSource = filename:join([?SCENARIOS_DIR_S,
+                                        ?SAMPLE_SCENARIO_S]),
+    ScenarioFileBeam = filename:join(["ebin",
+                                      ?SAMPLE_SCENARIO_BEAM_S]),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assert(filelib:is_regular("scenarios/sample_test.erl")),
-    ?assert(filelib:is_regular("ebin/sample_test.beam")),
+    ?assert(filelib:is_regular(ScenarioFileSource)),
+    ?assert(filelib:is_regular(ScenarioFileBeam)),
     ?assertEqual([{<<"compile">>, <<"ok">>}],
                  Body).
 
