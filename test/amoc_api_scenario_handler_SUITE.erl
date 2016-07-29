@@ -2,6 +2,11 @@
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
+
+-define(SCENARIOS_DIR_S, "scenarios").
+-define(SAMPLE_SCENARIO_S, "sample_test.erl").
+-define(SAMPLE_SCENARIO_A, sample_test).
+
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
 -export([
@@ -98,21 +103,19 @@ patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
 %% Helpers
 
 create_env(Config) ->
-    file:make_dir("scenarios"),
-    copy(
-      data(Config, "sample_test.erl"),
-      "scenarios/sample_test.erl"),
-    compile:file("scenarios/sample_test.erl"),
-    code:load_file(sample_test),
+    file:make_dir(?SCENARIOS_DIR_S),
+    SampleScenario = filename:join([?SCENARIOS_DIR_S,
+                                    ?SAMPLE_SCENARIO_S]),
+    copy(data(Config, ?SAMPLE_SCENARIO_S), SampleScenario),
+    compile:file(SampleScenario),
+    code:load_file(?SAMPLE_SCENARIO_A),
     {ok, _} = application:ensure_all_started(inets),
-    {ok, _} = application:ensure_all_started(amoc),
-    ok.
- 
+    {ok, _} = application:ensure_all_started(amoc).
 
 destroy_env() ->
-    file:delete("scenarios/sample_test.erl"),
-    file:del_dir("scenarios"),
-    ok.
+    file:delete(filename:join([?SCENARIOS_DIR_S,
+                               ?SAMPLE_SCENARIO_S])),
+    file:del_dir(?SCENARIOS_DIR_S).
 
 copy(Src, Dst) ->
     {ok, _} = file:copy(Src, Dst).
