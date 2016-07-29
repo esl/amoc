@@ -16,8 +16,8 @@
 %% ------------------------------------------------------------------
 -spec start_nodes() -> [ok].
 start_nodes() ->
-    Hosts = application:get_env(amoc, hosts, []),
-    Path = application:get_env(amoc, path, "/usr"),
+    Hosts = amoc_config:get(hosts, []),
+    Path = amoc_config:get(path, "/usr"),
     start_nodes(Hosts, Path).
 
 -spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) ->
