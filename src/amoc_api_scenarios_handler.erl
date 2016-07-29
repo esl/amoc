@@ -18,7 +18,7 @@
 
 -type state() :: #state{}.
 
--spec trails() -> [tuple()] .
+-spec trails() -> [trails:trail()] .
 trails() ->
     Metadata =
     #{get =>
@@ -34,33 +34,33 @@ trails() ->
      },
     [trails:trail("/scenarios", ?MODULE, [], Metadata)].
 
--spec init(tuple(), cowboy:req(), state()) -> {upgrade, protocol, cowboy_rest}.
+-spec init(tuple(), cowboy_req:req(), state()) -> {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_rest}.
 
--spec rest_init(cowboy:req(), [atom()]) -> {ok, cowboy:req(), state()}.
+-spec rest_init(cowboy_req:req(), [atom()]) -> {ok, cowboy_req:req(), state()}.
 rest_init(Req, _Opts) ->
     {ok, Req, #state{}}.
 
--spec allowed_methods(cowboy:req(), state()) -> 
-    {[binary()], cowboy:req(), state()}.
+-spec allowed_methods(cowboy_req:req(), state()) -> 
+    {[binary()], cowboy_req:req(), state()}.
 allowed_methods(Req, State) ->
     {[<<"POST">>, <<"GET">>], Req, State}.
 
--spec content_types_provided(cowboy:req(), state()) -> 
-    {[tuple()], cowboy:req(), state()}.
+-spec content_types_provided(cowboy_req:req(), state()) -> 
+    {[tuple()], cowboy_req:req(), state()}.
 content_types_provided(Req, State) ->
     {[{<<"application/json">>, to_json}], Req, State}.
 
--spec content_types_accepted(cowboy:req(), state()) -> 
-    {[tuple()], cowboy:req(), state()}.
+-spec content_types_accepted(cowboy_req:req(), state()) -> 
+    {[tuple()], cowboy_req:req(), state()}.
 content_types_accepted(Req, State) ->
     {[{<<"application/json">>, from_json}], Req, State}.
 
 %% Request processing functions
 
--spec to_json(cowboy:req(), state()) -> 
-    {string() | halt, cowboy:req(), state()}.
+-spec to_json(cowboy_req:req(), state()) -> 
+    {jsx:json_text(), cowboy_req:req(), state()}.
 to_json(Req0, State = #state{}) ->
     {ok, Filenames} = file:list_dir("scenarios"),
     Filenames2 =
@@ -76,8 +76,8 @@ to_json(Req0, State = #state{}) ->
     {Reply, Req0, State}.
 
 
--spec from_json(cowboy:req(), state()) ->
-    {boolean(), cowboy:req(), state()}.
+-spec from_json(cowboy_req:req(), state()) ->
+    {boolean(), cowboy_req:req(), state()}.
 from_json(Req, #state{}) ->
     case get_vars_from_body(Req) of
         {ok, State, Req2} ->
@@ -102,8 +102,8 @@ from_json(Req, #state{}) ->
     end.
 
 %% internal function
--spec get_vars_from_body(cowboy:req()) ->
-    {ok | error, state() | bad_request, cowboy:req()}.
+-spec get_vars_from_body(cowboy_req:req()) ->
+    {ok | error, state() | bad_request, cowboy_req:req()}.
 get_vars_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:body(Req),
     try
