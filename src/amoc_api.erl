@@ -2,6 +2,7 @@
 
 -export([start_listener/0, stop/0]).
 
+
 -spec start_listener() -> {ok, pid()}.
 start_listener() ->
     Port = amoc_config:get(api_port, 4000),
@@ -14,7 +15,9 @@ start_listener() ->
     trails:store(Trails),
     Dispatch = trails:single_host_compile(Trails),
     %% Dispatch = cowboy_router:compile(routes()),
-    {ok, _Pid} = cowboy:start_http(amoc_api, 10, [{port, Port}],
+    {ok, _Pid} = cowboy:start_http(amoc_api,
+                                   10,
+                                   [{port, Port}],
                                    [{env, [{dispatch, Dispatch}]}]
                                   ).
 
