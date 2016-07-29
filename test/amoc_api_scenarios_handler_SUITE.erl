@@ -58,16 +58,18 @@ post_scenarios_returns_400_when_malformed_request(_Config) ->
     URL = get_url() ++ "/scenarios",
     RequestBody = jsx:encode([{keyname_typo, sample_test}]),
     %% when
-    {CodeHttp, _Body} = post_request(URL, RequestBody),
+    {CodeHttp, Body} = post_request(URL, RequestBody),
     %% then
-    ?assertEqual(400, CodeHttp).
+    ?assertEqual(400, CodeHttp),
+    ?assertEqual([{<<"error">>, <<"bad_request">>}],
+                 Body).
 
 post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Config) ->
     %% given
     URL = get_url() ++ "/scenarios",
     RequestBody = jsx:encode([
                               {scenario, sample_test},
-                              {module_source, "invalid_source"}
+                              {module_source, invalid_source}
                              ]),
     %% when
     {CodeHttp, Body} = post_request(URL, RequestBody),
