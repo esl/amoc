@@ -82,7 +82,7 @@ get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
     {CodeHttp, Body} = get_request(URL),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"status">>, <<"running">>}], Body),
+    ?assertMatch([{<<"scenario_status">>, <<"running">>}], Body),
     %% cleanup
     cleanup_amoc_controller().
 
@@ -94,7 +94,7 @@ get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
     {CodeHttp, Body} = get_request(URL),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"status">>, <<"finished">>}], Body),
+    ?assertMatch([{<<"scenario_status">>, <<"finished">>}], Body),
     %% cleanup
     cleanup_amoc_controller().
 
@@ -106,7 +106,7 @@ get_scenario_status_returns_loaded_when_scenario_is_not_running(_Config) ->
     {CodeHttp, Body} = get_request(URL),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"status">>, <<"loaded">>}], Body),
+    ?assertMatch([{<<"scenario_status">>, <<"loaded">>}], Body),
     %% cleanup
     cleanup_amoc_controller().
 
