@@ -19,7 +19,7 @@
 
 -type state() :: #state{}.
 
--spec trails() -> [trails:trail()].
+-spec trails() -> trails:trails().
 trails() ->
     Metadata =
     #{get =>
@@ -81,8 +81,9 @@ resource_exists(Req, State = #state{resource = Resource}) ->
 -spec to_json(cowboy_req:req(), state()) -> 
     {jsx:json_text(), cowboy_req:req(), state()}.
 to_json(Req0, State = #state{resource = Resource}) ->
-    %% Need to retrive state of module here
-    Reply = jsx:encode([{module, Resource}]),
+    Status = amoc_controller:test_status(
+                     erlang:list_to_atom(Resource)),
+    Reply = jsx:encode([{scenario_status, Status}]),
     {Reply, Req0, State}.
 
 

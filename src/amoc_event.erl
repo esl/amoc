@@ -9,9 +9,7 @@
 %% ------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | {error, {already_started, pid()}}.
 start_link() ->
-    {ok, Pid} = gen_event:start_link({local, ?MODULE}),
-    gen_event:add_handler(Pid, amoc_test_event, []),
-    {ok, Pid}.
+    gen_event:start_link({local, ?MODULE}).
 
 -spec add_handler(module(), term()) ->  ok | {'EXIT', term()} | term().
 add_handler(Handler, Args) ->

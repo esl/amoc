@@ -13,7 +13,7 @@
 
 -type state() :: [].
 
--spec trails() -> [tuple()] .
+-spec trails() -> trails:trails().
 trails() ->
     Metadata =
         #{get =>
@@ -24,27 +24,27 @@ trails() ->
          },
     [trails:trail("/nodes", ?MODULE, [], Metadata)].
 
--spec init(tuple(), cowboy:req(), state()) ->
+-spec init(tuple(), cowboy_req:req(), state()) ->
                   {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_rest}.
 
--spec rest_init(cowboy:req(), []) -> {ok, cowboy:req(), []}.
+-spec rest_init(cowboy_req:req(), []) -> {ok, cowboy_req:req(), []}.
 rest_init(Req, _) ->
     {ok, Req, []}.
 
--spec allowed_methods(cowboy:req(), state()) -> 
-                             {[binary()], cowboy:req(), state()}.
+-spec allowed_methods(cowboy_req:req(), state()) -> 
+                             {[binary()], cowboy_req:req(), state()}.
 allowed_methods(Req, State) ->
     {[<<"GET">>], Req, State}.
 
--spec content_types_provided(cowboy:req(), state()) ->
-                                    {[tuple()], cowboy:req(), state()}.
+-spec content_types_provided(cowboy_req:req(), state()) ->
+                                    {[tuple()], cowboy_req:req(), state()}.
 content_types_provided(Req, State) ->
     {[{<<"application/json">>, to_json}], Req, State}.
 
--spec to_json(cowboy:req(), state()) ->
-                     {jsx:json_text(), cowboy:req(), state()}.
+-spec to_json(cowboy_req:req(), state()) ->
+                     {jsx:json_text(), cowboy_req:req(), state()}.
 to_json(Req, State) ->
     Nodes = amoc_dist:ping_nodes(),
     {jsx:encode([{<<"nodes">>, Nodes}]), Req, State}.

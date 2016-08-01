@@ -18,10 +18,13 @@
 -type state() :: #state{}.
 -type node_id() :: non_neg_integer().
 -type handle_call_res() :: ok | {ok, term()} | {error, term()}.
+-type scenario_status() :: running | finished | loaded.
 
 %% ------------------------------------------------------------------
 %% Types Exports
 %% ------------------------------------------------------------------
+
+-export_type([scenario_status/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -34,7 +37,8 @@
          remove/1,
          remove/2,
          remove/3,
-         users/0]).
+         users/0,
+         test_status/1]).
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
@@ -89,6 +93,10 @@ users() ->
     {ok, U} = gen_server:call(?SERVER, users),
     U.
 
+-spec test_status(atom()) -> {ok, scenario_status()} | {error, term()}.
+test_status(ScenarioName) ->
+    gen_server:call(?SERVER, {status, ScenarioName}).
+
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -107,6 +115,11 @@ handle_call(users, _From, State) ->
     Reply = [{count, ets:info(?TABLE, size)},
              {last, ets:last(?TABLE)}],
     {reply, {ok, Reply}, State};
+handle_call({status, Scenario}, _From, State) ->
+    case Scenario =:= State#state.scenario of
+        true -> {reply, get_test_status(), State};
+        false -> {reply, loaded, State}
+    end;
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
@@ -272,3 +285,10 @@ node_userids(Start, End, Nodes, NodeId) when is_integer(Nodes), Nodes > 0,
 -spec interarrival() -> integer().
 interarrival() ->
     amoc_config:get(interarrival, ?INTERARRIVAL_DEFAULT).
+
+-spec get_test_status() -> scenario_status().
+get_test_status() ->
+    case supervisor:which_children(amoc_users_sup) of
+        [] -> finished;
+        _Children -> running
+    end.

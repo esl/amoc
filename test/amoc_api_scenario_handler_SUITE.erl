@@ -12,6 +12,9 @@
 -export([
          get_scenario_status_returns_200_when_scenario_exists/1,
          get_scenario_status_returns_404_when_scenario_not_exists/1,
+         get_scenario_status_returns_running_when_scenario_is_running/1,
+         get_scenario_status_returns_finished_when_scenario_is_ended/1,
+         get_scenario_status_returns_loaded_when_scenario_is_not_running/1,
          patch_scenario_returns_404_when_scenario_not_exists/1,
          patch_scenario_returns_400_when_malformed_request/1,
          patch_scenario_returns_200_when_request_ok_and_module_exists/1
@@ -22,6 +25,9 @@ all() ->
     [
      get_scenario_status_returns_200_when_scenario_exists,
      get_scenario_status_returns_404_when_scenario_not_exists,
+     get_scenario_status_returns_running_when_scenario_is_running,
+     get_scenario_status_returns_finished_when_scenario_is_ended,
+     get_scenario_status_returns_loaded_when_scenario_is_not_running,
      patch_scenario_returns_404_when_scenario_not_exists,
      patch_scenario_returns_400_when_malformed_request,
      patch_scenario_returns_200_when_request_ok_and_module_exists
@@ -51,6 +57,7 @@ end_per_testcase(_, _Config) ->
 
 get_scenario_status_returns_200_when_scenario_exists(_Config) ->
     %% given
+    given_amoc_controller_mocked_with_test_status(true),
     URL = get_url() ++ "/scenarios/sample_test",
     %% when
     {CodeHttp, _Body} = get_request(URL),
@@ -67,6 +74,42 @@ get_scenario_status_returns_404_when_scenario_not_exists(_Config) ->
     %% Maybe check Body, as answer format will be ready
     ?assertEqual(404, CodeHttp).
 
+get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
+    %% given
+    given_amoc_controller_mocked_with_test_status(running),
+    URL = get_url() ++ "/scenarios/sample_test",
+    %% when
+    {CodeHttp, Body} = get_request(URL),
+    %% then
+    ?assertEqual(200, CodeHttp),
+    ?assertMatch([{<<"scenario_status">>, <<"running">>}], Body),
+    %% cleanup
+    cleanup_amoc_controller().
+
+get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
+    %% given
+    given_amoc_controller_mocked_with_test_status(finished),
+    URL = get_url() ++ "/scenarios/sample_test",
+    %% when
+    {CodeHttp, Body} = get_request(URL),
+    %% then
+    ?assertEqual(200, CodeHttp),
+    ?assertMatch([{<<"scenario_status">>, <<"finished">>}], Body),
+    %% cleanup
+    cleanup_amoc_controller().
+
+get_scenario_status_returns_loaded_when_scenario_is_not_running(_Config) ->
+    %% given
+    given_amoc_controller_mocked_with_test_status(loaded),
+    URL = get_url() ++ "/scenarios/sample_test",
+    %% when
+    {CodeHttp, Body} = get_request(URL),
+    %% then
+    ?assertEqual(200, CodeHttp),
+    ?assertMatch([{<<"scenario_status">>, <<"loaded">>}], Body),
+    %% cleanup
+    cleanup_amoc_controller().
+
 patch_scenario_returns_404_when_scenario_not_exists(_Config) ->
     %% given
     URL = get_url() ++ "/scenarios/non_existing_scenario",
@@ -82,7 +125,7 @@ patch_scenario_returns_400_when_malformed_request(_Config) ->
     URL = get_url() ++ "/scenarios/sample_test",
     RequestBody = jsx:encode([{bad_key, bad_value}]),
     %% when
-    {CodeHttp, Body} = patch_request(URL, RequestBody),
+    {CodeHttp, _Body} = patch_request(URL, RequestBody),
     %% then
     %% Maybe check Body, as answer format will be ready
     ?assertEqual(400, CodeHttp).
@@ -93,7 +136,7 @@ patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
     URL = get_url() ++ "/scenarios/sample_test",
     RequestBody = jsx:encode([{users, 10}]),
     %% when
-    {CodeHttp, Body} = patch_request(URL, RequestBody),
+    {CodeHttp, _Body} = patch_request(URL, RequestBody),
     %% then
     %% Maybe check Body, as answer format will be ready
     meck:wait(amoc_dist, do, ['sample_test', 1, 10], 2000),
@@ -170,3 +213,11 @@ patch_request(URL, RequestBody) ->
               end,
     {CodeHttp, BodyErl}.
 
+-spec given_amoc_controller_mocked_with_test_status(amoc_controller:scenario_status()) -> ok.
+given_amoc_controller_mocked_with_test_status(Value) ->
+    meck:new(amoc_controller, [unstick, passtrough]),
+    meck:expect(amoc_controller, test_status, fun(_) -> Value end).
+
+-spec cleanup_amoc_controller() -> ok.
+cleanup_amoc_controller() ->
+    meck:unload(amoc_controller).
