@@ -93,10 +93,9 @@ users() ->
     {ok, U} = gen_server:call(?SERVER, users),
     U.
 
--spec test_status(atom()) -> scenario_status().  
+-spec test_status(atom()) -> {ok, scenario_status()} | {error, term()}.
 test_status(ScenarioName) ->
-    {ok, Res} = gen_server:call(?SERVER, {status, ScenarioName}),
-    Res.
+    gen_server:call(?SERVER, {status, ScenarioName}).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
