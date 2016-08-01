@@ -18,7 +18,7 @@
 
 -type state() :: #state{}.
 
--spec trails() -> [trails:trail()] .
+-spec trails() -> trails:trails().
 trails() ->
     Metadata =
     #{get =>
@@ -34,7 +34,8 @@ trails() ->
      },
     [trails:trail("/scenarios", ?MODULE, [], Metadata)].
 
--spec init(tuple(), cowboy_req:req(), state()) -> {upgrade, protocol, cowboy_rest}.
+-spec init(tuple(), cowboy_req:req(), state()) ->
+    {upgrade, protocol, cowboy_rest}.
 init({tcp, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_rest}.
 
