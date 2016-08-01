@@ -18,10 +18,13 @@
 -type state() :: #state{}.
 -type node_id() :: non_neg_integer().
 -type handle_call_res() :: ok | {ok, term()} | {error, term()}.
+-type scenario_status() :: running | finished | loaded.
 
 %% ------------------------------------------------------------------
 %% Types Exports
 %% ------------------------------------------------------------------
+
+-export_type([scenario_status/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -90,7 +93,7 @@ users() ->
     {ok, U} = gen_server:call(?SERVER, users),
     U.
 
--spec test_status(atom()) -> boolean().  
+-spec test_status(atom()) -> scenario_status().  
 test_status(ScenarioName) ->
     {ok, Res} = gen_server:call(?SERVER, {status, ScenarioName}),
     Res.
@@ -116,7 +119,7 @@ handle_call(users, _From, State) ->
 handle_call({status, Scenario}, _From, State) ->
     case Scenario =:= State#state.scenario of
         true -> {reply, get_test_status(), State};
-        false -> {reply, undefined, State}
+        false -> {reply, loaded, State}
     end;
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
@@ -284,9 +287,9 @@ node_userids(Start, End, Nodes, NodeId) when is_integer(Nodes), Nodes > 0,
 interarrival() ->
     amoc_config:get(interarrival, ?INTERARRIVAL_DEFAULT).
 
--spec get_test_status() -> boolean().
+-spec get_test_status() -> scenario_status().
 get_test_status() ->
     case supervisor:which_children(amoc_users_sup) of
-        [] -> true;
-        _Children -> false
+        [] -> finished;
+        _Children -> running
     end.
