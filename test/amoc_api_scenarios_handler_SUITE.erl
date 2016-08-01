@@ -65,7 +65,7 @@ post_scenarios_returns_400_when_malformed_request(_Config) ->
     {CodeHttp, Body} = post_request(URL, RequestBody),
     %% then
     ?assertEqual(400, CodeHttp),
-    ?assertEqual([{<<"error">>, <<"bad_request">>}],
+    ?assertEqual([{<<"error">>, <<"wrong_json">>}],
                  Body).
 
 post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Config) ->

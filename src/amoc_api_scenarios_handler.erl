@@ -96,15 +96,15 @@ from_json(Req, #state{}) ->
             Reply = jsx:encode([{compile, Result}]),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {true, Req3, State};
-        {error, bad_request, Req2} ->
-            Reply = jsx:encode([{error, bad_request}]),
+        {error, Reason, Req2} ->
+            Reply = jsx:encode([{error, Reason}]),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {false, Req3, #state{}}
     end.
 
 %% internal function
 -spec get_vars_from_body(cowboy_req:req()) ->
-    {ok | error, state() | bad_request, cowboy_req:req()}.
+    {ok | error, state() | wrong_json, cowboy_req:req()}.
 get_vars_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:body(Req),
     try
@@ -120,7 +120,7 @@ get_vars_from_body(Req) ->
                    module_source = ModuleSource},
         {ok, State, Req2}
     catch _:_ ->
-              {error, bad_request, Req2}
+              {error, wrong_json, Req2}
     end.
 
 -spec compile_and_load_scenario(binary(), string()) ->
