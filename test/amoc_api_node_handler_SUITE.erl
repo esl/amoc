@@ -65,7 +65,7 @@ send_request() ->
 -spec given_prepared_nodes() -> ok.
 given_prepared_nodes() ->
     meck:new(amoc_dist, [unstick]),
-    meck:expect(amoc_dist, ping_nodes, fun() -> [{test1, ping}, {test2, pang}] end).
+    meck:expect(amoc_dist, ping_nodes, fun() -> [{test1, pong}, {test2, pang}] end).
 
 -spec clean_nodes() -> ok.
 clean_nodes() ->

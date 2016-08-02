@@ -48,7 +48,7 @@ content_types_provided(Req, State) ->
 to_json(Req, State) ->
     Nodes = amoc_dist:ping_nodes(),
     ResponseList = lists:map(
-                       fun({X, ping}) -> {X, up};
+                       fun({X, pong}) -> {X, up};
                           ({X, pang}) -> {X, down}
                         end, Nodes),
     {jsx:encode([{<<"nodes">>, ResponseList}]), Req, State}.
