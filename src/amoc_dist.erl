@@ -11,7 +11,8 @@
          add/1,
          add/2,
          remove/2,
-         remove/3]).
+         remove/3,
+         test_status/1]).
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
@@ -30,6 +31,12 @@ ping_nodes() ->
     [any()].
 do(Scenario, Start, End) ->
     do(Scenario, Start, End, []).
+
+-spec test_status(atom()) -> amoc_controller:scenario_status().
+test_status(ScenarioName) ->
+    Hosts = [erlang:node() | erlang:nodes()],
+    Status = [get_node_test_status(ScenarioName, Host) || Host <- Hosts],
+    pick_status(Status, [loaded, running, finished]).
 
 -spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(),
          amoc:do_opts()) -> [any()].
@@ -95,6 +102,25 @@ ping_node(Node) ->
         pang ->
               pang
     end.
+
+-spec pick_status(atom(), [amoc_controller:scenario_status()]) ->
+                                amoc_controller:scenario_status().
+pick_status(StatusList, [H | T]) ->
+    case lists:member(H, StatusList) of
+        true -> H;
+        false -> pick_status(StatusList, T)
+    end.
+
+-spec get_node_test_status(atom(), atom()) -> 
+            amoc_controller:scenario_status().
+get_node_test_status(ScenarioName, Node) ->    
+    try gen_server:call({amoc_controller, Node}, {status, ScenarioName}) of
+        Res -> Res
+    catch _:_ ->
+        %% TODO: Handle timeout properly
+        finished %% Just ignore it
+    end.
+
 %% ------------------------------------------------------------------
 %% Unit tests
 %% ------------------------------------------------------------------
