@@ -19,8 +19,7 @@ trails() ->
     Metadata =
         #{get =>
           #{tags => ["status"],
-            description => "Gets AMOC status, whether it is running or not. 
-                            Returns {\"status\": true | false}",
+            description => "Gets AMOC status, whether it is running or not.", 
             produces => ["application/json"]
           }
     },

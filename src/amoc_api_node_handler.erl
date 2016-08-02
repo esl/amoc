@@ -18,7 +18,7 @@ trails() ->
     Metadata =
     #{get =>
           #{tags => ["node"],
-            description => "Pings AMOC nodes from master node",
+            description => "Pings AMOC nodes from master node.",
             produces => ["application/json"]
            }
      },
