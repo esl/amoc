@@ -9,12 +9,13 @@ RUN apt-get update && \
     apt-get install -y git \
                        make \
                        gcc \
+                       clang \
                        libexpat1-dev \
                        wget && \
     wget http://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
     dpkg -i erlang-solutions_1.0_all.deb && \
     apt-get update && \
-    apt-get install -y esl-erlang=1:17.5.3 && \
+    apt-get install -y esl-erlang=1:18.3.4 && \
     apt-get autoremove -y --purge && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
