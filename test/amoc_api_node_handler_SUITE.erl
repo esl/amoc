@@ -4,10 +4,12 @@
 -include_lib("eunit/include/eunit.hrl").
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
--export([returns_empty_list_when_amoc_up/1]).
+-export([returns_empty_list_when_amoc_up/1,
+         returns_nodes_list_when_amoc_up/1]).
 
 all() ->
-    [returns_empty_list_when_amoc_up].
+    [returns_empty_list_when_amoc_up,
+     returns_nodes_list_when_amoc_up].
 
 init_per_testcase(_, Config) ->
     application:ensure_all_started(inets),
@@ -27,6 +29,20 @@ returns_empty_list_when_amoc_up(_Config) ->
     ?assertEqual(200, CodeHttp),
     ?assertMatch([{<<"nodes">>, []}], JSON).
 
+returns_nodes_list_when_amoc_up(_Config) ->
+    %% given
+    given_applications_started(),
+    given_prepared_nodes(),
+    %% when
+    {CodeHttp, JSON} = send_request(),
+    %% then
+    ?assertEqual(200, CodeHttp),
+    ?assertMatch(
+        [{<<"nodes">>, [{<<"test1">>, <<"up">>}, {<<"test2">>, <<"down">>}]}],
+        JSON),
+    %% cleanup
+    clean_nodes().
+    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% HELPERS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -42,6 +58,15 @@ get_url() ->
 -spec send_request() -> {integer(), jsx:json_term()}.
 send_request() ->
     Result = httpc:request(get_url() ++ "/nodes"),
-    {ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result, 
+    {ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result,
     BodyErl = jsx:decode(erlang:list_to_bitstring(Body)),
     {CodeHttp, BodyErl}.
+
+-spec given_prepared_nodes() -> ok.
+given_prepared_nodes() ->
+    meck:new(amoc_dist, [unstick]),
+    meck:expect(amoc_dist, ping_nodes, fun() -> [{test1, ping}, {test2, pang}] end).
+
+-spec clean_nodes() -> ok.
+clean_nodes() ->
+    meck:unload(amoc_dist).
