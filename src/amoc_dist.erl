@@ -21,10 +21,10 @@ start_nodes() ->
     Path = amoc_config:get(path, "/usr"),
     start_nodes(Hosts, Path).
 
--spec ping_nodes() -> [pong|pang].
+-spec ping_nodes() -> [{string(), pong|pang}].
 ping_nodes() ->
     Hosts = amoc_config:get(hosts, []),
-    [ ping_node(amoc_slave:node_name(Host)) || Host <- Hosts ].
+    [ {Host, ping_node(amoc_slave:node_name(Host))} || Host <- Hosts ].
 
 -spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     [any()].

@@ -16,12 +16,12 @@
 -spec trails() -> trails:trails().
 trails() ->
     Metadata =
-        #{get =>
-              #{tags => ["node"],
-                description => "Pings AMOC nodes from master node",
-                produces => ["application/json"]
-               }
-         },
+    #{get =>
+          #{tags => ["node"],
+            description => "Pings AMOC nodes from master node",
+            produces => ["application/json"]
+           }
+     },
     [trails:trail("/nodes", ?MODULE, [], Metadata)].
 
 -spec init(tuple(), cowboy_req:req(), state()) ->
@@ -47,4 +47,8 @@ content_types_provided(Req, State) ->
                      {jsx:json_text(), cowboy_req:req(), state()}.
 to_json(Req, State) ->
     Nodes = amoc_dist:ping_nodes(),
-    {jsx:encode([{<<"nodes">>, Nodes}]), Req, State}.
+    ResponseList = lists:map(
+                       fun({X, ping}) -> {X, up};
+                          ({X, pang}) -> {X, down}
+                        end, Nodes),
+    {jsx:encode([{<<"nodes">>, ResponseList}]), Req, State}.
