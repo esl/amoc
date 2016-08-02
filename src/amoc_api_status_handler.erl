@@ -49,7 +49,7 @@ content_types_provided(Req, State) ->
     {binary(), cowboy_req:req(), state()}.
 to_json(Req0, State) ->
     Status = get_status(),
-    StatusJson = jsx:encode([{result, Status}]),
+    StatusJson = jsx:encode([{node_status, Status}]),
     {StatusJson, Req0, State}.
     
 -spec get_status() -> boolean().
@@ -57,6 +57,6 @@ get_status() ->
     Results = application:which_applications(),
     Res = lists:keyfind(amoc, 1, Results),
     case Res of
-        {amoc, _Desc, _Vsn} -> true;
-        false -> false
+        {amoc, _Desc, _Vsn} -> up;
+        false -> down
     end.
