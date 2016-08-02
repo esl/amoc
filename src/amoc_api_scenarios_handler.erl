@@ -13,10 +13,7 @@
          to_json/2,
          from_json/2]).
 
-
--record(state, {module_name, module_source}).
-
--type state() :: #state{}.
+-type state() :: [].
 
 -spec trails() -> trails:trails().
 trails() ->
@@ -41,7 +38,7 @@ init({tcp, http}, _Req, _Opts) ->
 
 -spec rest_init(cowboy_req:req(), [atom()]) -> {ok, cowboy_req:req(), state()}.
 rest_init(Req, _Opts) ->
-    {ok, Req, #state{}}.
+    {ok, Req, []}.
 
 -spec allowed_methods(cowboy_req:req(), state()) -> 
     {[binary()], cowboy_req:req(), state()}.
@@ -62,7 +59,7 @@ content_types_accepted(Req, State) ->
 
 -spec to_json(cowboy_req:req(), state()) -> 
     {jsx:json_text(), cowboy_req:req(), state()}.
-to_json(Req0, State = #state{}) ->
+to_json(Req0, State) ->
     {ok, Filenames} = file:list_dir("scenarios"),
     Filenames2 =
         lists:filter(
@@ -79,11 +76,9 @@ to_json(Req0, State = #state{}) ->
 
 -spec from_json(cowboy_req:req(), state()) ->
     {boolean(), cowboy_req:req(), state()}.
-from_json(Req, #state{}) ->
+from_json(Req, State) ->
     case get_vars_from_body(Req) of
-        {ok, State, Req2} ->
-            ModuleName = State#state.module_name,
-            ModuleSource = State#state.module_source,
+        {ok, {ModuleName, ModuleSource}, Req2} ->
             ScenarioPath = "scenarios/" ++ erlang:binary_to_list(ModuleName),
             file:write_file(
               ScenarioPath ++ ".erl",
@@ -99,12 +94,13 @@ from_json(Req, #state{}) ->
         {error, Reason, Req2} ->
             Reply = jsx:encode([{error, Reason}]),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
-            {false, Req3, #state{}}
+            {false, Req3, State}
     end.
 
 %% internal function
 -spec get_vars_from_body(cowboy_req:req()) ->
-    {ok | error, state() | wrong_json, cowboy_req:req()}.
+    {ok, {binary(), binary()}, cowboy_req:req()} | 
+    {error, wrong_json, cowboy_req:req()}.
 get_vars_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:body(Req),
     try
@@ -115,10 +111,7 @@ get_vars_from_body(Req) ->
                          JSON),
         true = is_binary(ModuleName),
         true = is_binary(ModuleSource),
-        State = #state{
-                   module_name = ModuleName,
-                   module_source = ModuleSource},
-        {ok, State, Req2}
+        {ok, {ModuleName, ModuleSource}, Req2}
     catch _:_ ->
               {error, wrong_json, Req2}
     end.
