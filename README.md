@@ -206,7 +206,7 @@ There is available REST API for AMOC where we can:
 * run scenario
 * check status of nodes in AMOC cluster
 
-API is described in other file.
+API is described [here](REST_API_DOCS.md). You can also get an access to REST API by running AMOC and go to `(address:port)/api-docs`.
 ### Docker
 
 TODO

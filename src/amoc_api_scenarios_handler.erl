@@ -17,18 +17,71 @@
 
 -spec trails() -> trails:trails().
 trails() ->
+    RequestBody =
+    #{name => <<"request body">>,
+      in => body,
+      description => <<"request body (as json)">>,
+      required => true,
+      schema =>
+      #{type => <<"object">>,
+        required => [<<"scenario">>, <<"module_source">>],
+        properties =>
+        #{scenario => #{<<"type">> => <<"string">>,
+                        <<"description">> => <<"Name of scenario">>
+                      },
+          module_source => #{<<"type">> => <<"string">>,
+                             <<"description">> => <<"Source code of scenario">>
+                           }
+        }
+      }
+    },
+
+    ResponseBodyGet =
+    #{<<"200">> =>
+      #{description => <<"response object">>,
+        schema =>
+        #{type => <<"object">>,
+          required => [<<"scenarios">>],
+          properties =>
+          #{scenarios => #{<<"type">> => <<"array">>,
+                           <<"items">> => #{<<"type">> => <<"string">>},
+                           <<"description">> => <<"Scenario names">>
+                         }
+          }
+        }
+      }
+    },
+
+    ResponseBodyPost =
+    #{<<"200">> =>
+      #{description => <<"response object">>,
+        schema =>
+        #{type => <<"object">>,
+          required => [<<"compile">>],
+          properties =>
+          #{compile => #{<<"type">> => <<"string">>,
+                          <<"description">> => <<"ok | error">>
+                        }
+          }
+        }
+      }
+    },
+
     Metadata =
     #{get =>
       #{tags => ["scenarios"],
         description => "Gets list of available scenarios",
-        produces => ["application/json"]
-       },
+        produces => ["application/json"],
+        responses => ResponseBodyGet
+      },
       post =>
       #{tags => ["scenarios"],
         description => "Uploads new scenario",
-        produces => ["application/json"]
-       }
-     },
+        produces => ["application/json"],
+        parameters => [RequestBody],
+        responses => ResponseBodyPost
+      }
+    },
     [trails:trail("/scenarios", ?MODULE, [], Metadata)].
 
 -spec init(tuple(), cowboy_req:req(), state()) ->

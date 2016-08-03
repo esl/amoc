@@ -37,8 +37,8 @@ Requests and responses format
 `POST /scenarios` with:
 `
 {
-    "scenario": ScenarioName,
-    "module_source": ModuleSourceCode
+    "scenario": ScenarioName, //string
+    "module_source": ModuleSourceCode //string
 }
 `
 #### Response
@@ -47,19 +47,13 @@ Requests and responses format
     "compile" : "ok" | "error"
 }
 `
-OR
-`
-{
-    "error" : "bad_request"
-}
-`
 ### Start scenario
 
 #### Request 
 `PATCH /scenarios/:id` with:
 `
 {
-    "users": NumberOfUsers
+    "users": NumberOfUsers //integer
 }
 `
 #### Response

@@ -15,13 +15,29 @@
 
 -spec trails() -> trails:trails().
 trails() ->
+    ResponseBody =
+    #{<<"200">> =>
+      #{description => <<"response object">>,
+        schema =>
+          #{type => <<"object">>,
+            required => [<<"nodes">>],
+            properties =>
+            #{nodes => #{<<"type">> => <<"object">>,
+                         <<"description">> => <<"nodeName: up | down">>
+                       }
+            }
+          }
+      }
+    },
+
     Metadata =
     #{get =>
-          #{tags => ["node"],
-            description => "Pings AMOC nodes from master node.",
-            produces => ["application/json"]
-           }
-     },
+      #{tags => ["node"],
+        description => "Pings AMOC nodes from master node.",
+        produces => ["application/json"],
+        responses => ResponseBody
+      }
+    },
     [trails:trail("/nodes", ?MODULE, [], Metadata)].
 
 -spec init(tuple(), cowboy_req:req(), state()) ->

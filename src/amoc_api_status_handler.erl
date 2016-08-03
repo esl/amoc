@@ -16,12 +16,28 @@
 
 -spec trails() -> trails:trails().
 trails() ->
-    Metadata =
-        #{get =>
-          #{tags => ["status"],
-            description => "Gets AMOC status, whether it is running or not.", 
-            produces => ["application/json"]
+    ResponseBody =
+    #{<<"200">> =>
+      #{description => <<"response object">>,
+        schema =>
+        #{type => <<"object">>,
+          required => [<<"node_status">>],
+          properties =>
+          #{node_status => #{<<"type">> => <<"string">>,
+                             <<"description">> => <<"up | down">>
+                           }
           }
+        }
+      }
+    },
+
+    Metadata =
+    #{get =>
+      #{tags => ["status"],
+        description => "Gets AMOC status, whether it is running or not.",
+        produces => ["application/json"],
+        responses => ResponseBody
+      }
     },
     [trails:trail("/status", amoc_api_status_handler, [], Metadata)].
 
