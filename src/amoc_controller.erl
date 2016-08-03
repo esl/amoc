@@ -303,7 +303,7 @@ does_scenario_exists(Scenario) ->
             lists:member(Scenario ++ ".erl", Result);
         error -> false
     end.
--spec check_test(atom(), amoc:scenario()) -> boolean().
+-spec check_test(atom(), amoc:scenario()) -> scenario_status().
 check_test(Scenario, CurrentScenario) ->
     case Scenario =:= CurrentScenario of
         true -> get_test_status();
