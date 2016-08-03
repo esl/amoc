@@ -18,7 +18,7 @@
 -type state() :: #state{}.
 -type node_id() :: non_neg_integer().
 -type handle_call_res() :: ok | {ok, term()} | {error, term()}.
--type scenario_status() :: running | finished | loaded.
+-type scenario_status() :: error | running | finished | loaded.
 
 %% ------------------------------------------------------------------
 %% Types Exports
@@ -116,10 +116,11 @@ handle_call(users, _From, State) ->
              {last, ets:last(?TABLE)}],
     {reply, {ok, Reply}, State};
 handle_call({status, Scenario}, _From, State) ->
-    case Scenario =:= State#state.scenario of
-        true -> {reply, get_test_status(), State};
-        false -> {reply, loaded, State}
-    end;
+    Res = case does_scenario_exists(Scenario) of
+        true -> check_test(Scenario, State#state.scenario);
+        false -> error
+    end,
+    {reply, Res, State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
@@ -291,4 +292,20 @@ get_test_status() ->
     case supervisor:which_children(amoc_users_sup) of
         [] -> finished;
         _Children -> running
+    end.
+
+-spec does_scenario_exists(atom()) -> boolean().
+does_scenario_exists(Scenario) ->
+    {Status, Result} = file:list_dir("scenarios/"),
+    case Status of
+        ok -> 
+            %% Pred = fun (File) -> File == Scenario ++ ".erl" end,
+            lists:member(Scenario ++ ".erl", Result);
+        error -> false
+    end.
+-spec check_test(atom(), amoc:scenario()) -> boolean().
+check_test(Scenario, CurrentScenario) ->
+    case Scenario =:= CurrentScenario of
+        true -> get_test_status();
+        false -> loaded
     end.
