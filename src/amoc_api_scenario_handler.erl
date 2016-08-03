@@ -52,7 +52,8 @@ trails() ->
           required => [<<"scenario_status">>],
           properties =>
           #{scenario_status => #{<<"type">> => <<"string">>,
-                                 <<"description">> => <<"loaded | running | finished">>
+                                 <<"description">> => 
+                                   <<"loaded | running | finished">>
                                }
           }
         }
