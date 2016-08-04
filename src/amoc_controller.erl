@@ -116,7 +116,7 @@ handle_call(users, _From, State) ->
              {last, ets:last(?TABLE)}],
     {reply, {ok, Reply}, State};
 handle_call({status, Scenario}, _From, State) ->
-    Res = case does_scenario_exists(Scenario) of
+    Res = case does_scenario_exist(Scenario) of
         true -> check_test(Scenario, State#state.scenario);
         false -> error
     end,
@@ -294,13 +294,12 @@ get_test_status() ->
         _Children -> running
     end.
 
--spec does_scenario_exists(atom()) -> boolean().
-does_scenario_exists(Scenario) ->
+-spec does_scenario_exist(atom()) -> boolean().
+does_scenario_exist(Scenario) ->
     {Status, Result} = file:list_dir("scenarios/"),
     case Status of
         ok -> 
-            %% Pred = fun (File) -> File == Scenario ++ ".erl" end,
-            lists:member(Scenario ++ ".erl", Result);
+            lists:member(erlang:atom_to_list(Scenario) ++ ".erl", Result);
         error -> false
     end.
 -spec check_test(atom(), amoc:scenario()) -> scenario_status().
