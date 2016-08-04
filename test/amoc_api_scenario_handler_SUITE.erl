@@ -57,13 +57,15 @@ end_per_testcase(_, _Config) ->
 
 get_scenario_status_returns_200_when_scenario_exists(_Config) ->
     %% given
-    given_amoc_controller_mocked_with_test_status(true),
+    given_amoc_dist_mocked_with_test_status(true),
     URL = get_url() ++ "/scenarios/sample_test",
     %% when
     {CodeHttp, _Body} = get_request(URL),
     %% then
     %% Maybe check Body, as answer format will be ready
-    ?assertEqual(200, CodeHttp).
+    ?assertEqual(200, CodeHttp),
+    %% cleanup
+    cleanup_amoc_dist().
 
 get_scenario_status_returns_404_when_scenario_not_exists(_Config) ->
     %% given
@@ -76,7 +78,7 @@ get_scenario_status_returns_404_when_scenario_not_exists(_Config) ->
 
 get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
     %% given
-    given_amoc_controller_mocked_with_test_status(running),
+    given_amoc_dist_mocked_with_test_status(running),
     URL = get_url() ++ "/scenarios/sample_test",
     %% when
     {CodeHttp, Body} = get_request(URL),
@@ -84,11 +86,11 @@ get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
     ?assertEqual(200, CodeHttp),
     ?assertMatch([{<<"scenario_status">>, <<"running">>}], Body),
     %% cleanup
-    cleanup_amoc_controller().
+    cleanup_amoc_dist().
 
 get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
     %% given
-    given_amoc_controller_mocked_with_test_status(finished),
+    given_amoc_dist_mocked_with_test_status(finished),
     URL = get_url() ++ "/scenarios/sample_test",
     %% when
     {CodeHttp, Body} = get_request(URL),
@@ -96,11 +98,11 @@ get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
     ?assertEqual(200, CodeHttp),
     ?assertMatch([{<<"scenario_status">>, <<"finished">>}], Body),
     %% cleanup
-    cleanup_amoc_controller().
+    cleanup_amoc_dist().
 
 get_scenario_status_returns_loaded_when_scenario_is_not_running(_Config) ->
     %% given
-    given_amoc_controller_mocked_with_test_status(loaded),
+    given_amoc_dist_mocked_with_test_status(loaded),
     URL = get_url() ++ "/scenarios/sample_test",
     %% when
     {CodeHttp, Body} = get_request(URL),
@@ -108,7 +110,7 @@ get_scenario_status_returns_loaded_when_scenario_is_not_running(_Config) ->
     ?assertEqual(200, CodeHttp),
     ?assertMatch([{<<"scenario_status">>, <<"loaded">>}], Body),
     %% cleanup
-    cleanup_amoc_controller().
+    cleanup_amoc_dist().
 
 patch_scenario_returns_404_when_scenario_not_exists(_Config) ->
     %% given
@@ -213,11 +215,11 @@ patch_request(URL, RequestBody) ->
               end,
     {CodeHttp, BodyErl}.
 
--spec given_amoc_controller_mocked_with_test_status(amoc_controller:scenario_status()) -> ok.
-given_amoc_controller_mocked_with_test_status(Value) ->
-    meck:new(amoc_controller, [unstick, passtrough]),
-    meck:expect(amoc_controller, test_status, fun(_) -> Value end).
+-spec given_amoc_dist_mocked_with_test_status(amoc_controller:scenario_status()) -> ok.
+given_amoc_dist_mocked_with_test_status(Value) ->
+    meck:new(amoc_dist, [passtrough]),
+    meck:expect(amoc_dist, test_status, fun(_) -> Value end).
 
--spec cleanup_amoc_controller() -> ok.
-cleanup_amoc_controller() ->
-    meck:unload(amoc_controller).
+-spec cleanup_amoc_dist() -> ok.
+cleanup_amoc_dist() ->
+    meck:unload(amoc_dist).

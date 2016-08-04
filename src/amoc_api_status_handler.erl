@@ -39,7 +39,7 @@ trails() ->
         responses => ResponseBody
       }
     },
-    [trails:trail("/status", amoc_api_status_handler, [], Metadata)].
+    [trails:trail("/status", ?MODULE, [], Metadata)].
 
 -spec init(tuple(), cowboy_req:req(), state()) -> 
           {upgrade, protocol, cowboy_rest}.
@@ -67,7 +67,7 @@ to_json(Req0, State) ->
     StatusJson = jsx:encode([{node_status, Status}]),
     {StatusJson, Req0, State}.
     
--spec get_status() -> boolean().
+-spec get_status() -> up | down.
 get_status() ->
     Results = application:which_applications(),
     Res = lists:keyfind(amoc, 1, Results),

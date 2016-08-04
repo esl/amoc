@@ -139,8 +139,7 @@ resource_exists(Req, State = #state{resource = Resource}) ->
 -spec to_json(cowboy_req:req(), state()) -> 
     {jsx:json_text(), cowboy_req:req(), state()}.
 to_json(Req0, State = #state{resource = Resource}) ->
-    Status = amoc_controller:test_status(
-                     erlang:list_to_atom(Resource)),
+    Status = amoc_dist:test_status(erlang:list_to_atom(Resource)),
     Reply = jsx:encode([{scenario_status, Status}]),
     {Reply, Req0, State}.
 
