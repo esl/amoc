@@ -119,7 +119,7 @@ get_vars_from_body(Req) ->
 -spec compile_and_load_scenario(binary(), string()) ->
     ok | error.
 compile_and_load_scenario(BinModuleName, ScenarioPath) ->
-    case compile:file(ScenarioPath, [{outdir, ebin}]) of
+    case compile:file(ScenarioPath, [{outdir, scenarios_ebin}]) of
         {ok, _} ->
             Module = erlang:binary_to_atom(BinModuleName, utf8),
             code:load_file(Module),
