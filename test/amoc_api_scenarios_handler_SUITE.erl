@@ -5,6 +5,7 @@
 
 -define(SCENARIOS_URL_S, "/scenarios").
 -define(SCENARIOS_DIR_S, "scenarios").
+-define(SCENARIOS_EBIN_DIR_S, "scenarios_ebin").
 -define(SAMPLE_SCENARIO_S, "sample_test.erl").
 -define(SAMPLE_SCENARIO_BEAM_S, "sample_test.beam").
 -define(SAMPLE_SCENARIO_A, sample_test).
@@ -29,22 +30,22 @@ all() ->
 
 
 init_per_testcase(_, Config) ->
-    ok = file:make_dir("ebin"),
+    ok = file:make_dir(?SCENARIOS_EBIN_DIR_S),
     ok = file:make_dir(?SCENARIOS_DIR_S),
     {ok, _} = application:ensure_all_started(inets),
     {ok, _} = application:ensure_all_started(amoc),
     Config.
 
 end_per_testcase(post_scenarios_returns_200_and_when_scenario_valid, _Config) ->
-    ok = file:delete(filename:join(["ebin",
+    ok = file:delete(filename:join([?SCENARIOS_EBIN_DIR_S,
                                     ?SAMPLE_SCENARIO_BEAM_S])),
     ok = file:delete(filename:join([?SCENARIOS_DIR_S,
                                     ?SAMPLE_SCENARIO_S])),
-    ok = file:del_dir("ebin"),
+    ok = file:del_dir(?SCENARIOS_EBIN_DIR_S),
     ok = file:del_dir(?SCENARIOS_DIR_S);
 
 end_per_testcase(_, _Config) ->
-    ok = file:del_dir("ebin"),
+    ok = file:del_dir(?SCENARIOS_EBIN_DIR_S),
     ok = file:del_dir(?SCENARIOS_DIR_S).
 
 get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
@@ -98,7 +99,7 @@ post_scenarios_returns_200_and_when_scenario_valid(Config) ->
     {CodeHttp, Body} = post_request(URL, RequestBody),
     ScenarioFileSource = filename:join([?SCENARIOS_DIR_S,
                                         ?SAMPLE_SCENARIO_S]),
-    ScenarioFileBeam = filename:join(["ebin",
+    ScenarioFileBeam = filename:join([?SCENARIOS_EBIN_DIR_S,
                                       ?SAMPLE_SCENARIO_BEAM_S]),
     %% then
     ?assertEqual(200, CodeHttp),
