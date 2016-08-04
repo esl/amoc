@@ -27,7 +27,8 @@ trails() ->
         required => [<<"scenario">>, <<"module_source">>],
         properties =>
         #{scenario => #{<<"type">> => <<"string">>,
-                        <<"description">> => <<"Name of scenario">>
+                        <<"description">> => 
+                            <<"Name of scenario module without .erl suffix">>
                       },
           module_source => #{<<"type">> => <<"string">>,
                              <<"description">> => <<"Source code of scenario">>
