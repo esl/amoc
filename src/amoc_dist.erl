@@ -25,7 +25,8 @@ start_nodes() ->
 -spec ping_nodes() -> [{atom(), pong|pang}].
 ping_nodes() ->
     Hosts = amoc_config:get(hosts, []),
-    [ {erlang:list_to_atom(Host), ping_node(amoc_slave:node_name(Host))} || Host <- Hosts ].
+    [ {erlang:list_to_atom(Host), ping_node(amoc_slave:node_name(Host))} 
+        || Host <- Hosts ].
 
 -spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     [any()].
