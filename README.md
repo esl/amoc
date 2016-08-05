@@ -196,6 +196,17 @@ console (``application:set_env/3``) or set OS environment variable (with prefix
 A separate file is required for this
 since dictionaries are not supported in the inventory file.
 
+## REST API
+
+There is available REST API for AMOC where we can:
+* retrieve test status from node
+* check whether AMOC cluster is up or down
+* upload source code of scenario to run
+* list available scenarios
+* run scenario
+* check status of nodes in AMOC cluster
+
+API is described [here](REST_API_DOCS.md). You can also get an access to REST API by running AMOC and go to `(address:port)/api-docs`.
 ### Docker
 
 TODO
