@@ -38,8 +38,8 @@ trails() ->
         required => [<<"users">>],
         properties =>
         #{users => #{<<"type">> => <<"integer">>,
-                           <<"description">> => <<"Number of users to start">>
-                         }
+                     <<"description">> => <<"Number of users to start">>
+                   }
         }
       }
     },
