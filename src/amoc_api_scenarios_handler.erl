@@ -145,7 +145,7 @@ from_json(Req, State) ->
             ResultBody = case Result of 
                              ok -> Result;
                              {error, Errors, _Warnings} ->
-                                 R = io_lib:format("~p",[Errors]),
+                                 R = io_lib:format("~p", [Errors]),
                                  lists:flatten(R)
                          end,
             Reply = jsx:encode([{compile, ResultBody}]),
