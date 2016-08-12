@@ -61,7 +61,7 @@ trails() ->
           required => [<<"compile">>],
           properties =>
           #{compile => #{<<"type">> => <<"string">>,
-                          <<"description">> => <<"ok | error">>
+                          <<"description">> => <<"ok | Errors">>
                         }
           }
         }
@@ -142,7 +142,13 @@ from_json(Req, State) ->
             Result = compile_and_load_scenario(
                        ModuleName,
                        ScenarioPath),
-            Reply = jsx:encode([{compile, Result}]),
+            ResultBody = case Result of 
+                             ok -> Result;
+                             {error, Errors, _Warnings} ->
+                                 R = io_lib:format("~p",[Errors]),
+                                 lists:flatten(R)
+                         end,
+            Reply = jsx:encode([{compile, ResultBody}]),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {true, Req3, State};
         {error, Reason, Req2} ->
@@ -167,20 +173,21 @@ get_vars_from_body(Req) ->
         true = is_binary(ModuleSource),
         {ok, {ModuleName, ModuleSource}, Req2}
     catch _:_ ->
-              {error, wrong_json, Req2}
+        {error, wrong_json, Req2}
     end.
 
 -spec compile_and_load_scenario(binary(), string()) ->
-    ok | error.
+    ok | {error, [string()], [string()]}.
 compile_and_load_scenario(BinModuleName, ScenarioPath) ->
-    case compile:file(ScenarioPath, [{outdir, scenarios_ebin}]) of
+    case compile:file(ScenarioPath, [{outdir, scenarios_ebin}, verbose,
+        return_errors, report_errors, report_warnings]) of
         {ok, _} ->
             Module = erlang:binary_to_atom(BinModuleName, utf8),
             code:load_file(Module),
             ok;
-        error ->
+        {error, Errors, Warnings} ->
             file:delete(ScenarioPath ++ ".erl"),
-            error
+            {error, Errors, Warnings}
     end.
 
 
