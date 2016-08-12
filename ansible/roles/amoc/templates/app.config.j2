@@ -5,6 +5,7 @@
          {% if 'amoc-slave' in group_names %},{api_port, 4001}{% endif %}
          {% for key, value in amoc.iteritems() %},{ {{ key }}, {{ value }} }{% endfor %}
         ]},
+ {ssl, [{session_cb, amoc_always_null_ssl_session_cache}]},
  {exometer, [
     {predefined, [
         {[erlang, system_info],
