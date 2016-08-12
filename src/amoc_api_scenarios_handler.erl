@@ -177,6 +177,7 @@ compile_and_load_scenario(BinModuleName, ScenarioPath) ->
         {ok, _} ->
             Module = erlang:binary_to_atom(BinModuleName, utf8),
             code:load_file(Module),
+            code:add_patha("scenarios_ebin"),
             ok;
         error ->
             file:delete(ScenarioPath ++ ".erl"),
