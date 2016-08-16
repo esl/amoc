@@ -181,7 +181,6 @@ get_result(Result) ->
     case Res of
         true -> started;
         false ->
-                %% Internal server error, log problems
                 Errors = lists:filter(fun(X) -> X =/= ok end, Result),
                 lager:error("Run scenario error: ~p", [Errors]),
                 error
