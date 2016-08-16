@@ -84,10 +84,11 @@ post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Con
     ?assertNot(filelib:is_regular(ScenarioFileSource)),
     ?assertEqual(200, CodeHttp),
     ?assertEqual([{<<"compile">>, 
-                "[{\"scenarios/sample_test.erl\",[{1,erl_parse," ++
-                "[\"syntax error before: \",[]]}]},\n " ++ 
-                "{\"scenarios/sample_test.erl\",[{1,erl_lint,undefined_module}" ++
-                "]}]"}],
+                   <<"[{\"scenarios/sample_test.erl\",[{1,erl_parse,"
+                     "[\"syntax error before: \",[]]}]},\n "
+                     "{\"scenarios/sample_test.erl\",["
+                     "{1,erl_lint,undefined_module}"
+                     "]}]">>}],
                  Body).
 
 post_scenarios_returns_200_and_when_scenario_valid(Config) ->

@@ -146,7 +146,7 @@ from_json(Req, State) ->
                              ok -> Result;
                              {error, Errors, _Warnings} ->
                                  R = io_lib:format("~p", [Errors]),
-                                 lists:flatten(R)
+                                 erlang:list_to_bitstring(lists:flatten(R))
                          end,
             Reply = jsx:encode([{compile, ResultBody}]),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
