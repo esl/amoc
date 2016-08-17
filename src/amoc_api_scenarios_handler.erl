@@ -112,7 +112,7 @@ content_types_accepted(Req, State) ->
 %% Request processing functions
 
 -spec to_json(cowboy_req:req(), state()) -> 
-    {jsx:json_text(), cowboy_req:req(), state()}.
+    {iolist(), cowboy_req:req(), state()}.
 to_json(Req0, State) ->
     {ok, Filenames} = file:list_dir("scenarios"),
     Filenames2 =
@@ -124,7 +124,7 @@ to_json(Req0, State) ->
     [ erlang:list_to_binary(Y) ||  X <- Filenames2,
                                    Y <- string:tokens(X, "."),
                                    Y =/= "erl" ],
-    Reply = jsx:encode([{scenarios, Scenarios}]),
+    Reply = jiffy:encode({[{scenarios, {Scenarios}}]}),
     {Reply, Req0, State}.
 
 
@@ -146,13 +146,13 @@ from_json(Req, State) ->
                              ok -> Result;
                              {error, Errors, _Warnings} ->
                                  R = io_lib:format("~p", [Errors]),
-                                 lists:flatten(R)
+                                 erlang:list_to_bitstring(lists:flatten(R))
                          end,
-            Reply = jsx:encode([{compile, ResultBody}]),
+            Reply = jiffy:encode({[{compile, ResultBody}]}),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {true, Req3, State};
         {error, Reason, Req2} ->
-            Reply = jsx:encode([{error, Reason}]),
+            Reply = jiffy:encode({[{error, Reason}]}),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {false, Req3, State}
     end.
@@ -164,7 +164,7 @@ from_json(Req, State) ->
 get_vars_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:body(Req),
     try
-        JSON = jsx:decode(Body),
+        {JSON} = jiffy:decode(Body),
         ModuleName = proplists:get_value(<<"scenario">>, JSON),
         ModuleSource = proplists:get_value(
                          <<"module_source">>,

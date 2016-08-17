@@ -39,7 +39,7 @@ returns_up_when_amoc_up_online(_Config) ->
     {CodeHttp, Body} = send_request(),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"node_status">>, <<"up">>}], Body).
+    ?assertMatch({[{<<"node_status">>, <<"up">>}]}, Body).
 
 
 returns_down_when_api_up_and_amoc_down_offline(_Config) ->
@@ -57,7 +57,7 @@ returns_down_when_api_up_and_amoc_down_online(_Config) ->
     {CodeHttp, Body} = send_request(),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"node_status">>, <<"down">>}], Body).
+    ?assertMatch({[{<<"node_status">>, <<"down">>}]}, Body).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% HELPERS
@@ -75,9 +75,9 @@ get_url() ->
     Port = amoc_config:get(api_port, 4000),
     "http://localhost:" ++ erlang:integer_to_list(Port).
 
--spec send_request() -> {integer(), jsx:json_term()}.
+-spec send_request() -> {integer(), jiffy:jiffy_decode_result()}.
 send_request() ->
     Result = httpc:request(get_url() ++ "/status"),
     {ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result, 
-    BodyErl = jsx:decode(erlang:list_to_bitstring(Body)),
+    BodyErl = jiffy:decode(erlang:list_to_bitstring(Body)),
     {CodeHttp, BodyErl}.

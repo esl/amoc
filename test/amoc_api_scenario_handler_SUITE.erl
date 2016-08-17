@@ -84,7 +84,7 @@ get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
     {CodeHttp, Body} = get_request(URL),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"scenario_status">>, <<"running">>}], Body),
+    ?assertMatch({[{<<"scenario_status">>, <<"running">>}]}, Body),
     %% cleanup
     cleanup_amoc_dist().
 
@@ -96,7 +96,7 @@ get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
     {CodeHttp, Body} = get_request(URL),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"scenario_status">>, <<"finished">>}], Body),
+    ?assertMatch({[{<<"scenario_status">>, <<"finished">>}]}, Body),
     %% cleanup
     cleanup_amoc_dist().
 
@@ -108,14 +108,14 @@ get_scenario_status_returns_loaded_when_scenario_is_not_running(_Config) ->
     {CodeHttp, Body} = get_request(URL),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"scenario_status">>, <<"loaded">>}], Body),
+    ?assertMatch({[{<<"scenario_status">>, <<"loaded">>}]}, Body),
     %% cleanup
     cleanup_amoc_dist().
 
 patch_scenario_returns_404_when_scenario_not_exists(_Config) ->
     %% given
     URL = get_url() ++ "/scenarios/non_existing_scenario",
-    RequestBody = jsx:encode([{users,30}]),
+    RequestBody = jiffy:encode({[{users,30}]}),
     %% when
     {CodeHttp, _Body} = patch_request(URL, RequestBody),
     %% then
@@ -125,7 +125,7 @@ patch_scenario_returns_404_when_scenario_not_exists(_Config) ->
 patch_scenario_returns_400_when_malformed_request(_Config) ->
     %% given
     URL = get_url() ++ "/scenarios/sample_test",
-    RequestBody = jsx:encode([{bad_key, bad_value}]),
+    RequestBody = jiffy:encode({[{bad_key, bad_value}]}),
     %% when
     {CodeHttp, _Body} = patch_request(URL, RequestBody),
     %% then
@@ -136,7 +136,7 @@ patch_scenario_returns_400_when_malformed_request(_Config) ->
 patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
     %% given
     URL = get_url() ++ "/scenarios/sample_test",
-    RequestBody = jsx:encode([{users, 10}]),
+    RequestBody = jiffy:encode({[{users, 10}]}),
     %% when
     {CodeHttp, _Body} = patch_request(URL, RequestBody),
     %% then
@@ -176,7 +176,7 @@ get_url() ->
     "http://localhost:" ++ erlang:integer_to_list(Port).
 
 -spec get_request(string()) -> 
-    {integer(), jsx:json_term()}.
+    {integer(), jiffy:jiffy_decode_result()}.
 get_request(URL) ->
     Header = [],
     HTTPOpts = [],
@@ -191,12 +191,12 @@ get_request(URL) ->
                   [] -> 
                       [];
                   _ ->
-                      jsx:decode(erlang:list_to_bitstring(Body))
+                      jiffy:decode(erlang:list_to_bitstring(Body))
               end,
     {CodeHttp, BodyErl}.
 
 -spec patch_request(string(), string()) ->
-    {integer(), jsx:json_term()}.
+    {integer(), jiffy:jiffy_decode_result()}.
 patch_request(URL, RequestBody) ->
     Header = "",
     Type = "application/json",
@@ -211,7 +211,7 @@ patch_request(URL, RequestBody) ->
                   [] -> 
                       [];
                   _ ->
-                      jsx:decode(erlang:list_to_bitstring(Body))
+                      jiffy:decode(erlang:list_to_bitstring(Body))
               end,
     {CodeHttp, BodyErl}.
 

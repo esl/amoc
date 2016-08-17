@@ -27,7 +27,7 @@ returns_empty_list_when_amoc_up(_Config) ->
     {CodeHttp,JSON} = send_request(),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch([{<<"nodes">>, []}], JSON).
+    ?assertMatch({[{<<"nodes">>, {[]}}]}, JSON).
 
 returns_nodes_list_when_amoc_up(_Config) ->
     %% given
@@ -38,7 +38,7 @@ returns_nodes_list_when_amoc_up(_Config) ->
     %% then
     ?assertEqual(200, CodeHttp),
     ?assertMatch(
-        [{<<"nodes">>, [{<<"test1">>, <<"up">>}, {<<"test2">>, <<"down">>}]}],
+        {[{<<"nodes">>, {[{<<"test1">>, <<"up">>}, {<<"test2">>, <<"down">>}]}}]},
         JSON),
     %% cleanup
     clean_nodes().
@@ -55,11 +55,11 @@ get_url() ->
     Port = amoc_config:get(api_port, 4000),
     "http://localhost:" ++ erlang:integer_to_list(Port).
 
--spec send_request() -> {integer(), jsx:json_term()}.
+-spec send_request() -> {integer(), jiffy:jiffy_decode_result()}.
 send_request() ->
     Result = httpc:request(get_url() ++ "/nodes"),
     {ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result,
-    BodyErl = jsx:decode(erlang:list_to_bitstring(Body)),
+    BodyErl = jiffy:decode(erlang:list_to_bitstring(Body)),
     {CodeHttp, BodyErl}.
 
 -spec given_prepared_nodes() -> ok.

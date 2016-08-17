@@ -7,10 +7,10 @@
                   kernel,
                   stdlib,
                   lager,
+                  jiffy,
                   exometer,
                   lhttpc,
                   ssl,
-                  jsx,
                   trails,
                   cowboy,
                   cowboy_swagger

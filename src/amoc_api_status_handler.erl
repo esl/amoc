@@ -61,10 +61,10 @@ content_types_provided(Req, State) ->
     {[{<<"application/json">>, to_json}], Req, State}.
 
 -spec to_json(cowboy_req:req(), state()) ->
-    {binary(), cowboy_req:req(), state()}.
+    {iolist(), cowboy_req:req(), state()}.
 to_json(Req0, State) ->
     Status = get_status(),
-    StatusJson = jsx:encode([{node_status, Status}]),
+    StatusJson = jiffy:encode({[{node_status, Status}]}),
     {StatusJson, Req0, State}.
     
 -spec get_status() -> up | down.

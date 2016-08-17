@@ -60,11 +60,11 @@ content_types_provided(Req, State) ->
     {[{<<"application/json">>, to_json}], Req, State}.
 
 -spec to_json(cowboy_req:req(), state()) ->
-                     {jsx:json_text(), cowboy_req:req(), state()}.
+                     {iolist(), cowboy_req:req(), state()}.
 to_json(Req, State) ->
     Nodes = amoc_dist:ping_nodes(),
     ResponseList = lists:map(
                        fun({X, pong}) -> {X, up};
                           ({X, pang}) -> {X, down}
                         end, Nodes),
-    {jsx:encode([{<<"nodes">>, ResponseList}]), Req, State}.
+    {jiffy:encode({[{<<"nodes">>, {ResponseList}}]}), Req, State}.
