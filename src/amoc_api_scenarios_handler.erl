@@ -146,7 +146,7 @@ from_json(Req, State) ->
                              ok -> Result;
                              {error, Errors, _Warnings} ->
                                  R = io_lib:format("~p", [Errors]),
-                                 lists:flatten(R)
+                                 erlang:list_to_bitstring(lists:flatten(R))
                          end,
             Reply = jsx:encode([{compile, ResultBody}]),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
@@ -179,8 +179,8 @@ get_vars_from_body(Req) ->
 -spec compile_and_load_scenario(binary(), string()) ->
     ok | {error, [string()], [string()]}.
 compile_and_load_scenario(BinModuleName, ScenarioPath) ->
-    case compile:file(ScenarioPath, [{outdir, scenarios_ebin}, verbose,
-        return_errors, report_errors, report_warnings]) of
+    case compile:file(ScenarioPath, [{parse_transform, lager_transform},
+        {outdir, "scenarios_ebin"}, return_errors, report_errors, verbose]) of
         {ok, _} ->
             Module = erlang:binary_to_atom(BinModuleName, utf8),
             code:add_patha("scenarios_ebin"),

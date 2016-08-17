@@ -37,7 +37,7 @@ init_per_testcase(
   patch_scenario_returns_200_when_request_ok_and_module_exists,
   Config) ->
     ok = meck:new(amoc_dist, [unstick]),
-    Fun = fun(_,1,_) -> ok end,
+    Fun = fun(_,1,_) -> [ok] end,
     ok = meck:expect(amoc_dist, do, Fun),
     create_env(Config),
     Config;

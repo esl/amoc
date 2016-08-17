@@ -150,8 +150,8 @@ from_json(Req, State = #state{resource = Resource}) ->
     case get_users_from_body(Req) of
         {ok, Users, Req2} ->
             Scenario = erlang:list_to_atom(Resource),
-            _ = amoc_dist:do(Scenario, 1, Users),
-            Reply = jsx:encode([{scenario, started}]),
+            Result = amoc_dist:do(Scenario, 1, Users),
+            Reply = jsx:encode([{scenario, get_result(Result)}]),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {true, Req3, State};
         {error, bad_request, Req2} ->
@@ -162,6 +162,8 @@ from_json(Req, State = #state{resource = Resource}) ->
 
 
 %% internal function
+-spec get_users_from_body(cowboy_req:req()) -> {ok, term(), cowboy_req:req()} |
+        {error, bad_request, cowboy_req:req()}.
 get_users_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:body(Req),
     try
@@ -173,3 +175,13 @@ get_users_from_body(Req) ->
               {error, bad_request, Req2}
     end.
 
+-spec get_result([ok | {error, term()}]) -> started | error.
+get_result(Result) ->
+    Res = lists:all(fun(X) -> X == ok end, Result),
+    case Res of
+        true -> started;
+        false ->
+                Errors = lists:filter(fun(X) -> X =/= ok end, Result),
+                lager:error("Run scenario error: ~p", [Errors]),
+                error
+    end. 
