@@ -52,8 +52,8 @@ get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
     %% given
     URL = get_url() ++ ?SCENARIOS_URL_S,
     %% when
-    {CodeHttp, Body} = get_request(URL),
-    Scenarios = proplists:get_value(<<"scenarios">>, Body),
+    {CodeHttp, {Body}} = get_request(URL),
+    {Scenarios} = proplists:get_value(<<"scenarios">>, Body),
     %% then
     ?assertEqual(200, CodeHttp),
     ?assert(is_list(Scenarios)).
@@ -61,21 +61,21 @@ get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
 post_scenarios_returns_400_when_malformed_request(_Config) ->
     %% given
     URL = get_url() ++ ?SCENARIOS_URL_S,
-    RequestBody = jsx:encode([{keyname_typo, ?SAMPLE_SCENARIO_A}]),
+    RequestBody = jiffy:encode({[{keyname_typo, ?SAMPLE_SCENARIO_A}]}),
     %% when
     {CodeHttp, Body} = post_request(URL, RequestBody),
     %% then
     ?assertEqual(400, CodeHttp),
-    ?assertEqual([{<<"error">>, <<"wrong_json">>}],
+    ?assertEqual({[{<<"error">>, <<"wrong_json">>}]},
                  Body).
 
 post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Config) ->
     %% given
     URL = get_url() ++ ?SCENARIOS_URL_S,
-    RequestBody = jsx:encode([
+    RequestBody = jiffy:encode({[
                               {scenario, ?SAMPLE_SCENARIO_A},
                               {module_source, invalid_source}
-                             ]),
+                              ]}),
     %% when
     {CodeHttp, Body} = post_request(URL, RequestBody),
     ScenarioFileSource = filename:join([?SCENARIOS_DIR_S,
@@ -83,12 +83,12 @@ post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Con
     %% then
     ?assertNot(filelib:is_regular(ScenarioFileSource)),
     ?assertEqual(200, CodeHttp),
-    ?assertEqual([{<<"compile">>, 
-                   <<"[{\"scenarios/sample_test.erl\",[{1,erl_parse,"
-                     "[\"syntax error before: \",[]]}]},\n "
-                     "{\"scenarios/sample_test.erl\",["
-                     "{1,erl_lint,undefined_module}"
-                     "]}]">>}],
+    ?assertEqual({[{<<"compile">>, 
+                <<"[{\"scenarios/sample_test.erl\",[{1,erl_parse,"
+                  "[\"syntax error before: \",[]]}]},\n " 
+                  "{\"scenarios/sample_test.erl\",[{1,erl_lint,"
+                  "undefined_module}"
+                  "]}]">>}]},
                  Body).
 
 post_scenarios_returns_200_and_when_scenario_valid(Config) ->
@@ -96,10 +96,10 @@ post_scenarios_returns_200_and_when_scenario_valid(Config) ->
     URL = get_url() ++ ?SCENARIOS_URL_S,
     ScenarioFile = data(Config, ?SAMPLE_SCENARIO_S),
     {ok, ScenarioContent} = file:read_file(ScenarioFile),
-    RequestBody = jsx:encode([
+    RequestBody = jiffy:encode({[
                               {scenario, ?SAMPLE_SCENARIO_A},
                               {module_source, ScenarioContent}
-                             ]),
+                               ]}),
     %% when
     {CodeHttp, Body} = post_request(URL, RequestBody),
     ScenarioFileSource = filename:join([?SCENARIOS_DIR_S,
@@ -110,7 +110,7 @@ post_scenarios_returns_200_and_when_scenario_valid(Config) ->
     ?assertEqual(200, CodeHttp),
     ?assert(filelib:is_regular(ScenarioFileSource)),
     ?assert(filelib:is_regular(ScenarioFileBeam)),
-    ?assertEqual([{<<"compile">>, <<"ok">>}],
+    ?assertEqual({[{<<"compile">>, <<"ok">>}]},
                  Body).
 
 %% Helpers
@@ -125,7 +125,7 @@ get_url() ->
     "http://localhost:" ++ erlang:integer_to_list(Port).
 
 -spec get_request(string()) -> 
-    {integer(), jsx:json_term()}.
+    {integer(), jiffy:jiffy_decode_result()}.
 get_request(URL) ->
     Header = [],
     HTTPOpts = [],
@@ -140,12 +140,12 @@ get_request(URL) ->
                   [] -> 
                       [];
                   _ ->
-                      jsx:decode(erlang:list_to_bitstring(Body))
+                      jiffy:decode(erlang:list_to_bitstring(Body))
               end,
     {CodeHttp, BodyErl}.
 
 -spec post_request(string(), string()) ->
-    {integer(), jsx:json_term()}.
+    {integer(), jiffy:jiffy_decode_result()}.
 post_request(URL, RequestBody) ->
     Header = "",
     Type = "application/json",
@@ -160,7 +160,6 @@ post_request(URL, RequestBody) ->
                   [] -> 
                       [];
                   _ ->
-                      jsx:decode(erlang:list_to_bitstring(Body))
+                      jiffy:decode(erlang:list_to_bitstring(Body))
               end,
     {CodeHttp, BodyErl}.
-

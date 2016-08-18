@@ -137,10 +137,10 @@ resource_exists(Req, State = #state{resource = Resource}) ->
 %% Request processing functions
 
 -spec to_json(cowboy_req:req(), state()) -> 
-    {jsx:json_text(), cowboy_req:req(), state()}.
+    {iolist(), cowboy_req:req(), state()}.
 to_json(Req0, State = #state{resource = Resource}) ->
     Status = amoc_dist:test_status(erlang:list_to_atom(Resource)),
-    Reply = jsx:encode([{scenario_status, Status}]),
+    Reply = jiffy:encode({[{scenario_status, Status}]}),
     {Reply, Req0, State}.
 
 
@@ -151,11 +151,11 @@ from_json(Req, State = #state{resource = Resource}) ->
         {ok, Users, Req2} ->
             Scenario = erlang:list_to_atom(Resource),
             Result = amoc_dist:do(Scenario, 1, Users),
-            Reply = jsx:encode([{scenario, get_result(Result)}]),
+            Reply = jiffy:encode({[{scenario, get_result(Result)}]}),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {true, Req3, State};
         {error, bad_request, Req2} ->
-            Reply = jsx:encode([{scenario, bad_request}]),
+            Reply = jiffy:encode({[{scenario, bad_request}]}),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {false, Req3, State}
     end.
@@ -167,7 +167,7 @@ from_json(Req, State = #state{resource = Resource}) ->
 get_users_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:body(Req),
     try
-        JSON = jsx:decode(Body),
+        {JSON} = jiffy:decode(Body),
         Users = proplists:get_value(<<"users">>, JSON),
         true = is_integer(Users),
         {ok, Users, Req2}
