@@ -179,6 +179,7 @@ get_vars_from_body(Req) ->
 -spec compile_and_load_scenario(binary(), string()) ->
     ok | {error, [string()], [string()]}.
 compile_and_load_scenario(BinModuleName, ScenarioPath) ->
+    ok = ensure_ebin_directory(),
     case compile:file(ScenarioPath, [{parse_transform, lager_transform},
         {outdir, "scenarios_ebin"}, return_errors, report_errors, verbose]) of
         {ok, _} ->
@@ -191,4 +192,11 @@ compile_and_load_scenario(BinModuleName, ScenarioPath) ->
             {error, Errors, Warnings}
     end.
 
-
+-spec ensure_ebin_directory() -> atom().
+ensure_ebin_directory() ->
+    Res = file:make_dir("scenarios_ebin"),
+    case Res of
+        ok -> ok;
+        {error, eexist} -> ok;
+        {error, Reason} -> Reason
+    end.
