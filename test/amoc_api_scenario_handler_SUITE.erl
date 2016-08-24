@@ -4,8 +4,8 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(SCENARIOS_DIR_S, "scenarios").
--define(SAMPLE_SCENARIO_S, "sample_test.erl").
--define(SAMPLE_SCENARIO_A, sample_test).
+-define(SAMPLE_SCENARIO_S, "sample_test1.erl").
+-define(SAMPLE_SCENARIO_A, sample_test1).
 
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
@@ -58,7 +58,7 @@ end_per_testcase(_, _Config) ->
 get_scenario_status_returns_200_when_scenario_exists(_Config) ->
     %% given
     given_amoc_dist_mocked_with_test_status(true),
-    URL = get_url() ++ "/scenarios/sample_test",
+    URL = get_url() ++ "/scenarios/sample_test1",
     %% when
     {CodeHttp, _Body} = get_request(URL),
     %% then
@@ -79,7 +79,7 @@ get_scenario_status_returns_404_when_scenario_not_exists(_Config) ->
 get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
     %% given
     given_amoc_dist_mocked_with_test_status(running),
-    URL = get_url() ++ "/scenarios/sample_test",
+    URL = get_url() ++ "/scenarios/sample_test1",
     %% when
     {CodeHttp, Body} = get_request(URL),
     %% then
@@ -91,7 +91,7 @@ get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
 get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
     %% given
     given_amoc_dist_mocked_with_test_status(finished),
-    URL = get_url() ++ "/scenarios/sample_test",
+    URL = get_url() ++ "/scenarios/sample_test1",
     %% when
     {CodeHttp, Body} = get_request(URL),
     %% then
@@ -103,7 +103,7 @@ get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
 get_scenario_status_returns_loaded_when_scenario_is_not_running(_Config) ->
     %% given
     given_amoc_dist_mocked_with_test_status(loaded),
-    URL = get_url() ++ "/scenarios/sample_test",
+    URL = get_url() ++ "/scenarios/sample_test1",
     %% when
     {CodeHttp, Body} = get_request(URL),
     %% then
@@ -124,7 +124,7 @@ patch_scenario_returns_404_when_scenario_not_exists(_Config) ->
 
 patch_scenario_returns_400_when_malformed_request(_Config) ->
     %% given
-    URL = get_url() ++ "/scenarios/sample_test",
+    URL = get_url() ++ "/scenarios/sample_test1",
     RequestBody = jiffy:encode({[{bad_key, bad_value}]}),
     %% when
     {CodeHttp, _Body} = patch_request(URL, RequestBody),
@@ -135,13 +135,13 @@ patch_scenario_returns_400_when_malformed_request(_Config) ->
 
 patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
     %% given
-    URL = get_url() ++ "/scenarios/sample_test",
+    URL = get_url() ++ "/scenarios/sample_test1",
     RequestBody = jiffy:encode({[{users, 10}]}),
     %% when
     {CodeHttp, _Body} = patch_request(URL, RequestBody),
     %% then
     %% Maybe check Body, as answer format will be ready
-    meck:wait(amoc_dist, do, ['sample_test', 1, 10], 2000),
+    meck:wait(amoc_dist, do, ['sample_test1', 1, 10], 2000),
     ?assertEqual(200, CodeHttp).
 
 

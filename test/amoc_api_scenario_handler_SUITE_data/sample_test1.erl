@@ -2,7 +2,7 @@
 %% Copyright 2015 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
--module(sample_test).
+-module(sample_test1).
 
 -define(HOST, <<"localhost">>).
 
