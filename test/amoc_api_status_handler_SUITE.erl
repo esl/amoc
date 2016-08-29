@@ -77,7 +77,9 @@ get_url() ->
 
 -spec send_request() -> {integer(), jiffy:jiffy_decode_result()}.
 send_request() ->
-    Result = httpc:request(get_url() ++ "/status"),
-    {ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result, 
-    BodyErl = jiffy:decode(erlang:list_to_bitstring(Body)),
-    {CodeHttp, BodyErl}.
+    {ok, Client} = fusco:start(get_url(), []),
+    {ok, Result} = fusco:request(
+                    Client, <<"/status">>, <<"GET">>, [] , [], 5000),
+    {{CodeHttpBin, _}, _Headers, Body, _, _} = Result,
+    BodyErl = jiffy:decode(Body),
+    {erlang:binary_to_integer(CodeHttpBin), BodyErl}.

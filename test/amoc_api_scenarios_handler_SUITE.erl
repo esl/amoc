@@ -49,10 +49,8 @@ end_per_testcase(_, _Config) ->
     ok = file:del_dir(?SCENARIOS_DIR_S).
 
 get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
-    %% given
-    URL = get_url() ++ ?SCENARIOS_URL_S,
     %% when
-    {CodeHttp, {Body}} = get_request(URL),
+    {CodeHttp, {Body}} = get_request(?SCENARIOS_URL_S),
     {Scenarios} = proplists:get_value(<<"scenarios">>, Body),
     %% then
     ?assertEqual(200, CodeHttp),
@@ -60,10 +58,9 @@ get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
 
 post_scenarios_returns_400_when_malformed_request(_Config) ->
     %% given
-    URL = get_url() ++ ?SCENARIOS_URL_S,
     RequestBody = jiffy:encode({[{keyname_typo, ?SAMPLE_SCENARIO_A}]}),
     %% when
-    {CodeHttp, Body} = post_request(URL, RequestBody),
+    {CodeHttp, Body} = post_request(?SCENARIOS_URL_S, RequestBody),
     %% then
     ?assertEqual(400, CodeHttp),
     ?assertEqual({[{<<"error">>, <<"wrong_json">>}]},
@@ -71,13 +68,12 @@ post_scenarios_returns_400_when_malformed_request(_Config) ->
 
 post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Config) ->
     %% given
-    URL = get_url() ++ ?SCENARIOS_URL_S,
     RequestBody = jiffy:encode({[
                               {scenario, ?SAMPLE_SCENARIO_A},
                               {module_source, invalid_source}
                               ]}),
     %% when
-    {CodeHttp, Body} = post_request(URL, RequestBody),
+    {CodeHttp, Body} = post_request(?SCENARIOS_URL_S, RequestBody),
     ScenarioFileSource = filename:join([?SCENARIOS_DIR_S,
                                         ?SAMPLE_SCENARIO_S]),
     %% then
@@ -93,7 +89,6 @@ post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Con
 
 post_scenarios_returns_200_and_when_scenario_valid(Config) ->
     %% given
-    URL = get_url() ++ ?SCENARIOS_URL_S,
     ScenarioFile = data(Config, ?SAMPLE_SCENARIO_S),
     {ok, ScenarioContent} = file:read_file(ScenarioFile),
     RequestBody = jiffy:encode({[
@@ -101,7 +96,7 @@ post_scenarios_returns_200_and_when_scenario_valid(Config) ->
                               {module_source, ScenarioContent}
                                ]}),
     %% when
-    {CodeHttp, Body} = post_request(URL, RequestBody),
+    {CodeHttp, Body} = post_request(?SCENARIOS_URL_S, RequestBody),
     ScenarioFileSource = filename:join([?SCENARIOS_DIR_S,
                                         ?SAMPLE_SCENARIO_S]),
     ScenarioFileBeam = filename:join([?SCENARIOS_EBIN_DIR_S,
@@ -126,40 +121,31 @@ get_url() ->
 
 -spec get_request(string()) -> 
     {integer(), jiffy:jiffy_decode_result()}.
-get_request(URL) ->
-    Header = [],
-    HTTPOpts = [],
-    Opts = [],
-    Result = httpc:request(get,
-                           {URL, Header},
-                           HTTPOpts,
-                           Opts),
-
-    {ok, {{_HttpVsn, CodeHttp, _Status}, _, Body}} = Result,
-    BodyErl = case Body of
-                  [] -> 
-                      [];
-                  _ ->
-                      jiffy:decode(erlang:list_to_bitstring(Body))
-              end,
-    {CodeHttp, BodyErl}.
+get_request(Path) ->
+    request(get, Path).
 
 -spec post_request(string(), string()) ->
     {integer(), jiffy:jiffy_decode_result()}.
-post_request(URL, RequestBody) ->
-    Header = "",
-    Type = "application/json",
-    HTTPOpts = [],
-    Opts = [],
-    Result = httpc:request(post,
-                           {URL, Header, Type, RequestBody},
-                           HTTPOpts,
-                           Opts),
-    {ok, {{_HttpVsn, CodeHttp, _Status},_, Body}} = Result, 
+post_request(Path, RequestBody) ->
+    request(<<"POST">>, Path, RequestBody).
+
+-spec request(get, string()) ->
+    {integer(), jiffy:jiffy_decode_result()}.
+request(get, Path) ->
+    request(<<"GET">>, Path, []).
+
+-spec request(binary, string(), string()) ->
+    {integer(), jiffy:jiffy_decode_result()}.
+request(Method, Path, RequestBody) ->
+    {ok, Client} = fusco:start(get_url(), []),
+    BinPath = erlang:list_to_bitstring(Path),
+    {ok, Result} = fusco:request(
+                    Client, BinPath, Method, 
+                    [{<<"content-type">>,<<"application/json">>}], 
+                    RequestBody, 5000),
+    {{CodeHttpBin, _}, _Headers, Body, _, _} = Result,
     BodyErl = case Body of
-                  [] -> 
-                      [];
-                  _ ->
-                      jiffy:decode(erlang:list_to_bitstring(Body))
+                <<"">> -> [];
+                _ -> jiffy:decode(Body)
               end,
-    {CodeHttp, BodyErl}.
+    {erlang:binary_to_integer(CodeHttpBin), BodyErl}.    
