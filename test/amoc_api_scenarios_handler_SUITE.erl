@@ -50,7 +50,7 @@ end_per_testcase(_, _Config) ->
 
 get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
     %% when
-    {CodeHttp, {Body}} = get_request(?SCENARIOS_URL_S),
+    {CodeHttp, {Body}} = amoc_api_helper:get(?SCENARIOS_URL_S),
     {Scenarios} = proplists:get_value(<<"scenarios">>, Body),
     %% then
     ?assertEqual(200, CodeHttp),
@@ -60,7 +60,7 @@ post_scenarios_returns_400_when_malformed_request(_Config) ->
     %% given
     RequestBody = jiffy:encode({[{keyname_typo, ?SAMPLE_SCENARIO_A}]}),
     %% when
-    {CodeHttp, Body} = post_request(?SCENARIOS_URL_S, RequestBody),
+    {CodeHttp, Body} = amoc_api_helper:post(?SCENARIOS_URL_S, RequestBody),
     %% then
     ?assertEqual(400, CodeHttp),
     ?assertEqual({[{<<"error">>, <<"wrong_json">>}]},
@@ -73,7 +73,7 @@ post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Con
                               {module_source, invalid_source}
                               ]}),
     %% when
-    {CodeHttp, Body} = post_request(?SCENARIOS_URL_S, RequestBody),
+    {CodeHttp, Body} = amoc_api_helper: post(?SCENARIOS_URL_S, RequestBody),
     ScenarioFileSource = filename:join([?SCENARIOS_DIR_S,
                                         ?SAMPLE_SCENARIO_S]),
     %% then
@@ -96,7 +96,7 @@ post_scenarios_returns_200_and_when_scenario_valid(Config) ->
                               {module_source, ScenarioContent}
                                ]}),
     %% when
-    {CodeHttp, Body} = post_request(?SCENARIOS_URL_S, RequestBody),
+    {CodeHttp, Body} = amoc_api_helper:post(?SCENARIOS_URL_S, RequestBody),
     ScenarioFileSource = filename:join([?SCENARIOS_DIR_S,
                                         ?SAMPLE_SCENARIO_S]),
     ScenarioFileBeam = filename:join([?SCENARIOS_EBIN_DIR_S,
@@ -113,39 +113,3 @@ post_scenarios_returns_200_and_when_scenario_valid(Config) ->
 data(Config, Path) ->
     Dir = proplists:get_value(data_dir, Config),
     filename:join([Dir, Path]).
-
--spec get_url() -> string().
-get_url() ->
-    Port = amoc_config:get(api_port, 4000),
-    "http://localhost:" ++ erlang:integer_to_list(Port).
-
--spec get_request(string()) -> 
-    {integer(), jiffy:jiffy_decode_result()}.
-get_request(Path) ->
-    request(get, Path).
-
--spec post_request(string(), string()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
-post_request(Path, RequestBody) ->
-    request(<<"POST">>, Path, RequestBody).
-
--spec request(get, string()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
-request(get, Path) ->
-    request(<<"GET">>, Path, []).
-
--spec request(binary, string(), string()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
-request(Method, Path, RequestBody) ->
-    {ok, Client} = fusco:start(get_url(), []),
-    BinPath = erlang:list_to_bitstring(Path),
-    {ok, Result} = fusco:request(
-                    Client, BinPath, Method, 
-                    [{<<"content-type">>,<<"application/json">>}], 
-                    RequestBody, 5000),
-    {{CodeHttpBin, _}, _Headers, Body, _, _} = Result,
-    BodyErl = case Body of
-                <<"">> -> [];
-                _ -> jiffy:decode(Body)
-              end,
-    {erlang:binary_to_integer(CodeHttpBin), BodyErl}.    

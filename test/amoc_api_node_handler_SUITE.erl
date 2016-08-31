@@ -7,6 +7,8 @@
 -export([returns_empty_list_when_amoc_up/1,
          returns_nodes_list_when_amoc_up/1]).
 
+-define(PATH, "/nodes").
+
 all() ->
     [returns_empty_list_when_amoc_up,
      returns_nodes_list_when_amoc_up].
@@ -24,7 +26,7 @@ returns_empty_list_when_amoc_up(_Config) ->
     %% given
     given_applications_started(),
     %% when
-    {CodeHttp,JSON} = send_request(),
+    {CodeHttp,JSON} = amoc_api_helper:get(?PATH),
     %% then
     ?assertEqual(200, CodeHttp),
     ?assertMatch({[{<<"nodes">>, {[]}}]}, JSON).
@@ -34,7 +36,7 @@ returns_nodes_list_when_amoc_up(_Config) ->
     given_applications_started(),
     given_prepared_nodes(),
     %% when
-    {CodeHttp, JSON} = send_request(),
+    {CodeHttp, JSON} = amoc_api_helper:get(?PATH),
     %% then
     ?assertEqual(200, CodeHttp),
     ?assertMatch(
@@ -49,20 +51,6 @@ returns_nodes_list_when_amoc_up(_Config) ->
 -spec given_applications_started() -> {ok, [atom()]} | {error, term()}.
 given_applications_started() ->
     application:ensure_all_started(amoc).
-
--spec get_url() -> string().
-get_url() ->
-    Port = amoc_config:get(api_port, 4000),
-    "http://localhost:" ++ erlang:integer_to_list(Port).
-
--spec send_request() -> {integer(), jiffy:jiffy_decode_result()}.
-send_request() ->
-    {ok, Client} = fusco:start(get_url(), []),
-    {ok, Result} = fusco:request(
-                    Client, <<"/nodes">>, <<"GET">>, [] , [], 5000),
-    {{CodeHttpBin, _}, _Headers, Body, _, _} = Result,
-    BodyErl = jiffy:decode(Body),
-    {erlang:binary_to_integer(CodeHttpBin), BodyErl}.
 
 -spec given_prepared_nodes() -> ok.
 given_prepared_nodes() ->

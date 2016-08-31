@@ -61,7 +61,7 @@ get_scenario_status_returns_200_when_scenario_exists(_Config) ->
     %% given
     given_amoc_dist_mocked_with_test_status(true),
     %% when
-    {CodeHttp, _Body} = get_request(?SAMPLE_GOOD_SCENARIO_PATH),
+    {CodeHttp, _Body} = amoc_api_helper:get(?SAMPLE_GOOD_SCENARIO_PATH),
     %% then
     %% Maybe check Body, as answer format will be ready
     ?assertEqual(200, CodeHttp),
@@ -70,7 +70,7 @@ get_scenario_status_returns_200_when_scenario_exists(_Config) ->
 
 get_scenario_status_returns_404_when_scenario_not_exists(_Config) ->
     %% when
-    {CodeHttp, _Body} = get_request(?SAMPLE_BAD_SCENARIO_PATH),
+    {CodeHttp, _Body} = amoc_api_helper:get(?SAMPLE_BAD_SCENARIO_PATH),
     %% then
     %% Maybe check Body, as answer format will be ready
     ?assertEqual(404, CodeHttp).
@@ -79,7 +79,7 @@ get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
     %% given
     given_amoc_dist_mocked_with_test_status(running),
     %% when
-    {CodeHttp, Body} = get_request(?SAMPLE_GOOD_SCENARIO_PATH),
+    {CodeHttp, Body} = amoc_api_helper:get(?SAMPLE_GOOD_SCENARIO_PATH),
     %% then
     ?assertEqual(200, CodeHttp),
     ?assertMatch({[{<<"scenario_status">>, <<"running">>}]}, Body),
@@ -90,7 +90,7 @@ get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
     %% given
     given_amoc_dist_mocked_with_test_status(finished),
     %% when
-    {CodeHttp, Body} = get_request(?SAMPLE_GOOD_SCENARIO_PATH),
+    {CodeHttp, Body} = amoc_api_helper:get(?SAMPLE_GOOD_SCENARIO_PATH),
     %% then
     ?assertEqual(200, CodeHttp),
     ?assertMatch({[{<<"scenario_status">>, <<"finished">>}]}, Body),
@@ -101,7 +101,7 @@ get_scenario_status_returns_loaded_when_scenario_is_not_running(_Config) ->
     %% given
     given_amoc_dist_mocked_with_test_status(loaded),
     %% when
-    {CodeHttp, Body} = get_request(?SAMPLE_GOOD_SCENARIO_PATH),
+    {CodeHttp, Body} = amoc_api_helper:get(?SAMPLE_GOOD_SCENARIO_PATH),
     %% then
     ?assertEqual(200, CodeHttp),
     ?assertMatch({[{<<"scenario_status">>, <<"loaded">>}]}, Body),
@@ -112,7 +112,8 @@ patch_scenario_returns_404_when_scenario_not_exists(_Config) ->
     %% given
     RequestBody = jiffy:encode({[{users,30}]}),
     %% when
-    {CodeHttp, _Body} = patch_request(?SAMPLE_BAD_SCENARIO_PATH, RequestBody),
+    {CodeHttp, _Body} = amoc_api_helper:patch(
+                            ?SAMPLE_BAD_SCENARIO_PATH, RequestBody),
     %% then
     %% Maybe check Body, as answer format will be ready
     ?assertEqual(404, CodeHttp).
@@ -121,7 +122,8 @@ patch_scenario_returns_400_when_malformed_request(_Config) ->
     %% given
     RequestBody = jiffy:encode({[{bad_key, bad_value}]}),
     %% when
-    {CodeHttp, _Body} = patch_request(?SAMPLE_GOOD_SCENARIO_PATH, RequestBody),
+    {CodeHttp, _Body} = amoc_api_helper:patch(
+                            ?SAMPLE_GOOD_SCENARIO_PATH, RequestBody),
     %% then
     %% Maybe check Body, as answer format will be ready
     ?assertEqual(400, CodeHttp).
@@ -131,7 +133,8 @@ patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
     %% given
     RequestBody = jiffy:encode({[{users, 10}]}),
     %% when
-    {CodeHttp, _Body} = patch_request(?SAMPLE_GOOD_SCENARIO_PATH, RequestBody),
+    {CodeHttp, _Body} = amoc_api_helper:patch(
+                            ?SAMPLE_GOOD_SCENARIO_PATH, RequestBody),
     %% then
     %% Maybe check Body, as answer format will be ready
     meck:wait(amoc_dist, do, ['sample_test1', 1, 10], 2000),
@@ -162,42 +165,6 @@ copy(Src, Dst) ->
 data(Config, Path) ->
     Dir = proplists:get_value(data_dir, Config),
     filename:join([Dir, Path]).
-
--spec get_url() -> string().
-get_url() ->
-    Port = amoc_config:get(api_port, 4000),
-    "http://localhost:" ++ erlang:integer_to_list(Port).
-
--spec get_request(string()) -> 
-    {integer(), jiffy:jiffy_decode_result()}.
-get_request(Path) ->
-    request(get, Path).
-
--spec patch_request(string(), string()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
-patch_request(Path, RequestBody) ->
-    request(<<"PATCH">>, Path, RequestBody).
-
--spec request(get, string()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
-request(get, Path) ->
-    request(<<"GET">>, Path, []).
-
--spec request(binary(), string(), string()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
-request(Method, Path, RequestBody) ->
-    {ok, Client} = fusco:start(get_url(), []),
-    BinPath = erlang:list_to_bitstring(Path),
-    {ok, Result} = fusco:request(
-                    Client, BinPath, Method, 
-                    [{<<"content-type">>,<<"application/json">>}],
-                    RequestBody, 5000),
-    {{CodeHttpBin, _}, _Headers, Body, _, _} = Result,
-    BodyErl = case Body of
-                <<"">> -> [];
-                _ -> jiffy:decode(Body)
-              end,
-    {erlang:binary_to_integer(CodeHttpBin), BodyErl}.
 
 -spec given_amoc_dist_mocked_with_test_status(
         amoc_controller:scenario_status()) -> ok.
