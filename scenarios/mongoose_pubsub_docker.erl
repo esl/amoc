@@ -50,7 +50,18 @@ start(MyId) ->
 
 work_as_publisher(MyId, Client) ->
     create_pubsub_node(Client, pubsub_node(MyId)),
-    publish_items_forever(Client, MyId, pubsub_node(MyId), 1).
+    case MyId rem 3 of
+        0 -> publish_many_items(Client, MyId, pubsub_node(MyId), 1, 20000);
+        _ -> publish_items_forever(Client, MyId, pubsub_node(MyId), 1)
+    end.
+
+publish_many_items(_, _, _, _, 0) -> ok;
+
+publish_many_items(Client, MyId, Node, ItemId, Count) ->
+    timer:sleep(?DELAY_BETWEEN_MESSAGES),
+    lager:debug("Publisher ~p publishing item ~p.", [MyId, ItemId]),
+    publish(Client, integer_to_binary(ItemId), Node),
+    publish_many_items(Client, MyId, Node, ItemId + 1, Count - 1).
 
 publish_items_forever(Client, MyId, Node, ItemId) ->
     timer:sleep(?DELAY_BETWEEN_MESSAGES),
