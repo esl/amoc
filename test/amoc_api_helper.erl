@@ -2,7 +2,6 @@
 
 -export([get/1, get/2, post/2, post/3, patch/2, patch/3]).
 
-
 -spec get(string()) -> {integer(), jiffy:jiffy_decode_result()}. 
 get(Path) -> get(get_url(), Path).
 
@@ -18,7 +17,6 @@ post(Path, Body) -> post(get_url(), Path, Body).
     {integer(), jiffy:jiffy_decode_result()}.
 post(BaseUrl, Path, Body) -> 
     request(BaseUrl, erlang:list_to_bitstring(Path), <<"POST">>, Body).
-
 
 -spec patch(string(), binary()) ->
     {integer(), jiffy:jiffy_decode_result()}.
@@ -46,6 +44,7 @@ request(BaseUrl, Path, Method, RequestBody) ->
                 <<"">> -> [];
                 _ -> jiffy:decode(Body)
               end,
+    fusco:disconnect(Client),
     {erlang:binary_to_integer(CodeHttpBin), BodyErl}.
 
 -spec get_url() -> string().
