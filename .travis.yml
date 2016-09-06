@@ -7,6 +7,11 @@ branches:
     only:
         - master
 
+
+matrix:
+    include:
+        - otp_release: 18.0
+
 addons:
     apt:
         packages:
