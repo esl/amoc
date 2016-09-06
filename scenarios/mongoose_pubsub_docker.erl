@@ -38,30 +38,17 @@ init() ->
     exometer_report:subscribe(exometer_report_graphite, ?ITEMS_RECEIVED_CT, [one, count], 10000),
     ok.
 
--spec start(amoc_scenario:user_id()) -> any().
+-spec start(amoc_scenario:user_id()) -> no_return().
 start(MyId) ->
     Client = connect_amoc_user(MyId),
     case MyId rem 2 of
         1 -> work_as_publisher(MyId, Client);
         0 -> work_as_subscriber(MyId, Client)
-    end,
-    timer:sleep(?SLEEP_TIME_AFTER_SCENARIO),
-    disconnect_amoc_user(Client).
+    end.
 
 work_as_publisher(MyId, Client) ->
     create_pubsub_node(Client, pubsub_node(MyId)),
-    case MyId rem 3 of
-        0 -> publish_many_items(Client, MyId, pubsub_node(MyId), 1, 20000);
-        _ -> publish_items_forever(Client, MyId, pubsub_node(MyId), 1)
-    end.
-
-publish_many_items(_, _, _, _, 0) -> ok;
-
-publish_many_items(Client, MyId, Node, ItemId, Count) ->
-    timer:sleep(?DELAY_BETWEEN_MESSAGES),
-    lager:debug("Publisher ~p publishing item ~p.", [MyId, ItemId]),
-    publish(Client, integer_to_binary(ItemId), Node),
-    publish_many_items(Client, MyId, Node, ItemId + 1, Count - 1).
+    publish_items_forever(Client, MyId, pubsub_node(MyId), 1).
 
 publish_items_forever(Client, MyId, Node, ItemId) ->
     timer:sleep(?DELAY_BETWEEN_MESSAGES),
@@ -179,18 +166,9 @@ connect_amoc_user(MyId) ->
     receive_presence(Client, Client),
     Client.
 
-disconnect_amoc_user(Client) ->
-    send_presence_unavailable(Client),
-    escalus_connection:stop(Client).
-
 -spec send_presence_available(escalus:client()) -> ok.
 send_presence_available(Client) ->
     Pres = escalus_stanza:presence(<<"available">>),
-    escalus_connection:send(Client, Pres).
-
--spec send_presence_unavailable(escalus:client()) -> ok.
-send_presence_unavailable(Client) ->
-    Pres = escalus_stanza:presence(<<"unavailable">>),
     escalus_connection:send(Client, Pres).
 
 receive_presence(Client1, Client2) ->
