@@ -18,6 +18,7 @@ start(_StartType, _StartArgs) ->
     Ret = amoc_sup:start_link(),
     amoc_dist:start_nodes(),
     ok = amoc_event:add_handler(amoc_annotations, []),
+    amoc_api:start_listener(),
     Ret.
 
 -spec stop(term()) -> ok.

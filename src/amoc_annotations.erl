@@ -63,10 +63,10 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 -spec annotate(tag(), list(), list(any())) -> {error, no_graphite} | ok.
 annotate(Tags, Format, Args) ->
-    case application:get_env(amoc, graphite_endpoint) of
+    case amoc_config:get(graphite_endpoint) of
         undefined ->
             {error, no_graphite};
-        {ok, Host} ->
+        Host ->
             What = iolist_to_binary(io_lib:format(Format, Args)),
             Struct = {struct, [{what, What}, {tags, Tags}]},
             Json = mochijson2:encode(Struct),

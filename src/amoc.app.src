@@ -7,9 +7,13 @@
                   kernel,
                   stdlib,
                   lager,
+                  jiffy,
                   exometer,
                   lhttpc,
-                  ssl
+                  ssl,
+                  trails,
+                  cowboy,
+                  cowboy_swagger
                  ]},
   {mod, { amoc_app, []}},
   {env, [{repeat_interval, 60000},

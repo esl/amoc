@@ -1,7 +1,7 @@
 sudo: false
 
 language: erlang
-otp_release: 17.5
+otp_release: 18.0
 
 branches:
     only:

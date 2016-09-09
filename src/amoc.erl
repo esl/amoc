@@ -3,9 +3,6 @@
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(amoc).
--define(INTERARRIVAL_DEFAULT, 30).
--define(INTERARRIVAL,
-    application:get_env(amoc, interarrival, ?INTERARRIVAL_DEFAULT)).
 
 -export([do/1]).
 

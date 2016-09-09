@@ -4,11 +4,11 @@
 %%==============================================================================
 -module(amoc_controller).
 -behaviour(gen_server).
+
 -define(SERVER, ?MODULE).
 -define(INTERARRIVAL_DEFAULT, 50).
--define(INTERARRIVAL,
-        application:get_env(amoc, interarrival, ?INTERARRIVAL_DEFAULT)).
 -define(TABLE, amoc_users).
+
 -record(state, {scenario :: amoc:scenario(),
                 scenario_state :: any(),
                 nodes ::  non_neg_integer(),
@@ -18,10 +18,13 @@
 -type state() :: #state{}.
 -type node_id() :: non_neg_integer().
 -type handle_call_res() :: ok | {ok, term()} | {error, term()}.
+-type scenario_status() :: error | running | finished | loaded.
 
 %% ------------------------------------------------------------------
 %% Types Exports
 %% ------------------------------------------------------------------
+
+-export_type([scenario_status/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -34,7 +37,8 @@
          remove/1,
          remove/2,
          remove/3,
-         users/0]).
+         users/0,
+         test_status/1]).
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
@@ -89,6 +93,10 @@ users() ->
     {ok, U} = gen_server:call(?SERVER, users),
     U.
 
+-spec test_status(atom()) -> {ok, scenario_status()} | {error, term()}.
+test_status(ScenarioName) ->
+    gen_server:call(?SERVER, {status, ScenarioName}).
+
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -107,6 +115,12 @@ handle_call(users, _From, State) ->
     Reply = [{count, ets:info(?TABLE, size)},
              {last, ets:last(?TABLE)}],
     {reply, {ok, Reply}, State};
+handle_call({status, Scenario}, _From, State) ->
+    Res = case does_scenario_exist(Scenario) of
+        true -> check_test(Scenario, State#state.scenario);
+        false -> error
+    end,
+    {reply, Res, State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
@@ -225,7 +239,7 @@ start_users(Scenario, UserIds, State) ->
     supervisor:startchild_ret().
 start_user(Scenario, Id, State) ->
     R = supervisor:start_child(amoc_users_sup, [Scenario, Id, State]),
-    timer:sleep(?INTERARRIVAL),
+    timer:sleep(interarrival()),
     R.
 
 -spec stop_users([amoc_scenario:user_id()], boolean()) -> [true | stop].
@@ -268,3 +282,29 @@ node_userids(Start, End, Nodes, NodeId) when is_integer(Nodes), Nodes > 0,
                 false
         end,
     lists:filter(F, lists:seq(Start, End)).
+
+-spec interarrival() -> integer().
+interarrival() ->
+    amoc_config:get(interarrival, ?INTERARRIVAL_DEFAULT).
+
+-spec get_test_status() -> scenario_status().
+get_test_status() ->
+    case supervisor:which_children(amoc_users_sup) of
+        [] -> finished;
+        _Children -> running
+    end.
+
+-spec does_scenario_exist(atom()) -> boolean().
+does_scenario_exist(Scenario) ->
+    {Status, Result} = file:list_dir("scenarios/"),
+    case Status of
+        ok -> 
+            lists:member(erlang:atom_to_list(Scenario) ++ ".erl", Result);
+        error -> false
+    end.
+-spec check_test(atom(), amoc:scenario()) -> scenario_status().
+check_test(Scenario, CurrentScenario) ->
+    case Scenario =:= CurrentScenario of
+        true -> get_test_status();
+        false -> loaded
+    end.

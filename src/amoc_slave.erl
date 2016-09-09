@@ -11,7 +11,9 @@
 %% ------------------------------------------------------------------
 -export([start_link/0,
          start/2,
-         monitor_master/1]).
+         monitor_master/1,
+         ping/1,
+         node_name/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -55,6 +57,10 @@ start(Host, Directory) ->
 -spec monitor_master(node()) -> ok.
 monitor_master(Node) ->
     gen_server:call({?SERVER, Node}, {monitor_master, node()}).
+
+-spec node_name(string()) -> node().
+node_name(Host) ->
+    list_to_atom("amoc@" ++ Host).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -108,6 +114,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 -spec handle_start(string(), file:filename(), state()) -> state().
 handle_start(Host, Directory, #state{to_ack=Ack}=State) ->
+    create_status_file(<<"connecting">>),
     _Port = start_slave_node(Host, Directory),
     Node = node_name(Host),
     Ack1 = [{Node, ?DEFAULT_RETRIES} | Ack],
@@ -123,7 +130,7 @@ start_slave_node(Host, Directory) ->
 ping_slave_nodes(#state{to_ack=Ack}=State) ->
     Ack1 = lists:filtermap(fun ping_slave_node/1, Ack),
     case Ack1 of
-        []  -> ok;
+        []  -> create_status_file(<<"ready">>);
         _   -> schedule_timer()
     end,
     State#state{to_ack=Ack1}.
@@ -144,10 +151,11 @@ ping_slave_node({Node, Retries}) ->
             {true, {Node, Retries-1}}
     end.
 
--spec node_name(string()) -> node().
-node_name(Host) ->
-    list_to_atom("amoc@" ++ Host).
-
 -spec schedule_timer() -> reference().
 schedule_timer() ->
     erlang:send_after(1000, self(), timeout).
+
+-spec create_status_file(binary()) -> ok.
+create_status_file(Status) ->
+    Path = application:get_env(amoc, status_file, ".amoc.status"),
+    ok = file:write_file(Path, Status).
