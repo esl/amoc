@@ -1,4 +1,4 @@
-.PHONY: all rel compile deploy prepare deps test ct eunit prop
+.PHONY: all rel compile clean deploy prepare deps test ct eunit prop
 
 all: rel deploy
 
@@ -7,6 +7,10 @@ rel: compile
 
 compile: deps
 	./rebar compile
+
+clean:
+	./rebar clean
+	rm -rf test/*.beam
 
 deps:
 	./rebar get-deps
