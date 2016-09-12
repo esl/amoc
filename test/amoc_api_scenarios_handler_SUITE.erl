@@ -50,10 +50,11 @@ end_per_testcase(_, _Config) ->
 
 get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
     %% when
-    {CodeHttp, {Body}} = amoc_api_helper:get(?SCENARIOS_URL_S),
-    {Scenarios} = proplists:get_value(<<"scenarios">>, Body),
+    {CodeHttp, Body} = amoc_api_helper:get(?SCENARIOS_URL_S),
     %% then
+    {[{Key, Scenarios}]} = Body,
     ?assertEqual(200, CodeHttp),
+    ?assertEqual(<<"scenarios">>, Key),
     ?assert(is_list(Scenarios)).
 
 post_scenarios_returns_400_when_malformed_request(_Config) ->

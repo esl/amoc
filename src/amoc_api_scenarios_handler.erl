@@ -124,7 +124,7 @@ to_json(Req0, State) ->
     [ erlang:list_to_binary(Y) ||  X <- Filenames2,
                                    Y <- string:tokens(X, "."),
                                    Y =/= "erl" ],
-    Reply = jiffy:encode({[{scenarios, {Scenarios}}]}),
+    Reply = jiffy:encode({[{scenarios, Scenarios}]}),
     {Reply, Req0, State}.
 
 
