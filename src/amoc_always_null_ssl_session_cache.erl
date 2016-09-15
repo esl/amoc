@@ -10,16 +10,29 @@
          terminate/1,
          update/3]).
 
+%% not exported by ssl
+%% only defined in "ssl_internal.hrl", we redefine it
+-type db_handle() :: any().
+-type key() :: tuple().
+-type session() :: tuple().
+
+-spec init(list()) -> invalid.
 init(_) -> invalid.
 
+-spec terminate(db_handle()) -> ok.
 terminate(_) -> ok.
 
-lookup(_,_) -> undefined.
+-spec lookup(db_handle(), key()) -> undefined.
+lookup(_, _) -> undefined.
 
-update(_,_,_) -> ok.
+-spec update(db_handle(), key(), session()) -> ok.
+update(_, _, _) -> ok.
 
-delete(_,_) -> ok.
+-spec delete(db_handle(), key()) -> ok.
+delete(_, _) -> ok.
 
-foldl(_,Acc,_) -> Acc.
+-spec foldl(fun(), any(), db_handle()) -> any().
+foldl(_, Acc, _) -> Acc.
 
-select_session(_,_) -> [].
+-spec select_session(db_handle(), tuple() | inet:port_number()) -> [].
+select_session(_, _) -> [].
