@@ -50,7 +50,7 @@ Requests and responses format
 ### Start scenario
 
 #### Request 
-`PATCH /scenarios/:id` with:
+`PATCH /scenarios/:id` (:id is a module name of scenario) with:
 `
 {
     "users": NumberOfUsers //integer
@@ -65,7 +65,7 @@ Requests and responses format
 ### Scenario status
 
 #### Request
-`GET /scenarios/:id`
+`GET /scenarios/:id` (:id is a module name of scenario)
 #### Response
 `{
     "scenario_status": "loaded" | "running" | "finished"
