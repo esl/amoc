@@ -11,7 +11,6 @@ init_per_suite(Config) ->
     Config.
 
 run_dialyzer(Config) ->
-    ok = file:delete(plt_file("erlang.plt")),
     build_or_check_plts(Config),
     dialyze(Config).
 
