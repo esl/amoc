@@ -26,7 +26,7 @@ dialyze(Config) ->
 
 build_or_check_plts(Config) ->
     build_or_check_plt(plt_file("erlang.plt"),
-                       [{apps, [kernel, stdlib, erts, crypto, compiler]},
+                       [{apps, [kernel, stdlib, erts, crypto, compiler, ssl]},
                         {output_file, log_file(Config, "erlang.log")}]),
     build_or_check_plt(plt_file("deps.plt"),
                        [{files_rec, deps_dirs()},
