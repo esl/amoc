@@ -33,7 +33,6 @@
 
 -spec init() -> ok.
 init() ->
-    set_env_interarrival(),
     lager:info("init some metrics"),
     exometer:new(?MESSAGES_CT, spiral),
     exometer_report:subscribe(exometer_report_graphite, ?MESSAGES_CT, [one, count], 10000),
@@ -167,8 +166,3 @@ pick_server() ->
     S = size(Servers),
     N = erlang:phash2(self(), S) + 1,
     element(N, Servers).
-
--spec set_env_interarrival() -> ok.
-set_env_interarrival() ->
-    Interarrival = amoc_config:get('INTERARRIVAL'),
-    application:set_env(amoc, interarrival, Interarrival).
