@@ -162,7 +162,7 @@ make_jid(Id) ->
 
 -spec pick_server() -> binary().
 pick_server() ->
-    Servers = amoc_config:get('XMPP_SERVERS'),
+    Servers = amoc_config:get(xmpp_servers),
     S = size(Servers),
     N = erlang:phash2(self(), S) + 1,
     element(N, Servers).
