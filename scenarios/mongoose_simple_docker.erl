@@ -33,7 +33,6 @@
 
 -spec init() -> ok.
 init() ->
-    set_env_interarrival(),
     lager:info("init some metrics"),
     exometer:new(?MESSAGES_CT, spiral),
     exometer_report:subscribe(exometer_report_graphite, ?MESSAGES_CT, [one, count], 10000),
@@ -163,21 +162,7 @@ make_jid(Id) ->
 
 -spec pick_server() -> binary().
 pick_server() ->
-    Servers = env_servers(),
+    Servers = amoc_config:get(xmpp_servers),
     S = size(Servers),
     N = erlang:phash2(self(), S) + 1,
     element(N, Servers).
-
--spec env_servers() -> {binary()}.
-env_servers() ->
-    List = re:split(os:getenv("AMOC_XMPP_SERVERS"), "\s",
-                    [{return, binary}, trim]),
-    list_to_tuple(List).
-
--spec set_env_interarrival() -> ok.
-set_env_interarrival() ->
-    Interarrival = case os:getenv("AMOC_INTERARRIVAL") of
-                       false -> 100;
-                       List -> list_to_integer(List)
-                   end,
-    application:set_env(amoc, interarrival, Interarrival).
