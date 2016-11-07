@@ -5,10 +5,12 @@
 -export([start/1]).
 -export([init/0]).
 
+-spec init() -> ok.
 init() ->
     http_req:start(),
     ok.
 
+-spec start(amoc_scenario:user_id()) -> any().
 start(MyId) ->
     Cfg = make_user(MyId, <<"xmpp-res">>),
     do_start(xmpp_or_rest(MyId), MyId, Cfg).
@@ -24,7 +26,6 @@ do_start(xmpp, _MyId, Cfg) ->
 
     receive_forever(Client),
 
-    send_presence_unavailable(Client),
     escalus_connection:stop(Client).
 
 receive_forever(Client) ->
@@ -90,9 +91,5 @@ xmpp_or_rest(MyId) ->
 
 send_presence_available(Client) ->
     Pres = escalus_stanza:presence(<<"available">>),
-    escalus_connection:send(Client, Pres).
-
-send_presence_unavailable(Client) ->
-    Pres = escalus_stanza:presence(<<"unavailable">>),
     escalus_connection:send(Client, Pres).
 
