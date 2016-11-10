@@ -40,6 +40,9 @@ eunit:
 
 test: compile eunit ct prop
 
+console:
+	erl -pa ebin/ -pa deps/*/ebin
+
 dialyzer/erlang.plt:
 	@mkdir -p dialyzer
 	@dialyzer --build_plt --output_plt dialyzer/erlang.plt \
