@@ -19,7 +19,7 @@ get_iffaddrs_by_subnets(Subnets) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
--spec unpack_interfaces({string(), proplists:property()}) ->
+-spec unpack_interfaces(proplists:property()) ->
     [{inet:ip_address(), inet:ip_address()}].
 unpack_interfaces({_IFName, Props}) ->
     Addrs = [ X || {addr, X} <- proplists:lookup_all(addr, Props)],
