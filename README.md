@@ -57,7 +57,7 @@ merged with amoc's `deps`.
 
 Everything you need to do is to create the release. To achieve that run:
 `make rel`. Now you are ready to test our scenario locally with one amoc node, to
-do this run `_rel/amoc/bin/amoc console`.
+do this run `_build/default/rel/amoc/bin/amoc console`.
 
 ```erlang
 amoc_local:do(my_scenario, 1, 10).
