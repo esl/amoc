@@ -8,7 +8,8 @@
          lookup/2,
          select_session/2,
          terminate/1,
-         update/3]).
+         update/3,
+         size/1]).
 
 %% not exported by ssl
 %% only defined in "ssl_internal.hrl", we redefine it
@@ -36,3 +37,7 @@ foldl(_, Acc, _) -> Acc.
 
 -spec select_session(db_handle(), tuple() | inet:port_number()) -> [].
 select_session(_, _) -> [].
+
+-spec size(db_handle()) -> integer().
+size(_) ->
+    0.

@@ -7,13 +7,7 @@
 
 -compile(export_all).
 
-all() ->
-    [config_prop_test].
-
-config_prop_test(_Config) ->
-     ?assertEqual(true, proper:quickcheck(config_prop(), [long_result, 100])).
-
-config_prop() ->
+prop_config_prop() ->
     ?FORALL(Cmds, proper_statem:commands(?MODULE),
             begin
                 {_History, State, Result} = proper_statem:run_commands(?MODULE, Cmds),
@@ -42,7 +36,7 @@ precondition(_S, _) ->
     true.
 
 %%
-next_state(S=#{vars := Vars}, _Res, {call, ?MODULE, set_app_env_variable, 
+next_state(S=#{vars := Vars}, _Res, {call, ?MODULE, set_app_env_variable,
                                         [Key, Value]}) ->
     ConvertedKey = lists:flatten(io_lib:format("~p", [Key])),
     case os:getenv("AMOC_" ++ ConvertedKey) of

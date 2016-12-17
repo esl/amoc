@@ -1,8 +1,5 @@
 -module(config_SUITE).
 
--behaviour(proper_statem).
-
--include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -compile(export_all).
