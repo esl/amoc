@@ -19,18 +19,16 @@ prepare:
 	ansible-playbook -i hosts ansible/amoc-prepare.yml $(ARGS)
 
 ct: compile
-	@if [ $$SUITE ]; then ./rebar3 ct -v --suite $$SUITE; \
-		else ./rebar3 ct -v; fi
-
-prop_files := $(shell ls test/ | grep 'prop_.*\.erl')
+	@if [ $$SUITE ]; then ./rebar3 as test ct -v --suite $$SUITE; \
+		else ./rebar3 as test ct -v; fi
 
 prop: compile
-	@if [ $$PROP ]; then ct_run -logdir logs -pa ebin/ -pa _build/test/lib/*/ebin/ -suite $$PROP; \
-		else ct_run  -pa ebin/ -pa _build/test/lib/*/ebin/ -suite $(prop_files); fi
+	@if [ $$PROP ]; then ./rebar3 as test proper --long_result 100 -m $$PROP; \
+		else ./rebar3 as test proper; fi
 
 eunit: compile
-	@if [ $$SUITE ]; then ./rebar3 eunit --suite $$SUITE; \
-		else ./rebar3 eunit; fi
+	@if [ $$SUITE ]; then ./rebar3 as test eunit --suite $$SUITE; \
+		else ./rebar3 as test eunit; fi
 
 test: compile eunit ct prop
 

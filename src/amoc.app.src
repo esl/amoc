@@ -6,14 +6,17 @@
   {applications, [
                   kernel,
                   stdlib,
+                  ssl,
                   lager,
                   jiffy,
                   exometer,
+                  usec,
+                  fusco,
                   lhttpc,
-                  ssl,
                   trails,
                   cowboy,
-                  cowboy_swagger
+                  cowboy_swagger,
+                  recon
                  ]},
   {mod, { amoc_app, []}},
   {env, [{repeat_interval, 60000},
