@@ -17,6 +17,8 @@
 -include_lib("exml/include/exml.hrl").
 -include_lib("escalus/include/escalus_xmlns.hrl").
 
+-type binjid() :: binary().
+
 -define(HOST, <<"localhost">>). %% The virtual host served by the server
 -define(SERVER_IPS, {<<"127.0.0.1">>}). %% Tuple of servers, for example {<<"10.100.0.21">>, <<"10.100.0.22">>}
 
@@ -30,8 +32,35 @@ flush_duration(Type) -> [amoc, times, Type, flush_duration].
 rand_access_duration(Type) -> [amoc, times, Type, random_access_query_duration].
 paging_duration(Type) -> [amoc, times, Type, paging_query_duration].
 last_page_duration(Type) -> [amoc, times, Type, last_page_query_duration].
+errors_per_second() -> [amoc, counters, errors_per_second].
+
+
 intermessage_time() -> amoc_config:get(intermessage_time, 100).
 messages_per_user() -> amoc_config:get(messages_per_user, 1000).
+backoff_base() -> amoc_config:get(backoff_base, 10).
+backoff_cap() -> amoc_config:get(backoff_cap, timer:minutes(1)).
+request_simple() -> amoc_config:get(request_simple, true).
+
+
+-spec init() -> ok.
+init() ->
+    register(test_master, spawn_link(fun() -> test_master([], 0, [], 0) end)),
+
+    lists:foreach(
+      fun(Type) ->
+              exometer:new(message_counter(Type), counter),
+              exometer_report:subscribe(exometer_report_graphite, message_counter(Type), [value], 10000),
+              exometer:new(errors_per_second(), spiral, [{time_span, timer:seconds(1)}]),
+              exometer_report:subscribe(exometer_report_graphite, errors_per_second(), [one], 10000),
+
+              lists:foreach(
+                fun(Metric) ->
+                        exometer:new(Metric, histogram, [{time_span, timer:seconds(5)}]),
+                        exometer_report:subscribe(exometer_report_graphite, Metric, [mean, max, min, median, 95, 99], 10000)
+                end,
+                [flush_duration(Type), rand_access_duration(Type), paging_duration(Type), last_page_duration(Type)])
+      end,
+      [pm, muc]).
 
 
 -spec start(amoc_scenario:user_id()) -> any().
@@ -86,12 +115,12 @@ test(Client, Room) ->
 test_master(UserSet, UserCount, WaitingList, UserCount) when UserCount =/= 0 ->
     Interarrival = amoc_config:get(interarrival, 50),
     lists:foldl(
-        fun(Pid, Delay) ->
-            erlang:send_after(Delay, Pid, resume),
-            Delay + Interarrival
-        end,
-        0,
-        WaitingList),
+      fun(Pid, Delay) ->
+              erlang:send_after(Delay, Pid, resume),
+              Delay + Interarrival
+      end,
+      0,
+      WaitingList),
     test_master(UserSet, UserCount, [], 0);
 
 test_master(UserSet, UserCount, WaitingList, WaitingCount) ->
@@ -115,27 +144,6 @@ test_master(UserSet, UserCount, WaitingList, WaitingCount) ->
             Pid ! {usercount, UserCount},
             test_master(UserSet, UserCount, WaitingList, WaitingCount)
     end.
-
-
--type binjid() :: binary().
-
--spec init() -> ok.
-init() ->
-    register(test_master, spawn_link(fun() -> test_master([], 0, [], 0) end)),
-
-    lists:foreach(
-      fun(Type) ->
-              exometer:new(message_counter(Type), counter),
-              exometer_report:subscribe(exometer_report_graphite, message_counter(Type), [value], 10000),
-
-              lists:foreach(
-                fun(Metric) ->
-                        exometer:new(Metric, histogram, [{time_span, 5000}]),
-                        exometer_report:subscribe(exometer_report_graphite, Metric, [mean, max, min, median, 95, 99], 10000)
-                end,
-                [flush_duration(Type), rand_access_duration(Type), paging_duration(Type), last_page_duration(Type)])
-      end,
-      [pm, muc]).
 
 
 -spec user_spec(binary(), binary(), binary()) -> escalus_users:user_spec().
@@ -248,23 +256,7 @@ create_mam_request(RSM, Room) ->
 
 create_mam_request(RSM) ->
     escalus_stanza:mam_lookup_messages_iq(
-      <<"QueryID">>, undefined, undefined, undefined, RSM, true).
-
-
-%% count_mam_messages(Client) ->
-%%     escalus_connection:send(Client, create_mam_request(0, undefined, false)),
-%%
-%%     Stanza = #xmlel{name = <<"iq">>} =
-%%         escalus_connection:get_stanza(Client, count, timer:seconds(30)),
-%%
-%%     BinCount = exml_query:path(Stanza, [
-%%                                         {element, <<"query">>},
-%%                                         {element, <<"set">>},
-%%                                         {element, <<"count">>},
-%%                                         cdata
-%%                                        ], undefined),
-%%
-%%     binary_to_integer(BinCount).
+      <<"QueryID">>, undefined, undefined, undefined, RSM, request_simple()).
 
 
 neighbour_jids(Count) ->
@@ -280,12 +272,15 @@ populate_mam(Client, Room) ->
 
 
 query(Client, Query) ->
+    query(Client, Query, 0, 1).
+
+query(Client, Query, TotalDuration, MaxBackoff) ->
     escalus_connection:set_filter_predicate(
       Client,
       fun(Stanza) ->
               escalus_pred:is_mam_fin_message(Stanza) orelse
-              escalus_pred:is_iq_error(Stanza) orelse
-              escalus_pred:is_message(Stanza)
+                  escalus_pred:is_iq_error(Stanza) orelse
+                  escalus_pred:is_message(Stanza)
       end),
 
     SendTime = erlang:monotonic_time(),
@@ -294,18 +289,27 @@ query(Client, Query) ->
     ResultTime = erlang:monotonic_time(),
 
     First = exml_query:path(Stanza,
-        [
-        {element, <<"fin">>},
-        {element, <<"set">>},
-         {element, <<"first">>},
-         cdata
-         ]),
+                            [
+                             {element, <<"fin">>},
+                             {element, <<"set">>},
+                             {element, <<"first">>},
+                             cdata
+                            ]),
 
     escalus_connection:set_filter_predicate(Client, fun(_) -> false end),
 
+    Duration = TotalDuration + ResultTime - SendTime,
+
     case escalus_pred:is_iq_error(Stanza) of
-        true -> lager:error("Error: ~s", [exml:to_list(Stanza)]), error;
-        false -> {erlang:convert_time_unit(ResultTime - SendTime, native, milli_seconds), Count, First}
+        true ->
+            lager:error("Lookup error: ~s", [exml:to_list(Stanza)]),
+            update_errors(),
+            timer:sleep(rand:uniform(MaxBackoff)),
+            NextBackoff = min(MaxBackoff * backoff_base(), backoff_cap()),
+            query(Client, Query, Duration, NextBackoff);
+
+        false ->
+            {erlang:convert_time_unit(Duration, native, milli_seconds), Count, First}
     end.
 
 
@@ -351,6 +355,14 @@ update_message_counter({jid, _}) ->
     exometer:update(message_counter(pm), 1);
 update_message_counter({room, _}) ->
     exometer:update(message_counter(muc), 1).
+
+update_errors() ->
+    exometer:update(errors_per_second(), 1).
+
+% term_to_metric_type(undefined) -> pm;
+% term_to_metric_type({jid, _}) -> pm;
+% term_to_metric_type({room, _}) -> muc;
+% term_to_metric_type(_) -> muc;
 
 read_message_counter(undefined) ->
     {ok, [{value, Messages}]} = exometer:get_value(message_counter(pm), value),
@@ -406,7 +418,7 @@ read_pages(Client, Room, Before, PagesLeft, TotalDuration, Count) ->
 
         {Duration, 1, First} ->
             read_pages(Client, Room, First, PagesLeft - 1,
-                TotalDuration + Duration, Count + 1)
+                       TotalDuration + Duration, Count + 1)
     end.
 
 
