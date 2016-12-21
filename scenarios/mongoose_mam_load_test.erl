@@ -46,12 +46,13 @@ request_simple() -> amoc_config:get(request_simple, true).
 init() ->
     register(test_master, spawn_link(fun() -> test_master([], 0, [], 0) end)),
 
+    exometer:new(errors_per_second(), spiral, [{time_span, timer:seconds(1)}]),
+    exometer_report:subscribe(exometer_report_graphite, errors_per_second(), [one], 10000),
+
     lists:foreach(
       fun(Type) ->
               exometer:new(message_counter(Type), counter),
               exometer_report:subscribe(exometer_report_graphite, message_counter(Type), [value], 10000),
-              exometer:new(errors_per_second(), spiral, [{time_span, timer:seconds(1)}]),
-              exometer_report:subscribe(exometer_report_graphite, errors_per_second(), [one], 10000),
 
               lists:foreach(
                 fun(Metric) ->
@@ -74,12 +75,12 @@ start(MyId) ->
 
     send_presence_available(Client),
     join_muc(Client, MyId, Room),
+    initialize_muc(Client, MyId, Room),
 
     case register() of
         ok ->
             ok;
         new ->
-            initialize_muc(Client, MyId, Room),
             timer:sleep(timer:seconds(10))
     end,
 
