@@ -12,6 +12,7 @@ RUN buildDeps=' \
     clang \
     libexpat1-dev \
     wget \
+    iproute2 \
     ' && \
     apt-get update && \
     apt-get install -y --no-install-recommends $buildDeps && \
