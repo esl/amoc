@@ -15,6 +15,7 @@
      [{exometer_report_graphite, [
                                   {prefix, "AMOC_PREFIX"},
                                   {host, "AMOC_GRAPHITE_HOST"},
+                                  {port, AMOC_GRAPHITE_PORT},
                                   {api_key, ""}
                                  ]}]},
     {subscribers, [
