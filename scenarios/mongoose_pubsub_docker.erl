@@ -152,7 +152,7 @@ connect_amoc_user(MyId) ->
     User = make_user(MyId, <<"res1">>),
     {ConnectionTime, ConnectionResult} = timer:tc(escalus_connection, start, [User]),
     Client0 = case ConnectionResult of
-        {ok, ConnectedClient, _, _} ->
+        {ok, ConnectedClient, _EscalusSessionFeatures} ->
             exometer:update([amoc, counters, connections], 1),
             exometer:update([amoc, times, connection], ConnectionTime),
             ConnectedClient;

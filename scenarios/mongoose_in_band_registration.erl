@@ -41,7 +41,7 @@ start(MyId) ->
 
     maybe_register(Cfg),
 
-    {ok, Client, _, _} = escalus_connection:start(Cfg),
+    {ok, Client, _EscalusSessionFeatures} = escalus_connection:start(Cfg),
 
     %%Allow presence stanza only
     AllowPresence = fun escalus_pred:is_presence/1,

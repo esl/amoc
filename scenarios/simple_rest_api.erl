@@ -20,7 +20,7 @@ do_start(rest, MyId, Cfg) ->
     send_message(AuthHeader, MyId - 1),
     ok;
 do_start(xmpp, _MyId, Cfg) ->
-    {ok, Client, _, _} = escalus_connection:start(Cfg),
+    {ok, Client, _EscalusSessionFeatures} = escalus_connection:start(Cfg),
 
     send_presence_available(Client),
 
