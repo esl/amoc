@@ -26,13 +26,24 @@ trails() ->
       #{type => <<"object">>,
         required => [<<"scenario">>, <<"module_source">>],
         properties =>
-        #{scenario => #{<<"type">> => <<"string">>,
-                        <<"description">> => 
+        #{scenario => #{type => <<"string">>,
+                        description =>
                             <<"Name of scenario module without .erl suffix">>
                       },
-          module_source => #{<<"type">> => <<"string">>,
-                             <<"description">> => <<"Source code of scenario">>
-                           }
+          module_source => #{type => <<"string">>,
+                             description => <<"Source code of scenario">>
+                           },
+          module_macros => #{type => <<"array">>,
+                             items => #{type => <<"object">>,
+                                              properties => #{macro_name => #{type => <<"string">>,
+                                                                              description => <<"dd">>},
+                                                              macro_value => #{type => <<"string">>,
+                                                                               description => <<"dd2">>},
+                                                              macro_type => #{type => <<"string">>,
+                                                                              description => <<"dd2">>}
+                                                             }
+                                             }
+                            }
         }
       }
     },
