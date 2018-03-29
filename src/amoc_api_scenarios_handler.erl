@@ -143,7 +143,7 @@ to_json(Req0, State) ->
     {boolean(), cowboy_req:req(), state()}.
 from_json(Req, State) ->
     case get_vars_from_body(Req) of
-        {ok, {ModuleName, ModuleSource}, Req2} ->
+        {ok, {ModuleName, ModuleSource, ModuleMacros}, Req2} ->
             ScenarioPath = "scenarios/" ++ erlang:binary_to_list(ModuleName),
             file:write_file(
               ScenarioPath ++ ".erl",
@@ -152,7 +152,8 @@ from_json(Req, State) ->
              ),
             Result = compile_and_load_scenario(
                        ModuleName,
-                       ScenarioPath),
+                       ScenarioPath,
+                       ModuleMacros),
             ResultBody = case Result of 
                              ok -> Result;
                              {error, Errors, _Warnings} ->
@@ -170,29 +171,61 @@ from_json(Req, State) ->
 
 %% internal function
 -spec get_vars_from_body(cowboy_req:req()) ->
-    {ok, {binary(), binary()}, cowboy_req:req()} | 
+    {ok, {binary(), binary()}, cowboy_req:req()} |
     {error, wrong_json, cowboy_req:req()}.
 get_vars_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:body(Req),
     try
         {JSON} = jiffy:decode(Body),
         ModuleName = proplists:get_value(<<"scenario">>, JSON),
-        ModuleSource = proplists:get_value(
-                         <<"module_source">>,
-                         JSON),
+        ModuleSource = proplists:get_value( <<"module_source">>, JSON),
+        ModuleMacros0 = proplists:get_value( <<"module_macros">>, JSON, []),
+        ModuleMacros1 = prepare_macros_list(ModuleMacros0),
         true = is_binary(ModuleName),
         true = is_binary(ModuleSource),
-        {ok, {ModuleName, ModuleSource}, Req2}
+        {ok, {ModuleName, ModuleSource, ModuleMacros1}, Req2}
     catch _:_ ->
         {error, wrong_json, Req2}
     end.
 
--spec compile_and_load_scenario(binary(), string()) ->
+%% This function is converts JSON macro list, into argument, thath will
+%% be passed as an parameters to compile function:
+%% [{
+%%  "macro_name": "TEST",
+%%  "macro_value": "42",
+%%  "macro_type": "integer"
+%% }]
+%% into
+%% [{d, 'TEST', 42}]
+%%
+prepare_macros_list([]) -> [];
+prepare_macros_list([{Attributes} | T]) ->
+    MacroName0 = proplists:get_value(<<"macro_name">>, Attributes, undefined),
+    MacroVal0 = proplists:get_value(<<"macro_value">>, Attributes, undefined),
+    MacroType = proplists:get_value(<<"macro_type">>, Attributes, undefined),
+    % Verify all arguemtns are present. Raise an error otherwise.
+    lists:foreach(fun (Attr) -> Attr =/= undefined end,
+                  [MacroName0, MacroVal0, MacroType]),
+    MacroName1 = binary_to_atom(MacroName0, utf8),
+    MacroVal1 = convert_value_to_type(MacroVal0, MacroType),
+    % will be passed later to compile:file. This is why we append  `d` at the
+    % beggining of the tuple. It indicates `define macro`.
+    [ {d, MacroName1, MacroVal1} | prepare_macros_list(T)].
+
+convert_value_to_type(MacroVal, <<"binary">>) -> MacroVal;
+convert_value_to_type(MacroVal, <<"integer">>) -> binary_to_integer(MacroVal);
+convert_value_to_type(MacroVal, <<"atom">>) -> binary_to_atom(MacroVal, utf8).
+
+-spec compile_and_load_scenario(binary(), string(), [proplists:property()]) ->
     ok | {error, [string()], [string()]}.
-compile_and_load_scenario(BinModuleName, ScenarioPath) ->
+compile_and_load_scenario(BinModuleName, ScenarioPath, ModuleMacros) ->
     ok = ensure_ebin_directory(),
-    case compile:file(ScenarioPath, [{parse_transform, lager_transform},
-        {outdir, "scenarios_ebin"}, return_errors, report_errors, verbose]) of
+    CompileParams = [{parse_transform, lager_transform},
+                     {outdir, "scenarios_ebin"},
+                     return_errors,
+                     report_errors,
+                     verbose] ++ ModuleMacros,
+    case compile:file(ScenarioPath, CompileParams) of
         {ok, _} ->
             Module = erlang:binary_to_atom(BinModuleName, utf8),
             code:add_patha("scenarios_ebin"),
