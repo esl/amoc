@@ -7,6 +7,7 @@
          init/1,
          lookup/2,
          select_session/2,
+         size/1,
          terminate/1,
          update/3]).
 
@@ -36,3 +37,6 @@ foldl(_, Acc, _) -> Acc.
 
 -spec select_session(db_handle(), tuple() | inet:port_number()) -> [].
 select_session(_, _) -> [].
+
+-spec size(db_handle()) -> integer().
+size(_) -> 0.
