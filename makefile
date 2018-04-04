@@ -3,17 +3,14 @@
 all: rel deploy
 
 rel: compile
-	./relx tar
+	./rebar3 tar
 
-compile: deps
-	./rebar compile
+compile:
+	./rebar3 compile
 
 clean:
 	./rebar clean
 	rm -rf test/*.beam
-
-deps:
-	./rebar get-deps
 
 deps := $(wildcard deps/*/ebin)
 
