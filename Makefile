@@ -24,16 +24,16 @@ prepare:
 	ansible-playbook -i hosts ansible/amoc-prepare.yml $(ARGS)
 
 ct:
-	@if [ $$SUITE ]; then ./rebar3 skip_deps=true -v ct suite=$$SUITE; \
-		else ./rebar3 skip_deps=true -v ct; fi
+	@if [ $$SUITE ]; then ./rebar3 ct --verbose --suite $$SUITE; \
+		else ./rebar3 ct --verbose; fi
 
 prop:
 	@if [ $$PROP ]; then ct_run -logdir logs -pa $(DEPS) -suite $$PROP; \
 		else ct_run -pa $(DEPS) -suite $(PROP_FILES); fi
 
 eunit:
-	@if [ $$SUITE ]; then ./rebar3 skip_deps=true eunit suite=$$SUITE; \
-		else ./rebar3 skip_deps=true eunit; fi
+	@if [ $$SUITE ]; then ./rebar3 eunit --suite $$SUITE; \
+		else ./rebar3 eunit; fi
 
 test: compile eunit ct prop
 
