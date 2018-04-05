@@ -68,7 +68,7 @@ dialyzer_dir() ->
     filename:join([amoc_dir(), "dialyzer"]).
 
 ebin_dir() ->
-    filename:join([amoc_dir(), "_build/default/rel/amoc/lib/amoc/ebin"]).
+    filelib:wildcard(filename:join([amoc_dir(), "_build/default/rel/amoc/lib", "amoc-*", "ebin"])).
 
 amoc_dir() ->
     code:lib_dir(amoc).
