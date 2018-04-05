@@ -56,7 +56,7 @@
   1},
  {<<"jiffy">>,
   {git,"https://github.com/davisp/jiffy.git",
-       {ref,"6303ff98aaa3fce625038c8b7af2aa8b802f4742"}},
+       {ref,"fe43b59f4f5e8aafb111f400a7e4f813cd134b55"}},
   0},
  {<<"lager">>,
   {git,"git://github.com/basho/lager.git",
