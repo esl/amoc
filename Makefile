@@ -1,7 +1,7 @@
 .PHONY: all rel compile clean deploy prepare deps test ct eunit prop
 
-DEPS := $(wildcard _build/default/rel/amoc/lib/*/ebin)
-AMOC := $(wildcard _build/default/rel/amoc/lib/amoc-*/ebin)
+DEPS := $(wildcard _build/default/lib/*/ebin)
+AMOC := $(wildcard _build/default/lib/amoc-*/ebin)
 PROP_FILES := $(shell ls test/ | grep 'prop_.*\.erl')
 
 
