@@ -62,13 +62,13 @@ plt_file(Filename) ->
     filename:join(dialyzer_dir(), Filename).
 
 deps_dirs() ->
-    filelib:wildcard(filename:join([amoc_dir(), "_build/default/rel/amoc/lib", "*", "ebin"])).
+    filelib:wildcard(filename:join([amoc_dir(), "..", "*", "ebin"])) -- ebin_dir().
 
 dialyzer_dir() ->
     filename:join([amoc_dir(), "dialyzer"]).
 
 ebin_dir() ->
-    filelib:wildcard(filename:join([amoc_dir(), "_build/default/rel/amoc/lib", "amoc-*", "ebin"])).
+    filename:join([amoc_dir(), "ebin"]).
 
 amoc_dir() ->
     code:lib_dir(amoc).
