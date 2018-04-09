@@ -1,21 +1,20 @@
 .PHONY: all rel compile clean deploy prepare deps test ct eunit prop
 
+DEPS := $(wildcard _build/default/lib/*/ebin)
+AMOC := $(wildcard _build/default/lib/amoc-*/ebin)
+PROP_FILES := $(shell ls test/ | grep 'prop_.*\.erl')
+
+
 all: rel deploy
 
 rel: compile
-	./relx tar
+	./rebar3 tar
 
-compile: deps
-	./rebar compile
+compile:
+	./rebar3 compile
 
 clean:
-	./rebar clean
-	rm -rf test/*.beam
-
-deps:
-	./rebar get-deps
-
-deps := $(wildcard deps/*/ebin)
+	./rebar3 clean
 
 deploy: rel
 	ansible-playbook -i hosts ansible/amoc-master.yml;
@@ -25,23 +24,21 @@ prepare:
 	ansible-playbook -i hosts ansible/amoc-prepare.yml $(ARGS)
 
 ct:
-	@if [ $$SUITE ]; then ./rebar skip_deps=true -v ct suite=$$SUITE; \
-		else ./rebar skip_deps=true -v ct; fi
-
-prop_files := $(shell ls test/ | grep 'prop_.*\.erl')
+	@if [ $$SUITE ]; then ./rebar3 ct --verbose --suite $$SUITE; \
+		else ./rebar3 ct --verbose; fi
 
 prop:
-	@if [ $$PROP ]; then ct_run -logdir logs -pa ebin/ -pa deps/*/ebin/ -suite $$PROP; \
-		else ct_run -pa ebin/ -pa deps/*/ebin/ -suite $(prop_files); fi
+	@if [ $$PROP ]; then ct_run -logdir logs -pa $(DEPS) -suite $$PROP; \
+		else ct_run -pa $(DEPS) -suite $(PROP_FILES); fi
 
 eunit:
-	@if [ $$SUITE ]; then ./rebar skip_deps=true eunit suite=$$SUITE; \
-		else ./rebar skip_deps=true eunit; fi
+	@if [ $$SUITE ]; then ./rebar3 eunit --suite $$SUITE; \
+		else ./rebar3 eunit; fi
 
 test: compile eunit ct prop
 
 console:
-	erl -pa ebin/ -pa deps/*/ebin
+	erl -pa $(DEPS)
 
 dialyzer/erlang.plt:
 	@mkdir -p dialyzer
@@ -52,13 +49,13 @@ dialyzer/erlang.plt:
 dialyzer/deps.plt:
 	@mkdir -p dialyzer
 	@dialyzer --build_plt --output_plt dialyzer/deps.plt \
-	-o dialyzer/deps.log $(deps); \
+	-o dialyzer/deps.log $(DEPS); \
 	status=$$? ; if [ $$status -ne 2 ]; then exit $$status; else exit 0; fi
 
 dialyzer/amoc.plt:
 	@mkdir -p dialyzer
 	@dialyzer --build_plt --output_plt dialyzer/amoc.plt \
-		-o dialyzer/amoc.log ebin; \
+		-o dialyzer/amoc.log $(AMOC); \
 		status=$$? ; if [ $$status -ne 2 ]; then exit $$status; else exit 0; fi
 
 erlang_plt: dialyzer/erlang.plt
@@ -75,4 +72,4 @@ deps_plt: dialyzer/deps.plt
 
 dialyzer: erlang_plt deps_plt amoc_plt
 	@dialyzer --plts dialyzer/*.plt --no_check_plt \
-	--get_warnings -o dialyzer/error.log ebin
+	--get_warnings -o dialyzer/error.log $(AMOC)

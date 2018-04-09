@@ -6,7 +6,7 @@
   file: dest={{ install_dir }} mode=755 state=directory
 
 - name: unarchive amoc tarball remotely
-  unarchive: src=../_rel/amoc/amoc-0.9.tar.gz dest={{ install_dir }}
+  unarchive: src=../_build/default/rel/amoc/amoc-0.9.tar.gz dest={{ install_dir }}
 
 - name: template configuration
   template: src=app.config.j2 dest={{ install_dir }}/releases/0.9/sys.config

@@ -26,7 +26,7 @@ RUN buildDeps=' \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     rm -rf erlang-solutions_1.0_all.deb && \
-    cp -r /amoc_build/_rel/amoc /home/amoc/amoc && \
+    cp -r /amoc_build/_build/default/rel/amoc /home/amoc/amoc && \
     chown -R amoc:amoc /home/amoc/amoc && \
     rm -rf /amoc_build
 
