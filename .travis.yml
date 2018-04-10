@@ -13,7 +13,9 @@ addons:
             - libexpat1-dev
 
 install: make compile
-script: make test
+script:
+    - make test
+    - make dialyzer
 
 cache:
     directories:
