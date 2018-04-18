@@ -34,7 +34,7 @@ EXPOSE 4000
 
 RUN mkdir /etc/service/amoc
 ADD amoc.sh /etc/service/amoc/run
-ADD config/vm.args /home/amoc/amoc/releases/0.9
+ADD config/vm.args /home/amoc/amoc/releases/0.9.0/
 ADD config/sys.config.template /
 ADD run.sh /
 
