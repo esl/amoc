@@ -1,5 +1,5 @@
 FROM phusion/baseimage
-MAINTAINER Rafał Studnicki <rafal.studnicki@erlang-solutions.com>
+MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
 ENV AMOC_VSN master
 
