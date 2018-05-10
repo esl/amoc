@@ -5,37 +5,38 @@ ENV AMOC_VSN master
 
 RUN useradd -ms /bin/bash amoc
 
-RUN buildDeps=' \
-    git \
-    make \
-    gcc \
-    clang \
-    libexpat1-dev \
-    wget \
-    ' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends $buildDeps iproute2 && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        git \
+        make \
+        gcc \
+        clang \
+        libexpat1-dev \
+        wget \
+        iproute2 && \
     wget https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
     dpkg -i erlang-solutions_1.0_all.deb && \
     apt-get update && \
-    apt-get install -y esl-erlang=1:18.3.4 && \
-    git clone https://github.com/esl/amoc.git --branch ${AMOC_VSN} amoc_build && \
-    cd amoc_build && \
+    apt-get install -y esl-erlang=1:18.3.4
+
+RUN git clone https://github.com/esl/amoc.git --branch ${AMOC_VSN} amoc_build
+RUN cd amoc_build && \
     make rel && \
-    apt-get purge -y --auto-remove $buildDeps esl-erlang && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    rm -rf erlang-solutions_1.0_all.deb && \
-    cp -r /amoc_build/_build/default/rel/amoc /home/amoc/amoc && \
-    chown -R amoc:amoc /home/amoc/amoc && \
-    rm -rf /amoc_build
+    rm _build/default/rel/amoc/*tar.gz
+
+FROM phusion/baseimage
+MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
+
+RUN useradd -ms /bin/bash amoc
+
+COPY --from=0 /amoc_build/_build/default/rel/amoc/ /home/amoc/amoc/
 
 EXPOSE 4000
 
 RUN mkdir /etc/service/amoc
-ADD amoc.sh /etc/service/amoc/run
-ADD config/vm.args /home/amoc/amoc/releases/0.9.0/
-ADD config/sys.config.template /
-ADD run.sh /
+ADD docker/amoc.sh /etc/service/amoc/run
+ADD docker/config/vm.args /home/amoc/amoc/releases/0.9.0/
+ADD docker/config/sys.config.template /
+ADD docker/run.sh /
 
 CMD ["/run.sh"]
