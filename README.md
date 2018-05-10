@@ -207,6 +207,45 @@ There is available REST API for AMOC where we can:
 * check status of nodes in AMOC cluster
 
 API is described [here](REST_API_DOCS.md). You can also get an access to REST API by running AMOC and go to `(address:port)/api-docs`.
-### Docker
 
-TODO
+## Docker
+
+Building local Docker image may be started with:
+```
+docker build -f docker/Dockerfile -t tag .
+```
+It is important to start building at project root (it is indicated with dot `.`
+at the end of command). It will set build context at the project root. Dockerfile
+commands expects a context to be set like that:
+ - it copies **current** source code into container to compile it.
+ - It looks for files in `docker/` relative path.
+
+Dockerfile leverages multi-stage build feature (more reading [here](https://docs.docker.com/develop/develop-images/multistage-build/)).
+It allows to define intermediate container inside of Dockerfile, which will
+be used just for installing compilation time dependencies and compiling. When
+release is ready inside of temporary container, it is possible to copy just
+the release into fresh image. It will become final image.
+
+When image is ready it may be started just with
+```
+docker run -d image
+```
+
+However, you may want to use Amoc HTTP API for uploading and starting scenarios.
+In this case port 4000 should be published.
+```
+docker run -d -p 4000:4000 image
+```
+
+Amoc logs are connected with container standard output, so it is possible
+to get Amoc logs from running container with:
+```
+docker logs amoc_container
+```
+
+### Useful commands with Amoc container:
+
+Starting Amoc remote_console:
+```
+docker exec -it amoc_container /home/amoc/amoc/bin/amoc remote_console
+````
