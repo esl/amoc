@@ -1,8 +1,6 @@
 FROM phusion/baseimage
 MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
-ENV AMOC_VSN master
-
 RUN useradd -ms /bin/bash amoc
 
 RUN apt-get update && \
@@ -19,7 +17,8 @@ RUN apt-get update && \
     apt-get update && \
     apt-get install -y esl-erlang=1:18.3.4
 
-RUN git clone https://github.com/esl/amoc.git --branch ${AMOC_VSN} amoc_build
+COPY . /amoc_build
+
 RUN cd amoc_build && \
     make rel && \
     rm _build/default/rel/amoc/*tar.gz
