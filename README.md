@@ -207,6 +207,50 @@ There is available REST API for AMOC where we can:
 * check status of nodes in AMOC cluster
 
 API is described [here](REST_API_DOCS.md). You can also get an access to REST API by running AMOC and go to `(address:port)/api-docs`.
-### Docker
 
-TODO
+## Docker
+
+To build a Docker image with Amoc, run the following command from the root of
+the repository:
+```
+docker build -f Dockerfile -t amoc_image:tag .
+```
+It is important to start building at project root (it is indicated with dot `.`
+at the end of command). It will set build context at the project root. Dockerfile
+commands expects a context to be set like that:
+ - it copies **current** source code into container to compile it.
+ - It looks for files in `docker/` relative path.
+
+When image is ready it may be started just with
+```
+docker run -d --name amoc_container amoc_image:tag
+```
+
+However, you may want to use Amoc HTTP API for uploading and starting scenarios.
+In this case port 4000 should be published.
+```
+docker run -d -p 4000:4000 -name amoc_container amoc_image:tag
+```
+
+Amoc logs are connected with container standard output, so it is possible
+to get Amoc logs from running container with:
+```
+docker logs amoc_container
+```
+
+Amoc is able to report metrics to Graphite. It is possible to set up
+reporting endpoint by passing following envromental variables:
+```
+docker run -d \
+           -e AMOC_GRAPHITE_HOST=192.168.0.1 \
+           -e AMOC_GRAPHITE_PORT=2003 \
+           --name amoc_container \
+           amoc_image:tag
+```
+
+### Useful commands with Amoc container:
+
+Starting Amoc remote_console:
+```
+docker exec -it amoc_container /home/amoc/amoc/bin/amoc remote_console
+````

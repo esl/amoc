@@ -2,6 +2,9 @@
 
 set -x
 
+AMOC_GRAPHITE_HOST=${AMOC_GRAPHITE_HOST:-127.0.0.1}
+AMOC_GRAPHITE_PORT=${AMOC_GRAPHITE_PORT:-2003}
+
 SYSCONFIG="/home/amoc/amoc/releases/0.9.0/sys.config"
 sed -e "s/AMOC_GRAPHITE_HOST/${AMOC_GRAPHITE_HOST}/" /sys.config.template > \
     ${SYSCONFIG}
