@@ -13,7 +13,8 @@
                   ssl,
                   trails,
                   cowboy,
-                  cowboy_swagger
+                  cowboy_swagger,
+                  amqp_client
                  ]},
   {mod, { amoc_app, []}},
   {env, [{repeat_interval, 60000},

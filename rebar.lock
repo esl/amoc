@@ -1,4 +1,6 @@
-[{<<"base16">>,
+{"1.1.0",
+[{<<"amqp_client">>,{pkg,<<"amqp_client">>,<<"3.7.5">>},0},
+ {<<"base16">>,
   {git,"https://github.com/goj/base16.git",
        {ref,"ec420aa4ce0fb971f155274c606e00188a2ed37d"}},
   1},
@@ -58,6 +60,7 @@
   {git,"https://github.com/davisp/jiffy.git",
        {ref,"fe43b59f4f5e8aafb111f400a7e4f813cd134b55"}},
   0},
+ {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.2">>},2},
  {<<"lager">>,
   {git,"git://github.com/basho/lager.git",
        {ref,"8187757388c9adc915379caaab36a2f2ca26e944"}},
@@ -90,10 +93,12 @@
   {git,"https://github.com/okeuday/quickrand.git",
        {ref,"de0f2c7657723a223c5f8fc92a388e101697eae3"}},
   2},
+ {<<"rabbit_common">>,{pkg,<<"rabbit_common">>,<<"3.7.5">>},1},
  {<<"ranch">>,
   {git,"https://github.com/ninenines/ranch.git",
        {ref,"adf1822defc2b7cfdc7aca112adabfa1d614043c"}},
   1},
+ {<<"ranch_proxy_protocol">>,{pkg,<<"ranch_proxy_protocol">>,<<"1.5.0">>},2},
  {<<"recon">>,
   {git,"https://github.com/ferd/recon.git",
        {ref,"3578fa86ad408d98e0512ded0b2f2c5b834a84ad"}},
@@ -113,4 +118,11 @@
  {<<"uuid">>,
   {git,"https://github.com/okeuday/uuid.git",
        {ref,"1e82caca1568ee374ee8610880141a8d058df5ab"}},
-  1}].
+  1}]}.
+[
+{pkg_hash,[
+ {<<"amqp_client">>, <<"EE5FF6209CA4BE0FF950E92775F4E4AAB272C74003ABD84DED9CFF64AF1B597A">>},
+ {<<"jsx">>, <<"7ACC7D785B5ABE8A6E9ADBDE926A24E481F29956DD8B4DF49E3E4E7BCC92A018">>},
+ {<<"rabbit_common">>, <<"3346C2C65DF2528891C3113AA33E78AADBD5E6996E4230B937C2429F86861268">>},
+ {<<"ranch_proxy_protocol">>, <<"E698AAEB590AD504B649DC0D3055ABEE6CAF0B49D3CAEE1A080AE83B5B499F30">>}]}
+].
