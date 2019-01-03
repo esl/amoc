@@ -2,9 +2,8 @@ sudo: false
 
 language: erlang
 otp_release:
-    - 18.3
     - 19.3
-    -  20.3
+    - 20.3
     - 21.2
 
 branches:
@@ -19,8 +18,8 @@ addons:
 install: make compile
 script:
     - make test
-    - make dialyzer
+    - rebar3 dialyzer
 
 cache:
-    directories:
-        - dialyzer
+        directories:
+                - $HOME/.cache/rebar3
