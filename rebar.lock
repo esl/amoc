@@ -1,5 +1,5 @@
 {"1.1.0",
-[{<<"amqp_client">>,{pkg,<<"amqp_client">>,<<"3.7.5">>},0},
+[{<<"amqp_client">>,{pkg,<<"amqp_client">>,<<"3.7.9">>},0},
  {<<"base16">>,
   {git,"https://github.com/goj/base16.git",
        {ref,"ec420aa4ce0fb971f155274c606e00188a2ed37d"}},
@@ -61,9 +61,9 @@
   {git,"https://github.com/okeuday/quickrand.git",
        {ref,"336c0d94a6a384f307183b3c14fc2112656dac37"}},
   2},
- {<<"rabbit_common">>,{pkg,<<"rabbit_common">>,<<"3.7.5">>},1},
+ {<<"rabbit_common">>,{pkg,<<"rabbit_common">>,<<"3.7.9">>},1},
  {<<"ranch">>,{pkg,<<"ranch">>,<<"1.4.0">>},1},
- {<<"ranch_proxy_protocol">>,{pkg,<<"ranch_proxy_protocol">>,<<"1.5.0">>},2},
+ {<<"ranch_proxy_protocol">>,{pkg,<<"ranch_proxy_protocol">>,<<"2.1.1">>},2},
  {<<"recon">>,{pkg,<<"recon">>,<<"2.4.0">>},0},
  {<<"setup">>,
   {git,"git://github.com/uwiger/setup.git",
@@ -84,7 +84,7 @@
   1}]}.
 [
 {pkg_hash,[
- {<<"amqp_client">>, <<"EE5FF6209CA4BE0FF950E92775F4E4AAB272C74003ABD84DED9CFF64AF1B597A">>},
+ {<<"amqp_client">>, <<"EBEF998500C31D4954E882868806258A9CEBF01DD6C76804B1A2EFDB454753FC">>},
  {<<"cowboy">>, <<"268429481D6F41AD5564ADE4A2439C284B569083FCA0D19078AD4F56B4624724">>},
  {<<"cowboy_swagger">>, <<"53C36D4228E139F65DB4DB716C1A5BF9CE6DA9BF04C4C785EBB3A1A462CAD223">>},
  {<<"cowlib">>, <<"1AFA5B233CEE8F642C153EC6F1DC48DB0DD9A43E2114BC8B43E9D59636F6AE1F">>},
@@ -94,9 +94,9 @@
  {<<"lager">>, <<"897EFC7679BB82383448646C96768CDC4E747464DD18B999C7AACA485686B0DA">>},
  {<<"meck">>, <<"1F7B1A9F5D12C511848FEC26BBEFD09A21E1432EADB8982D9A8ACEB9891A3CF2">>},
  {<<"proper">>, <<"C1ACD51C51DA17A2FE91D7A6FC6A0C25A6A9849D8DC77093533109D1218D8457">>},
- {<<"rabbit_common">>, <<"3346C2C65DF2528891C3113AA33E78AADBD5E6996E4230B937C2429F86861268">>},
+ {<<"rabbit_common">>, <<"542D2EB8EF8F76E5346B30665604D8D63B8D5CF47D1878243CEC44D1642C4435">>},
  {<<"ranch">>, <<"10272F95DA79340FA7E8774BA7930B901713D272905D0012B06CA6D994F8826B">>},
- {<<"ranch_proxy_protocol">>, <<"E698AAEB590AD504B649DC0D3055ABEE6CAF0B49D3CAEE1A080AE83B5B499F30">>},
+ {<<"ranch_proxy_protocol">>, <<"3C4723327166D2D63C0405F4914E2E471C6DE362CC844E9B203AF5763E7C9D25">>},
  {<<"recon">>, <<"901FF78B39C754FB4D6FD72DCF0DBD398967BBD2E4D59C08D4D7AA44A73DE91D">>},
  {<<"trails">>, <<"D51D7F065F2B692654C611C663BFAC377D47EAFF9D38D0C17ECD031D1A59399A">>}]}
 ].
