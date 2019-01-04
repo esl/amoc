@@ -15,10 +15,9 @@ start_listener() ->
     trails:store(Trails),
     Dispatch = trails:single_host_compile(Trails),
     %% Dispatch = cowboy_router:compile(routes()),
-    {ok, _Pid} = cowboy:start_http(amoc_api,
-                                   10,
-                                   [{port, Port}],
-                                   [{env, [{dispatch, Dispatch}]}]
+    {ok, _Pid} = cowboy:start_clear(amoc_api,
+                                   [{num_acceptors, 10}, {port, Port}],
+                                   #{env => #{dispatch => Dispatch}}
                                   ).
 
 -spec stop() -> ok | {error, not_found}.

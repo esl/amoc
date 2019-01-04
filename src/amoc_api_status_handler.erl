@@ -4,10 +4,9 @@
 
 -export([trails/0]).
 
--export([init/3]).
+-export([init/2]).
 
--export([rest_init/2,
-         allowed_methods/2,
+-export([allowed_methods/2,
          content_types_provided/2,
          to_json/2,
          get_status/0]).
@@ -41,21 +40,17 @@ trails() ->
     },
     [trails:trail("/status", ?MODULE, [], Metadata)].
 
--spec init(tuple(), cowboy_req:req(), state()) -> 
-          {upgrade, protocol, cowboy_rest}.
-init({tcp, http}, _Req, _Opts) ->
-    {upgrade, protocol, cowboy_rest}.
+-spec init(cowboy_req:req(), state()) ->
+          {cowboy_rest, cowboy_req:req(), state()}.
+init(Req, Opts) ->
+    {cowboy_rest, Req, Opts}.
 
--spec rest_init(cowboy_req:req(), any()) -> {ok, cowboy_req:req(), state()}.
-rest_init(Req, _) ->
-    {ok, Req, []}.
-
--spec allowed_methods(cowboy_req:req(), state()) -> 
+-spec allowed_methods(cowboy_req:req(), state()) ->
         {[binary()], cowboy_req:req(), state()}.
 allowed_methods(Req, State) ->
     {[<<"GET">>], Req, State}.
 
--spec content_types_provided(cowboy_req:req(), state()) -> 
+-spec content_types_provided(cowboy_req:req(), state()) ->
         {[tuple()], cowboy_req:req(), state()}.
 content_types_provided(Req, State) ->
     {[{<<"application/json">>, to_json}], Req, State}.
@@ -66,7 +61,7 @@ to_json(Req0, State) ->
     Status = get_status(),
     StatusJson = jiffy:encode({[{node_status, Status}]}),
     {StatusJson, Req0, State}.
-    
+
 -spec get_status() -> up | down.
 get_status() ->
     Results = application:which_applications(),

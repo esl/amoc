@@ -68,10 +68,12 @@ annotate(Tags, Format, Args) ->
             {error, no_graphite};
         Host ->
             What = iolist_to_binary(io_lib:format(Format, Args)),
-            Struct = {struct, [{what, What}, {tags, Tags}]},
-            Json = mochijson2:encode(Struct),
-            Path = "http://" ++ Host ++ "/events/",
-            Response = lhttpc:request(Path, "POST", [], Json, 5000),
+            Json = jiffy:encode(#{what => What, tags => Tags}),
+            Path = "/events/",
+            Destination = "http://" ++ Host,
+            {ok, Client} = fusco:start_link({Destination, []}),
+            ok = fusco:connect(Client),
+            Response = fusco:request(Client, Path, "POST", [], Json, 5000),
             {ok, {{200, _}, _, _}} = Response,
             ok
     end.

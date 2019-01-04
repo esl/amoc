@@ -9,7 +9,6 @@
                   lager,
                   jiffy,
                   exometer,
-                  lhttpc,
                   ssl,
                   trails,
                   cowboy,

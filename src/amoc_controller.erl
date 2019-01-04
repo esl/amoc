@@ -9,10 +9,10 @@
 -define(INTERARRIVAL_DEFAULT, 50).
 -define(TABLE, amoc_users).
 
--record(state, {scenario :: amoc:scenario(),
+-record(state, {scenario :: amoc:scenario() | undefined,
                 scenario_state :: any(),
                 nodes ::  non_neg_integer(),
-                node_id :: node_id()}).
+                node_id :: node_id() | undefined}).
 
 
 -type state() :: #state{}.
@@ -103,7 +103,8 @@ test_status(ScenarioName) ->
 -spec init([]) -> {ok, state()}.
 init([]) ->
     process_flag(priority, max),
-    State = #state{scenario = undefined},
+    State = #state{scenario = undefined,
+                   nodes = 0},
     {ok, State}.
 
 -spec handle_call(any(), any(), state()) -> {reply, handle_call_res(), state()}.
@@ -298,7 +299,7 @@ get_test_status() ->
 does_scenario_exist(Scenario) ->
     {Status, Result} = file:list_dir("scenarios/"),
     case Status of
-        ok -> 
+        ok ->
             lists:member(erlang:atom_to_list(Scenario) ++ ".erl", Result);
         error -> false
     end.

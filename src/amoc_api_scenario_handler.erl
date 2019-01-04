@@ -4,10 +4,9 @@
 
 -export([trails/0]).
 
--export([init/3]).
+-export([init/2]).
 
--export([rest_init/2,
-         allowed_methods/2,
+-export([allowed_methods/2,
          content_types_provided/2,
          content_types_accepted/2,
          resource_exists/2,
@@ -52,7 +51,7 @@ trails() ->
           required => [<<"scenario_status">>],
           properties =>
           #{scenario_status => #{<<"type">> => <<"string">>,
-                                 <<"description">> => 
+                                 <<"description">> =>
                                    <<"loaded | running | finished">>
                                }
           }
@@ -93,29 +92,24 @@ trails() ->
     },
     [trails:trail("/scenarios/:id", ?MODULE, [], Metadata)].
 
--spec init(tuple(), cowboy_req:req(), state()) ->
-    {upgrade, protocol, cowboy_rest}.
-init({tcp, http}, _Req, _Opts) ->
-    {upgrade, protocol, cowboy_rest}.
-
--spec rest_init(cowboy_req:req(), [atom()]) ->
-    {ok, cowboy_req:req(), state()}.
-rest_init(Req, _Opts) ->
-    {ResourceB, Req2} = cowboy_req:binding(id, Req),
+-spec init(cowboy_req:req(), state()) ->
+    {cowboy_rest, cowboy_req:req(), state()}.
+init(Req, _Opts) ->
+    ResourceB = cowboy_req:binding(id, Req),
     Resource = erlang:binary_to_list(ResourceB),
-    {ok, Req2, #state{resource = Resource}}.
+    {cowboy_rest, Req, #state{resource = Resource}}.
 
--spec allowed_methods(cowboy_req:req(), state()) -> 
+-spec allowed_methods(cowboy_req:req(), state()) ->
     {[binary()], cowboy_req:req(), state()}.
 allowed_methods(Req, State) ->
     {[<<"PATCH">>, <<"GET">>], Req, State}.
 
--spec content_types_provided(cowboy_req:req(), state()) -> 
+-spec content_types_provided(cowboy_req:req(), state()) ->
     {[tuple()], cowboy_req:req(), state()}.
 content_types_provided(Req, State) ->
     {[{<<"application/json">>, to_json}], Req, State}.
 
--spec content_types_accepted(cowboy_req:req(), state()) -> 
+-spec content_types_accepted(cowboy_req:req(), state()) ->
     {[tuple()], cowboy_req:req(), state()}.
 content_types_accepted(Req, State) ->
     {[{<<"application/json">>, from_json}], Req, State}.
@@ -136,7 +130,7 @@ resource_exists(Req, State = #state{resource = Resource}) ->
 
 %% Request processing functions
 
--spec to_json(cowboy_req:req(), state()) -> 
+-spec to_json(cowboy_req:req(), state()) ->
     {iolist(), cowboy_req:req(), state()}.
 to_json(Req0, State = #state{resource = Resource}) ->
     Status = amoc_dist:test_status(erlang:list_to_atom(Resource)),
@@ -165,7 +159,7 @@ from_json(Req, State = #state{resource = Resource}) ->
 -spec get_users_from_body(cowboy_req:req()) -> {ok, term(), cowboy_req:req()} |
         {error, bad_request, cowboy_req:req()}.
 get_users_from_body(Req) ->
-    {ok, Body, Req2} = cowboy_req:body(Req),
+    {ok, Body, Req2} = cowboy_req:read_body(Req),
     try
         {JSON} = jiffy:decode(Body),
         Users = proplists:get_value(<<"users">>, JSON),
@@ -184,4 +178,4 @@ get_result(Result) ->
                 Errors = lists:filter(fun(X) -> X =/= ok end, Result),
                 lager:error("Run scenario error: ~p", [Errors]),
                 error
-    end. 
+    end.
