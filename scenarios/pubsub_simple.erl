@@ -37,19 +37,17 @@ start(Id) ->
     Nodes = get_nodes(3, Client),
     case Id rem ?PUBLISHER_SUBSCRIBER_DENOMINATOR of
         X when X =< ?PUBLISHERS_NUMERATOR ->
-            lager:info("Client: Starting publisher Id = ~p\n", [Id]),
+            lager:debug("Client: Starting publisher Id = ~p\n", [Id]),
             publish_items_forever(Client, Id, Nodes, 1);
         _ ->
-            lager:info("Client: Starting subscriber Id = ~p\n", [Id]),
+            lager:debug("Client: Starting subscriber Id = ~p\n", [Id]),
             work_as_subscriber(Id, Client, Nodes)
     end,
     ok.
 
 provide_nodes_names(SelfClient, Nodes) ->
     receive
-        {what_nodes, PID, Client} ->
-            AffChange = [{Client, <<"publisher">>}],
-            [ set_affiliations(SelfClient, Node, AffChange) || Node <- Nodes],
+        {what_nodes, PID} ->
             PID ! {nodes, Nodes}
     end,
     provide_nodes_names(SelfClient, Nodes).
@@ -58,20 +56,19 @@ get_nodes(0, _) ->
     loger:error("Client: NO NODES PROVIDED"),
     [];
 get_nodes(Retries, Client) ->
-
     case erlang:get(nodes_names) of
         {nodes_names, Nodes} ->
             Nodes;
         _ ->
             Members = pg2:get_members(?GROUPNAME),
-            [ M ! {what_nodes, self(), Client} || M <- Members ],
+            [ M ! {what_nodes, self()} || M <- Members ],
             receive
                 {nodes, Nodes} ->
                     erlang:put(nodes_names, {nodes_names, Nodes}),
                     Nodes
             after
                 ?WAIT_FOR_NODES ->
-                    logger:info("Client: PID \n~p\n TIMEOUT", []),
+                    logger:debug("Client: PID \n~p\n TIMEOUT", []),
                     get_nodes(Retries - 1, Client)
             end
     end.
@@ -80,17 +77,17 @@ publish_items_forever(Client, Id, Nodes, ItemId) ->
     timer:sleep(?DELAY_BETWEEN_MESSAGES),
     ItemIdBin = integer_to_binary(ItemId),
     Resp = [ publish_pubsub_item(Client, <<"item_", ItemIdBin/binary>>, Node) || Node <- Nodes ],
-    lager:info("Client: Response is ~p\n", [Resp]),
+    lager:debug("Client: Response is ~p\n", [Resp]),
     publish_items_forever(Client, Id, Nodes, ItemId + 1).
 
 work_as_subscriber(Id, Client, Nodes) ->
     [subscribe(Client, Node) || Node <- Nodes],
-    lager:info("Client: Subscriber ~p subscribed to ~p nodes.", [Id, length(Nodes)]),
+    lager:debug("Client: Subscriber ~p subscribed to ~p nodes.", [Id, length(Nodes)]),
     receive_messages_forever(Id, Client).
 
 receive_messages_forever(Id, Client) ->
     Stanza = escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT),
-    lager:info("Client: Subscriber ~p got stanza ~p.", [Id, Stanza]),
+    lager:debug("Client: Subscriber ~p got stanza ~p.", [Id, Stanza]),
     receive_messages_forever(Id, Client).
 
 
@@ -110,8 +107,11 @@ connect_amoc_user(Id, Resource) ->
 create_pubsub_node(Client) ->
     Node = pubsub_node(),
     ReqId = id(Client, Node, <<"create">>),
+    NodeConfig = [{<<"pubsub#subscribe">>, <<"1">>},
+                  {<<"pubsub#access_model">>, <<"open">>},
+                  {<<"pubsub#publish_model">>, <<"open">>}],
     Request = escalus_pubsub_stanza:create_node(Client, ReqId,
-						Node, []),
+						Node, NodeConfig),
     escalus:send(Client, Request),
     Response = escalus:wait_for_stanza(Client,
 				       ?WAIT_FOR_STANZA_TIMEOUT),
@@ -168,17 +168,9 @@ publish_pubsub_item(Client, ItemId, Node) ->
     Request = escalus_pubsub_stanza:publish(Client, ItemId, item_content(), Id, Node),
     escalus:send(Client, Request),
     Response = escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT),
-    lager:info("Client: Publisher:  Response is: ~n~p~n", [Response]),
+    lager:debug("Client: Publisher:  Response is: ~n~p~n", [Response]),
     true = escalus_pred:is_iq_result(Response).
 
 item_content() ->
     #xmlel{name = <<"entry">>,
            attrs = [{<<"xmlns">>, <<"http://www.w3.org/2005/Atom">>}]}.
-
-set_affiliations(Client, Node, AffChange) ->
-    Id = id(Client, Node, <<"set_affs">>),
-    Request = escalus_pubsub_stanza:set_affiliations(Client, Id, Node, AffChange),
-    escalus:send(Client, Request),
-    Response = escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT),
-    lager:info("Client: Publisher: Change Afilations Response is: ~n~p~n", [Response]),
-    true = escalus_pred:is_iq_result(Response).
