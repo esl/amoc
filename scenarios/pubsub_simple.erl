@@ -13,6 +13,8 @@
 -define(NUMBER_OF_PUBSUB_NODES, 5).
 -define(DELAY_BETWEEN_MESSAGES, 100).
 -define(WAIT_FOR_NODES, 5000).
+-define(PUBLISHER_SUBSCRIBER_DENOMINATOR, 6).
+-define(PUBLISHERS_NUMERATOR, 2).
 
 -export([init/0]).
 -export([start/1]).
@@ -33,12 +35,12 @@ start(Id) ->
     pg2:create(?GROUPNAME),
     Client = connect_amoc_user(Id),
     Nodes = get_nodes(3, Client),
-    case Id rem 2 of
-        0 ->
-            lager:info("Client: Starting publisher\n", []),
+    case Id rem ?PUBLISHER_SUBSCRIBER_DENOMINATOR of
+        X when X =< ?PUBLISHERS_NUMERATOR ->
+            lager:info("Client: Starting publisher Id = ~p\n", [Id]),
             publish_items_forever(Client, Id, Nodes, 1);
-        1 ->
-            lager:info("Client: Starting subscriber\n", []),
+        _ ->
+            lager:info("Client: Starting subscriber Id = ~p\n", [Id]),
             work_as_subscriber(Id, Client, Nodes)
     end,
     ok.
