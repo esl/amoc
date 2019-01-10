@@ -16,11 +16,45 @@
 -define(PUBLISHER_SUBSCRIBER_DENOMINATOR, 6).
 -define(PUBLISHERS_NUMERATOR, 2).
 
+-define(NODE_CREATE_TIME, [amoc, timers, node_create_time]).
+-define(SUBSCRIBE_TIME, [amoc, timers, subscribe_time]).
+-define(PUBLISH_TIME, [amoc, timers, publish_time]).
+
+-define(NODE_CREATE_FAILS_COUTER, [amoc, counters, node_create_failed]).
+-define(SUBSCRIBE_FAILS_COUTER, [amoc, counters, subscribe_failed]).
+-define(PUBLISH_FAILS_COUTER, [amoc, counters, publish_failed]).
+
+-define(NODE_CREATE_SUCCESS_COUTER, [amoc, counters, node_create_success]).
+-define(SUBSCRIBE_SUCCESS_COUTER, [amoc, counters, subscribe_success]).
+-define(PUBLISH_SUCCESS_COUTER, [amoc, counters, publish_success]).
+
 -export([init/0]).
 -export([start/1]).
 
 -spec init() -> ok.
-init() -> ok.
+init() ->
+    Stats =
+    [
+        {?NODE_CREATE_FAILS_COUTER, spiral},
+        {?SUBSCRIBE_FAILS_COUTER, spiral},
+        {?PUBLISH_FAILS_COUTER, spiral},
+        {?NODE_CREATE_SUCCESS_COUTER, spiral},
+        {?SUBSCRIBE_SUCCESS_COUTER, spiral},
+        {?PUBLISH_SUCCESS_COUTER, spiral},
+        {?NODE_CREATE_TIME, histogram},
+        {?SUBSCRIBE_TIME, histogram},
+        {?PUBLISH_TIME, histogram}
+    ],
+    [create_stat(Path, GraphType) ||  {Path, GraphType} <- Stats],
+    ok.
+
+create_stat(Path, spiral) ->
+    exometer:new(Path, spiral),
+    exometer_report:subscribe(exometer_report_graphite, Path, [one, count], 1000);
+
+create_stat(Path, histogram) ->
+    exometer:new(Path, histogram),
+    exometer_report:subscribe(exometer_report_graphite, Path, [mean, min, max, median, 95, 99, 999], 1000).
 
 -spec start(integer()) -> ok.
 
@@ -113,9 +147,20 @@ create_pubsub_node(Client) ->
     Request = escalus_pubsub_stanza:create_node(Client, ReqId,
 						Node, NodeConfig),
     escalus:send(Client, Request),
-    Response = escalus:wait_for_stanza(Client,
-				       ?WAIT_FOR_STANZA_TIMEOUT),
-    true = escalus_pred:is_iq_result(Response),
+    {CreateNodeTime, CreateNodeResult} = timer:tc(
+        fun() ->
+            escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT)
+        end),
+
+    case escalus_pred:is_iq_result(CreateNodeResult) of
+        true ->
+            exometer:update(?NODE_CREATE_SUCCESS_COUTER, 1),
+            exometer:update(?NODE_CREATE_TIME, CreateNodeTime);
+        Error ->
+            exometer:update(?NODE_CREATE_FAILS_COUTER, 1),
+            loger:error("Error creating node: ~p", [Error]),
+            exit(connection_failed)
+    end,
     Node.
 
 pubsub_node() ->
@@ -159,17 +204,37 @@ subscribe(Client, Node) ->
     Id = id(Client, Node, <<"subscribe">>),
     Request = escalus_pubsub_stanza:subscribe(Client, Id, Node),
     escalus:send(Client, Request),
-    Response = escalus:wait_for_stanza(Client,
-				       ?WAIT_FOR_STANZA_TIMEOUT),
-    true = escalus_pred:is_iq_result(Response).
+    {SubscribeTime, SubscribeResult} = timer:tc(
+        fun() ->
+            escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT)
+        end),
+    case escalus_pred:is_iq_result(SubscribeResult) of
+        true ->
+            exometer:update(?SUBSCRIBE_SUCCESS_COUTER, 1),
+            exometer:update(?SUBSCRIBE_TIME, SubscribeTime);
+        Error ->
+            exometer:update(?SUBSCRIBE_FAILS_COUTER, 1),
+            loger:error("Error subscribing node ~p filed: ~p", [Node, Error]),
+            exit(connection_failed)
+        end.
 
 publish_pubsub_item(Client, ItemId, Node) ->
     Id = id(Client, Node, <<"publish">>),
     Request = escalus_pubsub_stanza:publish(Client, ItemId, item_content(), Id, Node),
     escalus:send(Client, Request),
-    Response = escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT),
-    lager:debug("Client: Publisher:  Response is: ~n~p~n", [Response]),
-    true = escalus_pred:is_iq_result(Response).
+    {PublishTime, PublishResult} = timer:tc(
+        fun() ->
+            escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT)
+        end),
+    case escalus_pred:is_iq_result(PublishResult) of
+        true ->
+            exometer:update(?PUBLISH_SUCCESS_COUTER, 1),
+            exometer:update(?PUBLISH_TIME, PublishTime);
+        Error ->
+            exometer:update(?PUBLISH_FAILS_COUTER, 1),
+            loger:error("Error subscribing node ~p filed: ~p", [Node, Error]),
+            exit(connection_failed)
+        end.
 
 item_content() ->
     #xmlel{name = <<"entry">>,
