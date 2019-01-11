@@ -6,13 +6,12 @@
 -include_lib("escalus/include/escalus.hrl").
 
 -define(HOST, <<"localhost">>). %% The virtual host served by the server
--define(SERVER_IPS, {<<"127.0.0.1">>}). %% Tuple of servers, for example {<<"10.100.0.21">>, <<"10.100.0.22">>}
 -define(PUBSUB_ADDR, <<"pubsub.localhost">>).
 -define(WAIT_FOR_STANZA_TIMEOUT, 10000).
 -define(GROUPNAME, <<"pubsub_test_group_name">>).
 -define(NUMBER_OF_PUBSUB_NODES, 5).
 -define(DELAY_BETWEEN_MESSAGES, 100).
--define(WAIT_FOR_NODES, 5000).
+-define(WAIT_FOR_NODES, 10000).
 -define(PUBLISHER_SUBSCRIBER_DENOMINATOR, 6).
 -define(PUBLISHERS_NUMERATOR, 2).
 
@@ -30,6 +29,8 @@
 
 -export([init/0]).
 -export([start/1]).
+
+-required_variable({'NUMBER_OF_NODE_CREATORS', <<"Specifies how many users will create node"/utf8>>}).
 
 -spec init() -> ok.
 init() ->
@@ -57,21 +58,23 @@ create_stat(Path, histogram) ->
     exometer_report:subscribe(exometer_report_graphite, Path, [mean, min, max, median, 95, 99, 999], 1000).
 
 -spec start(integer()) -> ok.
-
-start(1) ->
-    pg2:create(?GROUPNAME),
-    pg2:join(?GROUPNAME, self()),
-    Client = connect_amoc_user(1),
-    Nodes = [create_pubsub_node(Client) || _ <- lists:seq(1, ?NUMBER_OF_PUBSUB_NODES)],
-    provide_nodes_names(Client, Nodes);
-
 start(Id) ->
+    erlang:put(item_id, 1),
+    Creators = amoc_config:get('NUMBER_OF_NODE_CREATORS', 10),
+    start(Id, Creators).
+
+start(Id, Creators) when Id =< Creators ->
+    create_pubsub_nodes(Id);
+start(Id, _Creators) ->
+    connect_to_nodes(Id).
+
+connect_to_nodes(Id) ->
     pg2:create(?GROUPNAME),
     Client = connect_amoc_user(Id),
     Nodes = get_nodes(3, Client),
     case Id rem ?PUBLISHER_SUBSCRIBER_DENOMINATOR of
         X when X =< ?PUBLISHERS_NUMERATOR ->
-            lager:debug("Client: Starting publisher Id = ~p\n", [Id]),
+            lager:info("Publisher, node: ~p~n", [Nodes]),
             publish_items_forever(Client, Id, Nodes, 1);
         _ ->
             lager:debug("Client: Starting subscriber Id = ~p\n", [Id]),
@@ -83,19 +86,24 @@ provide_nodes_names(SelfClient, Nodes) ->
     receive
         {what_nodes, PID} ->
             PID ! {nodes, Nodes}
+    after
+        ?DELAY_BETWEEN_MESSAGES ->
+            ItemID = erlang:get(item_id),
+            erlang:put(item_id, ItemID + 1),
+            publish(ItemID, SelfClient, Nodes)
     end,
     provide_nodes_names(SelfClient, Nodes).
 
 get_nodes(0, _) ->
-    loger:error("Client: NO NODES PROVIDED"),
+    lager:error("Client: NO NODES PROVIDED"),
     [];
 get_nodes(Retries, Client) ->
     case erlang:get(nodes_names) of
         {nodes_names, Nodes} ->
             Nodes;
         _ ->
-            Members = pg2:get_members(?GROUPNAME),
-            [ M ! {what_nodes, self()} || M <- Members ],
+            Member = try_get_member([]),
+            Member ! {what_nodes, self()},
             receive
                 {nodes, Nodes} ->
                     erlang:put(nodes_names, {nodes_names, Nodes}),
@@ -109,14 +117,17 @@ get_nodes(Retries, Client) ->
 
 publish_items_forever(Client, Id, Nodes, ItemId) ->
     timer:sleep(?DELAY_BETWEEN_MESSAGES),
+    publish(ItemId, Client, Nodes),
+    publish_items_forever(Client, Id, Nodes, ItemId + 1).
+
+publish(ItemId, Client, Nodes) -> 
     ItemIdBin = integer_to_binary(ItemId),
     Resp = [ publish_pubsub_item(Client, <<"item_", ItemIdBin/binary>>, Node) || Node <- Nodes ],
-    lager:debug("Client: Response is ~p\n", [Resp]),
-    publish_items_forever(Client, Id, Nodes, ItemId + 1).
+    lager:debug("Client: Response is ~p\n", [Resp]).
 
 work_as_subscriber(Id, Client, Nodes) ->
     [subscribe(Client, Node) || Node <- Nodes],
-    lager:debug("Client: Subscriber ~p subscribed to ~p nodes.", [Id, length(Nodes)]),
+    lager:info("Subscriber, node: ~p~n", [Nodes]),
     receive_messages_forever(Id, Client).
 
 receive_messages_forever(Id, Client) ->
@@ -138,6 +149,13 @@ connect_amoc_user(Id, Resource) ->
     {ok, Client, _} = escalus_connection:start(Cfg),
     Client.
 
+create_pubsub_nodes(Id) ->
+    pg2:create(?GROUPNAME),
+    pg2:join(?GROUPNAME, self()),
+    Client = connect_amoc_user(Id),
+    Nodes = [create_pubsub_node(Client)],
+    provide_nodes_names(Client, Nodes).
+
 create_pubsub_node(Client) ->
     Node = pubsub_node(),
     ReqId = id(Client, Node, <<"create">>),
@@ -158,7 +176,7 @@ create_pubsub_node(Client) ->
             exometer:update(?NODE_CREATE_TIME, CreateNodeTime);
         Error ->
             exometer:update(?NODE_CREATE_FAILS_COUTER, 1),
-            loger:error("Error creating node: ~p", [Error]),
+            lager:error("Error creating node: ~p", [Error]),
             exit(connection_failed)
     end,
     Node.
@@ -180,25 +198,44 @@ id(Client, {NodeAddr, NodeName}, Suffix) ->
 				 [UserName, NodeAddr, NodeName, Suffix])).
 
 user_spec(ProfileId, Password, Res) ->
+    ConnectionDetails = pick_server(),
     [ {username, ProfileId},
       {server, ?HOST},
-      {host, pick_server(?SERVER_IPS)},
       {password, Password},
       {carbons, false},
       {stream_management, false},
       {resource, Res}
-    ].
+    ] ++ ConnectionDetails.
 
 make_user(Id, R) ->
     BinId = integer_to_binary(Id),
-    ProfileId = <<"user", BinId/binary>>,
-    Password = <<"password", BinId/binary>>,
+    ProfileId = <<"user_", BinId/binary>>,
+    Password = <<"password_", BinId/binary>>,
     user_spec(ProfileId, Password, R).
 
-pick_server(Servers) ->
-    S = size(Servers),
+-spec pick_server() -> [proplists:property()].
+pick_server() ->
+    Servers = amoc_config:get(xmpp_servers),
+    verify(Servers),
+    S = length(Servers),
     N = erlang:phash2(self(), S) + 1,
-    element(N, Servers).
+    lists:nth(N, Servers).
+
+verify(Servers) ->
+    lists:foreach(
+      fun(Proplist) ->
+              true = proplists:is_defined(host, Proplist)
+      end,
+      Servers
+     ).
+
+try_get_member([]) ->
+    Members = pg2:get_members(?GROUPNAME),
+    try_get_member(Members);
+try_get_member(Members) ->
+    L = length(Members),
+    N = erlang:phash2(self(), L) + 1,
+    lists:nth(N, Members).
 
 subscribe(Client, Node) ->
     Id = id(Client, Node, <<"subscribe">>),
@@ -214,7 +251,7 @@ subscribe(Client, Node) ->
             exometer:update(?SUBSCRIBE_TIME, SubscribeTime);
         Error ->
             exometer:update(?SUBSCRIBE_FAILS_COUTER, 1),
-            loger:error("Error subscribing node ~p filed: ~p", [Node, Error]),
+            lager:error("Error subscribing node ~p filed: ~p", [Node, Error]),
             exit(connection_failed)
         end.
 
@@ -232,7 +269,7 @@ publish_pubsub_item(Client, ItemId, Node) ->
             exometer:update(?PUBLISH_TIME, PublishTime);
         Error ->
             exometer:update(?PUBLISH_FAILS_COUTER, 1),
-            loger:error("Error subscribing node ~p filed: ~p", [Node, Error]),
+            lager:error("Error subscribing node ~p filed: ~p", [Node, Error]),
             exit(connection_failed)
         end.
 
