@@ -49,7 +49,8 @@ user_spec(ProfileId, Password, Res) ->
       {password, Password},
       {carbons, false},
       {stream_management, false},
-      {resource, Res}
+      {resource, Res},
+      {received_stanza_handlers, [fun measure_ttd/3]}
     ].
 
 -spec make_user(amoc_scenario:user_id(), binary()) -> escalus_users:user_spec().
@@ -67,7 +68,7 @@ start(MyId) ->
 
     {ConnectionTime, ConnectionResult} = timer:tc(escalus_connection, start, [Cfg]),
     Client = case ConnectionResult of
-        {ok, ConnectedClient, _, _} ->
+        {ok, ConnectedClient, _} ->
             exometer:update([amoc, counters, connections], 1),
             exometer:update([amoc, times, connection], ConnectionTime),
             ConnectedClient;
@@ -93,19 +94,17 @@ do(false, MyId, Client) ->
     NeighbourIds = lists:delete(MyId, lists:seq(max(1,MyId-?NUMBER_OF_PREV_NEIGHBOURS),
                                                 MyId+?NUMBER_OF_NEXT_NEIGHBOURS)),
     send_messages_many_times(Client, ?SLEEP_TIME_AFTER_EVERY_MESSAGE, NeighbourIds);
-do(_Other, _MyId, Client) ->
-    lager:info("checker"),
+do(_Other, MyId, Client) ->
+    lager:info("checker ~p", [MyId]),
     send_presence_available(Client),
-    receive_forever(Client).
+    escalus_connection:wait_forever(Client).
 
--spec receive_forever(escalus:client()) -> no_return().
-receive_forever(Client) ->
-    Stanza = escalus_connection:get_stanza(Client, message, infinity),
-    Now = usec:from_now(os:timestamp()),
+measure_ttd(_Client, Stanza, Metadata) ->
     case Stanza of
         #xmlel{name = <<"message">>, attrs=Attrs} ->
             case lists:keyfind(<<"timestamp">>, 1, Attrs) of
                 {_, Sent} ->
+                    Now = maps:get(recv_timestamp, Metadata),
                     TTD = (Now - binary_to_integer(Sent)),
                     exometer:update(?MESSAGE_TTD_CT, TTD);
                 _ ->
@@ -114,8 +113,7 @@ receive_forever(Client) ->
         _ ->
             ok
     end,
-    receive_forever(Client).
-
+    true.
 
 -spec send_presence_available(escalus:client()) -> ok.
 send_presence_available(Client) ->

@@ -24,14 +24,10 @@ do_start(xmpp, _MyId, Cfg) ->
 
     send_presence_available(Client),
 
-    receive_forever(Client),
+    escalus_connection:wait_forever(Client),
 
     escalus_connection:stop(Client).
 
-receive_forever(Client) ->
-    Stanza = escalus_connection:get_stanza(Client, message, infinity),
-    lager:warning("~p", [Stanza]),
-    receive_forever(Client).
 
 user_spec(ProfileId, Password, Res) ->
     [ {username, ProfileId},
@@ -40,8 +36,13 @@ user_spec(ProfileId, Password, Res) ->
       {password, Password},
       {carbons, false},
       {stream_management, false},
-      {resource, Res}
+      {resource, Res},
+      {received_stanza_handlers, [fun log_message/2]}
     ].
+
+log_message(_Client, Stanza) ->
+    lager:warning("~p", [Stanza]),
+    true.
 
 send_message(AuthHeader, Id) ->
     Msg = #{to => full_jid(Id),
