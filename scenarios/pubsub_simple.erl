@@ -9,11 +9,8 @@
 -define(PUBSUB_ADDR, <<"pubsub.localhost">>).
 -define(WAIT_FOR_STANZA_TIMEOUT, 10000).
 -define(GROUPNAME, <<"pubsub_test_group_name">>).
--define(NUMBER_OF_PUBSUB_NODES, 5).
 -define(DELAY_BETWEEN_MESSAGES, 100).
 -define(WAIT_FOR_NODES, 10000).
--define(PUBLISHER_SUBSCRIBER_DENOMINATOR, 6).
--define(PUBLISHERS_NUMERATOR, 2).
 
 -define(NODE_CREATE_TIME, [amoc, timers, node_create_time]).
 -define(SUBSCRIBE_TIME, [amoc, timers, subscribe_time]).
@@ -31,9 +28,31 @@
 -export([start/1]).
 
 -required_variable({'NUMBER_OF_NODE_CREATORS', <<"Specifies how many users will create node"/utf8>>}).
+-required_variable({'PUBLISHERS_RATIO', <<"Specifies the number of publishers per 10 users"/utf8>>}).
 
 -spec init() -> ok.
 init() ->
+    init_metrics(),
+    ok.
+
+-spec start(amoc_scenario:user_id()) -> any().
+start(Id) ->
+    pg2:create(?GROUPNAME),
+    CreatorsNumber = amoc_config:get('NUMBER_OF_NODE_CREATORS', 3),
+    Client = connect_amoc_user(Id),
+    lager:info("~p~p", [Id, Client]),
+    case assign_role(Id, CreatorsNumber) of
+        creator ->
+            creator_start(Client);
+        publisher ->
+            publisher_start(Client);
+        subscriber ->
+            subscriber_start(Client)
+    end.
+
+%% --- Metrics ---------------------------------------------------------------------------------------------
+
+init_metrics() ->
     Stats =
     [
         {?NODE_CREATE_FAILS_COUTER, spiral},
@@ -46,8 +65,7 @@ init() ->
         {?SUBSCRIBE_TIME, histogram},
         {?PUBLISH_TIME, histogram}
     ],
-    [create_stat(Path, GraphType) ||  {Path, GraphType} <- Stats],
-    ok.
+    [create_stat(Path, GraphType) ||  {Path, GraphType} <- Stats].
 
 create_stat(Path, spiral) ->
     exometer:new(Path, spiral),
@@ -56,43 +74,81 @@ create_stat(Path, spiral) ->
 create_stat(Path, histogram) ->
     exometer:new(Path, histogram),
     exometer_report:subscribe(exometer_report_graphite, Path, [mean, min, max, median, 95, 99, 999], 1000).
+%% ----------------------------------------------------------------------------------------------------------
 
--spec start(integer()) -> ok.
-start(Id) ->
-    erlang:put(item_id, 1),
-    Creators = amoc_config:get('NUMBER_OF_NODE_CREATORS', 10),
-    start(Id, Creators).
-
-start(Id, Creators) when Id =< Creators ->
-    create_pubsub_nodes(Id);
-start(Id, _Creators) ->
-    connect_to_nodes(Id).
-
-connect_to_nodes(Id) ->
-    pg2:create(?GROUPNAME),
-    Client = connect_amoc_user(Id),
-    Nodes = get_nodes(3, Client),
-    case Id rem ?PUBLISHER_SUBSCRIBER_DENOMINATOR of
-        X when X =< ?PUBLISHERS_NUMERATOR ->
-            lager:info("Publisher, node: ~p~n", [Nodes]),
-            publish_items_forever(Client, Id, Nodes, 1);
+assign_role(Id, CreatorsNumber) when Id < CreatorsNumber ->
+    creator;
+assign_role(Id, _CreatorsNumber) ->
+    Numerator = amoc_config:get('PUBLISHERS_RATIO', 4),
+    case Id rem 10 of
+        X when X < Numerator ->
+            publisher;
         _ ->
-            lager:debug("Client: Starting subscriber Id = ~p\n", [Id]),
-            work_as_subscriber(Id, Client, Nodes)
-    end,
-    ok.
+            subscriber
+    end.
+%% --- Creator ----------------------------------------------------------------------------------------------
+creator_start(Client) ->
+    pg2:join(?GROUPNAME, self()),
+    Nodes = [create_pubsub_node(Client)],
+    lager:info("Created, node: ~p~n", [Nodes]),
+    schedule(start_publishing_items, ?DELAY_BETWEEN_MESSAGES),
+    creator_loop(Client, Nodes).
 
-provide_nodes_names(SelfClient, Nodes) ->
+creator_loop(Client, Nodes) ->
     receive
-        {what_nodes, PID} ->
-            PID ! {nodes, Nodes}
-    after
-        ?DELAY_BETWEEN_MESSAGES ->
-            ItemID = erlang:get(item_id),
-            erlang:put(item_id, ItemID + 1),
-            publish(ItemID, SelfClient, Nodes)
+        {message, {what_nodes, PID}} ->
+            PID ! {nodes, Nodes};
+        {scheduled, start_publishing_items} ->
+            schedule({publish_item, 1}, ?DELAY_BETWEEN_MESSAGES);
+        {scheduled, {publish_item, ItemId}} ->
+            schedule({publish_item, ItemId + 1}, ?DELAY_BETWEEN_MESSAGES),
+            publish(Client, Nodes, ItemId)
     end,
-    provide_nodes_names(SelfClient, Nodes).
+    creator_loop(Client, Nodes).
+
+%% --- Publisher --------------------------------------------------------------------------------------------
+publisher_start(Client) ->
+    Nodes = get_nodes(3, Client),
+    lager:info("Publisher, node: ~p~n", [Nodes]),
+    schedule({publish_item, 1}, ?DELAY_BETWEEN_MESSAGES),
+    publisher_loop(Client, Nodes).
+
+publisher_loop(Client, Nodes) ->
+    receive
+        {scheduled, {publish_item, ItemId}} ->
+            publish(Client, Nodes, ItemId),
+            schedule({publish_item, ItemId + 1}, ?DELAY_BETWEEN_MESSAGES)
+    end,
+    publisher_loop(Client, Nodes).
+
+publish(Client, Nodes, ItemId) ->
+    lager:debug("Published ~p ~p ~n", [ItemId, Nodes]),
+    ItemIdBin = integer_to_binary(ItemId),
+    [ publish_pubsub_item(Client, <<"item_", ItemIdBin/binary>>, Node) || Node <- Nodes ].
+
+%% --- Subscriber -------------------------------------------------------------------------------------------
+subscriber_start(Client) ->
+    Nodes = get_nodes(3, Client),
+    lager:info("Subscriber, node: ~p~n", [Nodes]),
+    [subscribe(Client, Node) || Node <- Nodes],
+    subscriber_loop(Client).
+
+subscriber_loop(Client) ->
+    try escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT) of
+        Stanza ->
+            lager:debug("Received ~p ~n", [Stanza])
+    catch
+        Error:Reason ->
+            lager:error("No items received! ~p~n ~p~n", [Error, Reason])
+    end,
+    subscriber_loop(Client).
+
+%% --- Scheduler --------------------------------------------------------------------------------------------
+
+schedule(Msg, Timeout) ->
+    erlang:send_after(Timeout, self(), {scheduled, Msg}).
+
+%% --- Nodes discovery --------------------------------------------------------------------------------------
 
 get_nodes(0, _) ->
     lager:error("Client: NO NODES PROVIDED"),
@@ -103,44 +159,18 @@ get_nodes(Retries, Client) ->
             Nodes;
         _ ->
             Member = try_get_member([]),
-            Member ! {what_nodes, self()},
+            Member ! {message, {what_nodes, self()}},
             receive
                 {nodes, Nodes} ->
                     erlang:put(nodes_names, {nodes_names, Nodes}),
                     Nodes
             after
                 ?WAIT_FOR_NODES ->
-                    logger:debug("Client: PID \n~p\n TIMEOUT", []),
                     get_nodes(Retries - 1, Client)
             end
     end.
 
-publish_items_forever(Client, Id, Nodes, ItemId) ->
-    timer:sleep(?DELAY_BETWEEN_MESSAGES),
-    publish(ItemId, Client, Nodes),
-    publish_items_forever(Client, Id, Nodes, ItemId + 1).
-
-publish(ItemId, Client, Nodes) -> 
-    ItemIdBin = integer_to_binary(ItemId),
-    Resp = [ publish_pubsub_item(Client, <<"item_", ItemIdBin/binary>>, Node) || Node <- Nodes ],
-    lager:debug("Client: Response is ~p\n", [Resp]).
-
-work_as_subscriber(Id, Client, Nodes) ->
-    [subscribe(Client, Node) || Node <- Nodes],
-    lager:info("Subscriber, node: ~p~n", [Nodes]),
-    receive_messages_forever(Id, Client).
-
-receive_messages_forever(Id, Client) ->
-    Stanza = escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT),
-    lager:debug("Client: Subscriber ~p got stanza ~p.", [Id, Stanza]),
-    receive_messages_forever(Id, Client).
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Helpers %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
+%% --- User helpers -----------------------------------------------------------------------------------------
 connect_amoc_user(Id) ->
     connect_amoc_user(Id, <<"res1">>).
 
@@ -149,13 +179,39 @@ connect_amoc_user(Id, Resource) ->
     {ok, Client, _} = escalus_connection:start(Cfg),
     Client.
 
-create_pubsub_nodes(Id) ->
-    pg2:create(?GROUPNAME),
-    pg2:join(?GROUPNAME, self()),
-    Client = connect_amoc_user(Id),
-    Nodes = [create_pubsub_node(Client)],
-    provide_nodes_names(Client, Nodes).
+user_spec(ProfileId, Password, Res) ->
+    ConnectionDetails = pick_server(),
+    [ {username, ProfileId},
+      {server, ?HOST},
+      {password, Password},
+      {carbons, false},
+      {stream_management, false},
+      {resource, Res}
+    ] ++ ConnectionDetails.
 
+make_user(Id, R) ->
+    BinId = integer_to_binary(Id),
+    ProfileId = <<"user_", BinId/binary>>,
+    Password = <<"password_", BinId/binary>>,
+    user_spec(ProfileId, Password, R).
+
+-spec pick_server() -> [proplists:property()].
+pick_server() ->
+    Servers = amoc_config:get(xmpp_servers),
+    verify(Servers),
+    S = length(Servers),
+    N = erlang:phash2(self(), S) + 1,
+    lists:nth(N, Servers).
+
+verify(Servers) ->
+    lists:foreach(
+      fun(Proplist) ->
+              true = proplists:is_defined(host, Proplist)
+      end,
+      Servers
+     ).
+
+%% ----------------------------------------------------------------------------------------------------------
 create_pubsub_node(Client) ->
     Node = pubsub_node(),
     ReqId = id(Client, Node, <<"create">>),
@@ -197,46 +253,6 @@ id(Client, {NodeAddr, NodeName}, Suffix) ->
     list_to_binary(io_lib:format("~s-~s-~s-~s",
 				 [UserName, NodeAddr, NodeName, Suffix])).
 
-user_spec(ProfileId, Password, Res) ->
-    ConnectionDetails = pick_server(),
-    [ {username, ProfileId},
-      {server, ?HOST},
-      {password, Password},
-      {carbons, false},
-      {stream_management, false},
-      {resource, Res}
-    ] ++ ConnectionDetails.
-
-make_user(Id, R) ->
-    BinId = integer_to_binary(Id),
-    ProfileId = <<"user_", BinId/binary>>,
-    Password = <<"password_", BinId/binary>>,
-    user_spec(ProfileId, Password, R).
-
--spec pick_server() -> [proplists:property()].
-pick_server() ->
-    Servers = amoc_config:get(xmpp_servers),
-    verify(Servers),
-    S = length(Servers),
-    N = erlang:phash2(self(), S) + 1,
-    lists:nth(N, Servers).
-
-verify(Servers) ->
-    lists:foreach(
-      fun(Proplist) ->
-              true = proplists:is_defined(host, Proplist)
-      end,
-      Servers
-     ).
-
-try_get_member([]) ->
-    Members = pg2:get_members(?GROUPNAME),
-    try_get_member(Members);
-try_get_member(Members) ->
-    L = length(Members),
-    N = erlang:phash2(self(), L) + 1,
-    lists:nth(N, Members).
-
 subscribe(Client, Node) ->
     Id = id(Client, Node, <<"subscribe">>),
     Request = escalus_pubsub_stanza:subscribe(Client, Id, Node),
@@ -276,3 +292,13 @@ publish_pubsub_item(Client, ItemId, Node) ->
 item_content() ->
     #xmlel{name = <<"entry">>,
            attrs = [{<<"xmlns">>, <<"http://www.w3.org/2005/Atom">>}]}.
+
+%% --- General Helpers ------------------------------------------------------------------------------------------------
+
+try_get_member([]) ->
+    Members = pg2:get_members(?GROUPNAME),
+    try_get_member(Members);
+try_get_member(Members) ->
+    L = length(Members),
+    N = erlang:phash2(self(), L) + 1,
+    lists:nth(N, Members).
