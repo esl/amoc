@@ -23,6 +23,8 @@
 -define(NODE_CREATE_SUCCESS_COUTER, [amoc, counters, node_create_success]).
 -define(SUBSCRIBE_SUCCESS_COUTER, [amoc, counters, subscribe_success]).
 -define(PUBLISH_SUCCESS_COUTER, [amoc, counters, publish_success]).
+-define(MESSAGE_TTD_CT, [amoc, times, message_ttd]).
+
 
 -export([init/0]).
 -export([start/1]).
@@ -63,7 +65,8 @@ init_metrics() ->
         {?PUBLISH_SUCCESS_COUTER, spiral},
         {?NODE_CREATE_TIME, histogram},
         {?SUBSCRIBE_TIME, histogram},
-        {?PUBLISH_TIME, histogram}
+        {?PUBLISH_TIME, histogram},
+        {?MESSAGE_TTD_CT, histogram}
     ],
     [create_stat(Path, GraphType) ||  {Path, GraphType} <- Stats].
 
@@ -99,10 +102,10 @@ creator_loop(Client, Nodes) ->
         {message, {what_nodes, PID}} ->
             PID ! {nodes, Nodes};
         {scheduled, start_publishing_items} ->
-            schedule({publish_item, 1}, ?DELAY_BETWEEN_MESSAGES);
-        {scheduled, {publish_item, ItemId}} ->
-            schedule({publish_item, ItemId + 1}, ?DELAY_BETWEEN_MESSAGES),
-            publish(Client, Nodes, ItemId)
+            schedule(publish_item, ?DELAY_BETWEEN_MESSAGES);
+        {scheduled, publish_item} ->
+            schedule(publish_item, ?DELAY_BETWEEN_MESSAGES),
+            publish(Client, Nodes)
     end,
     creator_loop(Client, Nodes).
 
@@ -115,16 +118,15 @@ publisher_start(Client) ->
 
 publisher_loop(Client, Nodes) ->
     receive
-        {scheduled, {publish_item, ItemId}} ->
-            publish(Client, Nodes, ItemId),
-            schedule({publish_item, ItemId + 1}, ?DELAY_BETWEEN_MESSAGES)
+        {scheduled, publish_item} ->
+            publish(Client, Nodes),
+            schedule(publish_item, ?DELAY_BETWEEN_MESSAGES)
     end,
     publisher_loop(Client, Nodes).
 
-publish(Client, Nodes, ItemId) ->
-    lager:debug("Published ~p ~p ~n", [ItemId, Nodes]),
-    ItemIdBin = integer_to_binary(ItemId),
-    [ publish_pubsub_item(Client, <<"item_", ItemIdBin/binary>>, Node) || Node <- Nodes ].
+publish(Client, Nodes) ->
+    lager:debug("Published ~p ~n", [Nodes]),
+    [ publish_pubsub_item(Client, Node) || Node <- Nodes ].
 
 %% --- Subscriber -------------------------------------------------------------------------------------------
 subscriber_start(Client) ->
@@ -136,7 +138,13 @@ subscriber_start(Client) ->
 subscriber_loop(Client) ->
     try escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT) of
         Stanza ->
-            lager:debug("Received ~p ~n", [Stanza])
+            escalus:assert(is_message, Stanza),
+            Item = exml_query:path(Stanza, [{element, <<"event">>}, {element, <<"items">>}, {element, <<"item">>}]),
+            TimeStampBin = exml_query:attr(Item, <<"id">>),
+            TimeStamp = binary_to_integer(TimeStampBin),
+            TTD =  os:system_time(microsecond) - TimeStamp,
+            exometer:update(?MESSAGE_TTD_CT, TTD),
+            lager:info("~n~n~p~n~n", [Stanza])
     catch
         Error:Reason ->
             lager:error("No items received! ~p~n ~p~n", [Error, Reason])
@@ -271,8 +279,9 @@ subscribe(Client, Node) ->
             exit(connection_failed)
         end.
 
-publish_pubsub_item(Client, ItemId, Node) ->
+publish_pubsub_item(Client, Node) ->
     Id = id(Client, Node, <<"publish">>),
+    ItemId = integer_to_binary(os:system_time(microsecond)),
     Request = escalus_pubsub_stanza:publish(Client, ItemId, item_content(), Id, Node),
     escalus:send(Client, Request),
     {PublishTime, PublishResult} = timer:tc(
