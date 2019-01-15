@@ -20,22 +20,18 @@
 -define(WAIT_FOR_STANZA_TIMEOUT, 10000).
 -define(PUBSUB_ADDR, <<"pubsub.localhost">>).
 
--define(PUBSUB_NODES_CT, [amoc, counters, pubsub_nodes]).
--define(SUBSCRIPTIONS_CT, [amoc, counters, subscriptions]).
--define(ITEMS_SENT_CT, [amoc, counters, items_sent]).
--define(ITEMS_RECEIVED_CT, [amoc, counters, items_received]).
+-define(PUBSUB_NODES_CT, pubsub_nodes).
+-define(SUBSCRIPTIONS_CT, subscriptions).
+-define(ITEMS_SENT_CT, [counters, items_sent]).
+-define(ITEMS_RECEIVED_CT, [counters, items_received]).
 
 -spec init() -> ok.
 init() ->
     set_env_interarrival(),
-    exometer:new(?PUBSUB_NODES_CT, counter),
-    exometer_report:subscribe(exometer_report_graphite, ?PUBSUB_NODES_CT, [value], 10000),
-    exometer:new(?SUBSCRIPTIONS_CT, counter),
-    exometer_report:subscribe(exometer_report_graphite, ?SUBSCRIPTIONS_CT, [value], 10000),
-    exometer:new(?ITEMS_SENT_CT, spiral),
-    exometer_report:subscribe(exometer_report_graphite, ?ITEMS_SENT_CT, [one, count], 10000),
-    exometer:new(?ITEMS_RECEIVED_CT, spiral),
-    exometer_report:subscribe(exometer_report_graphite, ?ITEMS_RECEIVED_CT, [one, count], 10000),
+    amoc_metrics:new_counter(?PUBSUB_NODES_CT),
+    amoc_metrics:new_counter(?SUBSCRIPTIONS_CT),
+    amoc_metrics:new_spiral(?ITEMS_SENT_CT),
+    amoc_metrics:new_spiral(?ITEMS_RECEIVED_CT),
     ok.
 
 -spec start(amoc_scenario:user_id()) -> no_return().
@@ -79,14 +75,14 @@ verify_item_notification(MyId, Stanza) ->
                                            {element, <<"items">>},
                                            {element, <<"item">>},
                                            {element, <<"entry">>}]),
-    exometer:update(?ITEMS_RECEIVED_CT, 1).
+    amoc_metrics:update_spiral(?ITEMS_RECEIVED_CT, 1).
 
 verify_subscribe_response(MyId, Stanza) ->
     lager:debug("Subscriber ~p got subscription response.", [MyId]),
     <<"subscribed">> = exml_query:path(Stanza, [{element, <<"pubsub">>},
                                                 {element, <<"subscription">>},
                                                 {attr, <<"subscription">>}]),
-    exometer:update(?SUBSCRIPTIONS_CT, 1).
+    amoc_metrics:update_counter(?SUBSCRIPTIONS_CT, 1).
 
 create_pubsub_node(Client, Node) ->
     Id = id(Client, Node, <<"create">>),
@@ -94,7 +90,7 @@ create_pubsub_node(Client, Node) ->
     escalus:send(Client, Request),
     Response = escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT),
     true = escalus_pred:is_iq_result(Response),
-    exometer:update(?PUBSUB_NODES_CT, 1).
+    amoc_metrics:update_counter(?PUBSUB_NODES_CT, 1).
 
 %% delete_pubsub_node(Client, Node) ->
 %%     Id = id(Client, Node, <<"delete">>),
@@ -109,7 +105,7 @@ publish(Client, ItemId, Node) ->
     escalus:send(Client, Request),
     Response = escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT),
     true = escalus_pred:is_iq_result(Response),
-    exometer:update(?ITEMS_SENT_CT, 1).
+    amoc_metrics:update_spiral(?ITEMS_SENT_CT, 1).
 
 item_content() ->
     #xmlel{name = <<"entry">>,
@@ -150,17 +146,7 @@ id(Client, {NodeAddr, NodeName}, Suffix) ->
 
 connect_amoc_user(MyId) ->
     User = make_user(MyId, <<"res1">>),
-    {ConnectionTime, ConnectionResult} = timer:tc(escalus_connection, start, [User]),
-    Client0 = case ConnectionResult of
-        {ok, ConnectedClient, _, _} ->
-            exometer:update([amoc, counters, connections], 1),
-            exometer:update([amoc, times, connection], ConnectionTime),
-            ConnectedClient;
-        Error ->
-            exometer:update([amoc, counters, connection_failures], 1),
-            lager:error("Could not connect user=~p, reason=~p", [User, Error]),
-            exit(connection_failed)
-    end,
+    {ok, Client0, _} = amoc_xmpp:connect_or_exit(User),
     Client = Client0#client{jid = make_jid(MyId)},
     send_presence_available(Client),
     receive_presence(Client, Client),
