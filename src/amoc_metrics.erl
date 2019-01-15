@@ -63,11 +63,11 @@ update_counter(Name, Value) ->
 
 -spec messages_spiral_name() -> name().
 messages_spiral_name() ->
-    [counters, messages_sent].
+    messages_sent.
 
 -spec message_ttd_histogram_name() -> name().
 message_ttd_histogram_name() ->
-    [times, message_ttd].
+    message_ttd.
 
 -spec default_reporting_opts() -> reporting_opts().
 default_reporting_opts() ->
@@ -75,14 +75,9 @@ default_reporting_opts() ->
       interval => timer:seconds(10)}.
 
 make_name(Type, Name) when is_atom(Name) ->
-    [amoc, name_by_type(Type), Name];
+    [amoc, Type, Name];
 make_name(_, Name) when is_list(Name) ->
     [amoc | Name].
-
-name_by_type(histogram) -> histograms;
-name_by_type(spiral) -> spirals;
-name_by_type(counter) -> counters.
-
 
 create_metric_and_maybe_subscribe(ExName, Type, Reporter, Interval, Datapoints) ->
     ok = exometer:re_register(ExName, Type, []),
