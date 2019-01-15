@@ -22,8 +22,8 @@
 
 -define(PUBSUB_NODES_CT, pubsub_nodes).
 -define(SUBSCRIPTIONS_CT, subscriptions).
--define(ITEMS_SENT_CT, [counters, items_sent]).
--define(ITEMS_RECEIVED_CT, [counters, items_received]).
+-define(ITEMS_SENT_CT, items_sent).
+-define(ITEMS_RECEIVED_CT, items_received).
 
 -spec init() -> ok.
 init() ->
