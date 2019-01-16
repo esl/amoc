@@ -29,22 +29,17 @@
 -export([start/1]).
 -export([init/0]).
 
--define(MESSAGES_CT, [amoc, counters, messages_sent]).
--define(MESSAGE_TTD_CT, [amoc, times, message_ttd]).
--define(MAM_READ_CT, [amoc, times, mam_last_10_read]).
+-define(MAM_READ_CT, mam_last_10_read).
 
 -type binjid() :: binary().
 
 
 -spec init() -> ok.
 init() ->
-    lager:info("init some metrics"),
-    exometer:new(?MESSAGES_CT, spiral),
-    exometer_report:subscribe(exometer_report_graphite, ?MESSAGES_CT, [one, count], 10000),
-    exometer:new(?MESSAGE_TTD_CT, histogram),
-    exometer_report:subscribe(exometer_report_graphite, ?MESSAGE_TTD_CT, [mean, min, max, median, 95, 99, 999], 10000),
-    exometer:new(?MAM_READ_CT, histogram),
-    exometer_report:subscribe(exometer_report_graphite, ?MAM_READ_CT, [mean, min, max, median, 95, 99, 999], 10000),
+    lager:info("init metrics"),
+    amoc_metrics:init(counters, amoc_metrics:messages_spiral_name()),
+    amoc_metrics:init(times, amoc_metrics:message_ttd_histogram_name()),
+    amoc_metrics:init(times, ?MAM_READ_CT),
     ok.
 
 -spec user_spec(binary(), binary(), binary()) -> escalus_users:user_spec().
@@ -56,7 +51,8 @@ user_spec(ProfileId, Password, Res) ->
       {carbons, false},
       {stream_management, false},
       {resource, Res},
-      {received_stanza_handlers, [fun measure_ttd/3]}
+      {received_stanza_handlers, [fun amoc_xmpp_handlers:measure_ttd/3]},
+      {sent_stanza_handlers, [fun amoc_xmpp_handlers:measure_sent_messages/2]}
     ].
 
 -spec make_user(amoc_scenario:user_id(), binary()) -> escalus_users:user_spec().
@@ -69,21 +65,9 @@ make_user(Id, R) ->
 -spec start(amoc_scenario:user_id()) -> any().
 start(MyId) ->
     Cfg = make_user(MyId, <<"res1">>),
+    {ok, Client, _} = amoc_xmpp:connect_or_exit(Cfg),
 
     IsChecker = MyId rem ?CHECKER_SESSIONS_INDICATOR == 0,
-
-    {ConnectionTime, ConnectionResult} = timer:tc(escalus_connection, start, [Cfg]),
-    Client = case ConnectionResult of
-        {ok, ConnectedClient, _} ->
-            exometer:update([amoc, counters, connections], 1),
-            exometer:update([amoc, times, connection], ConnectionTime),
-            ConnectedClient;
-        Error ->
-            exometer:update([amoc, counters, connection_failures], 1),
-            lager:error("Could not connect user=~p, reason=~p", [Cfg, Error]),
-            exit(connection_failed)
-    end,
-
     do(IsChecker, MyId, Client),
 
     timer:sleep(?SLEEP_TIME_AFTER_SCENARIO),
@@ -111,22 +95,6 @@ do(_Other, _MyId, Client) ->
     escalus_connection:set_filter_predicate(Client, fun escalus_pred:is_message/1),
     escalus_connection:wait_forever(Client).
 
-measure_ttd(_Client, Stanza, Metadata) ->
-    case Stanza of
-        #xmlel{name = <<"message">>, attrs=Attrs} ->
-            case lists:keyfind(<<"timestamp">>, 1, Attrs) of
-                {_, Sent} ->
-                    Now = maps:get(recv_timestamp, Metadata),
-                    TTD = (Now - binary_to_integer(Sent)),
-                    exometer:update(?MESSAGE_TTD_CT, TTD);
-                _ ->
-                    ok
-            end;
-        _ ->
-            ok
-    end,
-    true.
-
 -spec read_archive(escalus:client()) -> any().
 read_archive(Client) ->
     Payload = [#xmlel{name = <<"set">>,
@@ -143,7 +111,7 @@ read_archive(Client) ->
     Start = os:timestamp(),
     _IQResult = escalus_connection:get_stanza(Client, mam_result, 30000),
     Diff = timer:now_diff(os:timestamp(), Start),
-    exometer:update(?MAM_READ_CT, Diff).
+    amoc_metrics:update_time(?MAM_READ_CT, Diff).
 
 
 -spec send_presence_available(escalus:client()) -> ok.
@@ -173,7 +141,6 @@ send_message(Client, ToId, SleepTime) ->
     MsgIn = make_message(ToId),
     TimeStamp = integer_to_binary(usec:from_now(os:timestamp())),
     escalus_connection:send(Client, escalus_stanza:setattr(MsgIn, <<"timestamp">>, TimeStamp)),
-    exometer:update([amoc, counters, messages_sent], 1),
     timer:sleep(SleepTime).
 
 -spec make_message(binjid()) -> exml:element().
