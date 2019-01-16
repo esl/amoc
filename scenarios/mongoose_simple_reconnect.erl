@@ -14,8 +14,6 @@
 -include_lib("exml/include/exml.hrl").
 -include_lib("escalus/include/escalus.hrl").
 
--define(HOST, <<"localhost">>). %% The virtual host served by the server
--define(SERVER_IPS, {<<"192.168.99.100">>}). %% Tuple of servers, for example {<<"10.100.0.21">>, <<"10.100.0.22">>}
 -define(CHECKER_SESSIONS_INDICATOR, 10). %% How often a checker session should be generated
 -define(SLEEP_TIME_AFTER_SCENARIO, 0). %% wait 10s after scenario before disconnecting
 -define(NUMBER_OF_PREV_NEIGHBOURS, 4).
@@ -31,8 +29,6 @@
 
 -define(RECONNECTS_CT, reconnects).
 
--type binjid() :: binary().
-
 -spec init() -> ok.
 init() ->
     lager:info("init metrics"),
@@ -40,26 +36,6 @@ init() ->
     amoc_metrics:init(times, amoc_metrics:message_ttd_histogram_name()),
     amoc_metrics:init(counters, ?RECONNECTS_CT),
     ok.
-
--spec user_spec(binary(), binary(), binary()) -> escalus_users:user_spec().
-user_spec(ProfileId, Password, Res) ->
-    [ {username, ProfileId},
-      {server, ?HOST},
-      {host, pick_server(?SERVER_IPS)},
-      {password, Password},
-      {carbons, false},
-      {stream_management, false},
-      {resource, Res},
-      {received_stanza_handlers, [fun amoc_xmpp_handlers:measure_ttd/3]},
-      {sent_stanza_handlers, [fun amoc_xmpp_handlers:measure_sent_messages/2]}
-    ].
-
--spec make_user(amoc_scenario:user_id(), binary()) -> escalus_users:user_spec().
-make_user(Id, R) ->
-    BinId = integer_to_binary(Id),
-    ProfileId = <<"user_", BinId/binary>>,
-    Password = <<"password_", BinId/binary>>,
-    user_spec(ProfileId, Password, R).
 
 -spec start(amoc_scenario:user_id()) -> any().
 start(MyId) ->
@@ -77,11 +53,10 @@ start(MyId) ->
 -spec session(amoc_scenario:user_id()) -> any().
 session(MyId) ->
     ok = flush_mailbox(),
-    Cfg = make_user(MyId, <<"res1">>),
 
+    {ok, Client, _} = amoc_xmpp:connect_or_exit(MyId, send_and_recv_escalus_handlers()),
     IsChecker = MyId rem ?CHECKER_SESSIONS_INDICATOR == 0,
 
-    {ok, Client, _} = amoc_xmpp:connect_or_exit(Cfg),
 
     do(IsChecker, MyId, Client),
 
@@ -114,7 +89,7 @@ send_presence_unavailable(Client) ->
     Pres = escalus_stanza:presence(<<"unavailable">>),
     escalus_connection:send(Client, Pres).
 
--spec send_messages_many_times(escalus:client(), timeout(), [binjid()]) -> ok.
+-spec send_messages_many_times(escalus:client(), timeout(), [amoc_scenario:user_id()]) -> ok.
 send_messages_many_times(Client, MessageInterval, NeighbourIds) ->
     S = fun(_) ->
                 send_messages_to_neighbors(Client, NeighbourIds, MessageInterval)
@@ -122,36 +97,16 @@ send_messages_many_times(Client, MessageInterval, NeighbourIds) ->
     lists:foreach(S, lists:seq(1, ?NUMBER_OF_SEND_MESSAGE_REPEATS)).
 
 
--spec send_messages_to_neighbors(escalus:client(), [binjid()], timeout()) -> list().
+-spec send_messages_to_neighbors(escalus:client(), [amoc_scenario:user_id()], timeout()) -> list().
 send_messages_to_neighbors(Client, TargetIds, SleepTime) ->
-    [send_message(Client, make_jid(TargetId), SleepTime)
+    [send_message(Client, TargetId, SleepTime)
      || TargetId <- TargetIds].
 
--spec send_message(escalus:client(), binjid(), timeout()) -> ok.
+-spec send_message(escalus:client(), amoc_scenario:user_id(), timeout()) -> ok.
 send_message(Client, ToId, SleepTime) ->
-    MsgIn = make_message(ToId),
-    TimeStamp = integer_to_binary(usec:from_now(os:timestamp())),
-    escalus_connection:send(Client, escalus_stanza:setattr(MsgIn, <<"timestamp">>, TimeStamp)),
+    MsgIn = amoc_xmpp_stanzas:make_message_with_timestamp(ToId),
+    escalus_connection:send(Client, MsgIn),
     timer:sleep(SleepTime).
-
--spec make_message(binjid()) -> exml:element().
-make_message(ToId) ->
-    Body = <<"hello sir, you are a gentelman and a scholar.">>,
-    Id = escalus_stanza:id(),
-    escalus_stanza:set_id(escalus_stanza:chat_to(ToId, Body), Id).
-
--spec make_jid(amoc_scenario:user_id()) -> binjid().
-make_jid(Id) ->
-    BinInt = integer_to_binary(Id),
-    ProfileId = <<"user_", BinInt/binary>>,
-    Host = ?HOST,
-    << ProfileId/binary, "@", Host/binary >>.
-
--spec pick_server({binary()}) -> binary().
-pick_server(Servers) ->
-    S = size(Servers),
-    N = erlang:phash2(self(), S) + 1,
-    element(N, Servers).
 
 -spec flush_mailbox() -> ok.
 flush_mailbox() ->
@@ -161,3 +116,11 @@ flush_mailbox() ->
     after 0 ->
         ok
     end.
+
+-spec send_and_recv_escalus_handlers() -> [{atom(), any()}].
+send_and_recv_escalus_handlers() ->
+    [
+      {received_stanza_handlers, [fun amoc_xmpp_handlers:measure_ttd/3]},
+      {sent_stanza_handlers, [fun amoc_xmpp_handlers:measure_sent_messages/2]}
+    ].
+
