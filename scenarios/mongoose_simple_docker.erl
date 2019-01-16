@@ -31,8 +31,8 @@
 -spec init() -> ok.
 init() ->
     lager:info("init metrics"),
-    amoc_metrics:new_spiral(amoc_metrics:messages_spiral_name()),
-    amoc_metrics:new_histogram(amoc_metrics:message_ttd_histogram_name()),
+    amoc_metrics:init(counters, amoc_metrics:messages_spiral_name()),
+    amoc_metrics:init(times, amoc_metrics:message_ttd_histogram_name()),
     ok.
 
 -spec user_spec(binary(), binary(), binary()) -> escalus_users:user_spec().

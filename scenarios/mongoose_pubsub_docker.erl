@@ -28,10 +28,10 @@
 -spec init() -> ok.
 init() ->
     set_env_interarrival(),
-    amoc_metrics:new_counter(?PUBSUB_NODES_CT),
-    amoc_metrics:new_counter(?SUBSCRIPTIONS_CT),
-    amoc_metrics:new_spiral(?ITEMS_SENT_CT),
-    amoc_metrics:new_spiral(?ITEMS_RECEIVED_CT),
+    amoc_metrics:init(counters, ?PUBSUB_NODES_CT),
+    amoc_metrics:init(counters, ?SUBSCRIPTIONS_CT),
+    amoc_metrics:init(counters, ?ITEMS_SENT_CT),
+    amoc_metrics:init(counters, ?ITEMS_RECEIVED_CT),
     ok.
 
 -spec start(amoc_scenario:user_id()) -> no_return().
@@ -75,7 +75,7 @@ verify_item_notification(MyId, Stanza) ->
                                            {element, <<"items">>},
                                            {element, <<"item">>},
                                            {element, <<"entry">>}]),
-    amoc_metrics:update_spiral(?ITEMS_RECEIVED_CT, 1).
+    amoc_metrics:update_counter(?ITEMS_RECEIVED_CT, 1).
 
 verify_subscribe_response(MyId, Stanza) ->
     lager:debug("Subscriber ~p got subscription response.", [MyId]),
@@ -105,7 +105,7 @@ publish(Client, ItemId, Node) ->
     escalus:send(Client, Request),
     Response = escalus:wait_for_stanza(Client, ?WAIT_FOR_STANZA_TIMEOUT),
     true = escalus_pred:is_iq_result(Response),
-    amoc_metrics:update_spiral(?ITEMS_SENT_CT, 1).
+    amoc_metrics:update_counter(?ITEMS_SENT_CT, 1).
 
 item_content() ->
     #xmlel{name = <<"entry">>,

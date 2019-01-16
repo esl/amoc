@@ -13,7 +13,7 @@ measure_ttd(_Client, Stanza, Metadata) ->
                 {_, Sent} ->
                     Now = maps:get(recv_timestamp, Metadata),
                     TTD = (Now - binary_to_integer(Sent)),
-                    amoc_metrics:update_hist(amoc_metrics:message_ttd_histogram_name(), TTD);
+                    amoc_metrics:update_time(amoc_metrics:message_ttd_histogram_name(), TTD);
                 _ ->
                     ok
             end;
@@ -24,7 +24,7 @@ measure_ttd(_Client, Stanza, Metadata) ->
 
 -spec measure_sent_messages(escalus_connection:client(), exml_stream:element()) -> boolean().
 measure_sent_messages(_Client, #xmlel{name = <<"message">>}) ->
-    amoc_metrics:update_spiral(amoc_metrics:messages_spiral_name(), 1),
+    amoc_metrics:update_counter(amoc_metrics:messages_spiral_name()),
     true;
 measure_sent_messages(_, _) ->
     true.

@@ -29,16 +29,16 @@
 -export([start/1]).
 -export([init/0]).
 
--define(RECONNECTS_CT, [counters, reconnects]).
+-define(RECONNECTS_CT, reconnects).
 
 -type binjid() :: binary().
 
 -spec init() -> ok.
 init() ->
     lager:info("init metrics"),
-    amoc_metrics:new_spiral(amoc_metrics:messages_spiral_name()),
-    amoc_metrics:new_histogram(amoc_metrics:message_ttd_histogram_name()),
-    amoc_metrics:new_spiral(?RECONNECTS_CT),
+    amoc_metrics:init(counters, amoc_metrics:messages_spiral_name()),
+    amoc_metrics:init(times, amoc_metrics:message_ttd_histogram_name()),
+    amoc_metrics:init(counters, ?RECONNECTS_CT),
     ok.
 
 -spec user_spec(binary(), binary(), binary()) -> escalus_users:user_spec().
@@ -69,7 +69,7 @@ start(MyId) ->
               exit(shutdown);
           Exit:Reason ->
               lager:error("reconnection due to ~p ~p", [Exit, Reason]),
-              amoc_metrics:update_spiral(?RECONNECTS_CT, 1),
+              amoc_metrics:update_counter(?RECONNECTS_CT),
               timer:sleep(?SLEEP_TIME_BEFORE_RECONNECT),
               start(MyId)
     end.

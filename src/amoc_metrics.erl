@@ -1,64 +1,43 @@
 -module(amoc_metrics).
 
 -export([default_reporting_opts/0]).
--export([new_histogram/1, new_counter/1, new_spiral/1]).
--export([new_histogram/2, new_counter/2, new_spiral/2]).
--export([update_hist/2, update_counter/2, update_spiral/2]).
+-export([init/2]).
+-export([update_time/2, update_counter/2, update_counter/1]).
 -export([messages_spiral_name/0, message_ttd_histogram_name/0]).
 
--type name() :: atom() | [atom()].
+-type name() :: atom().
 
 -type reporting_opts() :: #{reporter := atom(),
                             interval := non_neg_integer(),
                             report => [atom()]}.
 
--spec new_histogram(name()) -> ok.
-new_histogram(Name) ->
-    new_histogram(Name, default_reporting_opts()).
+-type type() :: counters | times.
 
--spec new_histogram(name(), reporting_opts()) -> ok.
-new_histogram(Name, Opts) ->
-    ExName = make_name(histogram, Name),
+-spec init(type(), name()) -> ok.
+init(Type, Name) ->
+    init(Type, Name, default_reporting_opts()).
+
+init(Type, Name, Opts) ->
+    ExName = make_name(Type, Name),
+    ExType = exometer_metric_type(Type),
     #{reporter := Reporter, interval := Interval} = Opts,
-    HistProps = [mean, min, max, median, 95, 99, 999],
-    Datapoints = maps:get(report, Opts, HistProps),
-    create_metric_and_maybe_subscribe(ExName, histogram, Reporter, Interval, Datapoints).
+    Datapoints = metric_report_datapoints(ExType),
+    create_metric_and_maybe_subscribe(ExName, ExType, Reporter, Interval, Datapoints).
 
--spec new_spiral(name()) -> ok.
-new_spiral(Name) ->
-    new_spiral(Name, default_reporting_opts()).
 
--spec new_spiral(name(), reporting_opts()) -> ok.
-new_spiral(Name, Opts) ->
-    ExName = make_name(spiral, Name),
-    #{reporter := Reporter, interval := Interval} = Opts,
-    Datapoints = maps:get(report, Opts, [one, count]),
-    create_metric_and_maybe_subscribe(ExName, spiral, Reporter, Interval, Datapoints).
-
--spec new_counter(name()) -> ok.
-new_counter(Name) when is_atom(Name) ->
-    new_counter(Name, default_reporting_opts()).
-
--spec new_counter(name(), reporting_opts()) -> ok.
-new_counter(Name, Opts) when is_atom(Name) ->
-    ExName = [amoc, counters, Name],
-    #{reporter := Reporter, interval := Interval} = Opts,
-    Datapoints = maps:get(report, Opts, [value]),
-    create_metric_and_maybe_subscribe(ExName, counter, Reporter, Interval, Datapoints).
-
--spec update_hist(name(), integer()) -> ok.
-update_hist(Name, Value) ->
-    ExName = make_name(histogram, Name),
+-spec update_time(name(), integer()) -> ok.
+update_time(Name, Value) ->
+    ExName = make_name(times, Name),
     exometer:update(ExName, Value).
 
--spec update_spiral(name(), integer()) -> ok.
-update_spiral(Name, Value) ->
-    ExName = make_name(spiral, Name),
-    exometer:update(ExName, Value).
+-spec update_counter(name()) -> ok.
+update_counter(Name) ->
+    ExName = make_name(counters, Name),
+    exometer:update(ExName, 1).
 
 -spec update_counter(name(), integer()) -> ok.
 update_counter(Name, Value) ->
-    ExName = make_name(counter, Name),
+    ExName = make_name(counters, Name),
     exometer:update(ExName, Value).
 
 -spec messages_spiral_name() -> name().
@@ -75,9 +54,10 @@ default_reporting_opts() ->
       interval => timer:seconds(10)}.
 
 make_name(Type, Name) when is_atom(Name) ->
-    [amoc, Type, Name];
-make_name(_, Name) when is_list(Name) ->
-    [amoc | Name].
+    [amoc, Type, Name].
+
+metric_report_datapoints(spiral) -> [count, one];
+metric_report_datapoints(histogram) -> [mean, min, max, median, 95, 99, 999].
 
 create_metric_and_maybe_subscribe(ExName, Type, Reporter, Interval, Datapoints) ->
     ok = exometer:re_register(ExName, Type, []),
@@ -89,3 +69,5 @@ create_metric_and_maybe_subscribe(ExName, Type, Reporter, Interval, Datapoints) 
             lager:warning("Reporter=~p not_enbled")
     end.
 
+exometer_metric_type(counters) -> spiral;
+exometer_metric_type(times) -> histogram.

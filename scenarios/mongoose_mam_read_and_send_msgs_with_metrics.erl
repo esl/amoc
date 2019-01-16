@@ -29,7 +29,7 @@
 -export([start/1]).
 -export([init/0]).
 
--define(MAM_READ_CT, [times, mam_last_10_read]).
+-define(MAM_READ_CT, mam_last_10_read).
 
 -type binjid() :: binary().
 
@@ -37,9 +37,9 @@
 -spec init() -> ok.
 init() ->
     lager:info("init metrics"),
-    amoc_metrics:new_spiral(amoc_metrics:messages_spiral_name()),
-    amoc_metrics:new_histogram(amoc_metrics:message_ttd_histogram_name()),
-    amoc_metrics:new_histogram(?MAM_READ_CT),
+    amoc_metrics:init(counters, amoc_metrics:messages_spiral_name()),
+    amoc_metrics:init(times, amoc_metrics:message_ttd_histogram_name()),
+    amoc_metrics:init(times, ?MAM_READ_CT),
     ok.
 
 -spec user_spec(binary(), binary(), binary()) -> escalus_users:user_spec().
@@ -111,7 +111,7 @@ read_archive(Client) ->
     Start = os:timestamp(),
     _IQResult = escalus_connection:get_stanza(Client, mam_result, 30000),
     Diff = timer:now_diff(os:timestamp(), Start),
-    amoc_metrics:update_hist(?MAM_READ_CT, Diff).
+    amoc_metrics:update_time(?MAM_READ_CT, Diff).
 
 
 -spec send_presence_available(escalus:client()) -> ok.
