@@ -142,63 +142,18 @@ id(Client, {NodeAddr, NodeName}, Suffix) ->
     UserName = escalus_utils:get_username(Client),
     list_to_binary(io_lib:format("~s-~s-~s-~s", [UserName, NodeAddr, NodeName, Suffix])).
 
-%% TODO extract these common helpers to another module
-
 connect_amoc_user(MyId) ->
-    User = make_user(MyId, <<"res1">>),
-    {ok, Client0, _} = amoc_xmpp:connect_or_exit(User),
-    Client = Client0#client{jid = make_jid(MyId)},
-    send_presence_available(Client),
+    ExtraProps = amoc_xmpp:pick_server(),
+    {ok, Client0, _} = amoc_xmpp:connect_or_exit(MyId, ExtraProps),
+    Client = Client0#client{jid = amoc_xmpp_stanzas:make_jid(MyId)},
+    amoc_xmpp:send_presence_available(Client),
     receive_presence(Client, Client),
     Client.
-
--spec send_presence_available(escalus:client()) -> ok.
-send_presence_available(Client) ->
-    Pres = escalus_stanza:presence(<<"available">>),
-    escalus_connection:send(Client, Pres).
 
 receive_presence(Client1, Client2) ->
     PresenceNotification = escalus:wait_for_stanza(Client1, ?WAIT_FOR_STANZA_TIMEOUT),
     escalus:assert(is_presence, PresenceNotification),
     escalus:assert(is_stanza_from, [Client2], PresenceNotification).
-
--spec make_user(amoc_scenario:user_id(), binary()) -> escalus_users:user_spec().
-make_user(Id, R) ->
-    BinId = integer_to_binary(Id),
-    ProfileId = <<"user_", BinId/binary>>,
-    Password = <<"password_", BinId/binary>>,
-    user_spec(ProfileId, Password, R).
-
--spec user_spec(binary(), binary(), binary()) -> escalus_users:user_spec().
-user_spec(ProfileId, Password, Res) ->
-    [ {username, ProfileId},
-      {server, ?HOST},
-      {host, pick_server()},
-      {password, Password},
-      {carbons, false},
-      {stream_management, false},
-      {resource, Res}
-    ].
-
--spec make_jid(amoc_scenario:user_id()) -> any().
-make_jid(Id) ->
-    BinInt = integer_to_binary(Id),
-    ProfileId = <<"user_", BinInt/binary>>,
-    Host = ?HOST,
-    << ProfileId/binary, "@", Host/binary >>.
-
--spec pick_server() -> binary().
-pick_server() ->
-    Servers = env_servers(),
-    S = size(Servers),
-    N = erlang:phash2(self(), S) + 1,
-    element(N, Servers).
-
--spec env_servers() -> {binary()}.
-env_servers() ->
-    List = re:split(os:getenv("AMOC_XMPP_SERVERS"), "\s",
-                    [{return, binary}, trim]),
-    list_to_tuple(List).
 
 -spec set_env_interarrival() -> ok.
 set_env_interarrival() ->
