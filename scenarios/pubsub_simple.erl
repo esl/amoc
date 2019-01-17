@@ -12,9 +12,9 @@
 -define(DELAY_BETWEEN_MESSAGES, 100).
 -define(WAIT_FOR_NODES, 10000).
 
--define(NODE_CREATE_TIME, [amoc, timers, node_create_time]).
--define(SUBSCRIBE_TIME, [amoc, timers, subscribe_time]).
--define(PUBLISH_TIME, [amoc, timers, publish_time]).
+-define(NODE_CREATE_TIME, [amoc, times, node_create_time]).
+-define(SUBSCRIBE_TIME, [amoc, times, subscribe_time]).
+-define(PUBLISH_TIME, [amoc, times, publish_time]).
 
 -define(NODE_CREATE_FAILS_COUTER, [amoc, counters, node_create_failed]).
 -define(SUBSCRIBE_FAILS_COUTER, [amoc, counters, subscribe_failed]).
