@@ -87,7 +87,8 @@ send_messages_to_neighbors(Client,TargetIds, SleepTime) ->
 
 -spec send_message(escalus:client(), amoc_scenario:user_id(), timeout()) -> ok.
 send_message(Client, ToId, SleepTime) ->
-    Msg = amoc_xmpp_stanzas:make_message(ToId),
+    Body = <<"hello sir, you are a gentelman and a scholar.">>,
+    Msg = escalus_stanza:chat_to_with_id_and_timestamp(amoc_xmpp_users:make_jid(ToId), Body),
     escalus_connection:send(Client, Msg),
     timer:sleep(SleepTime).
 

@@ -44,7 +44,7 @@ send_message(AuthHeader, Id) ->
 
 auth_header(Id) ->
     Password = <<"password_", (integer_to_binary(Id))/binary>>,
-    User = amoc_xmpp_stanzas:make_jid(Id),
+    User = amoc_xmpp_users:make_jid(Id),
     UserAndPass = <<User/binary, ":", Password/binary>>,
     Base64  = base64:encode(UserAndPass),
     Basic = <<"basic ",Base64/binary>>,
