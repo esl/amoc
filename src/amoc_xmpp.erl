@@ -4,6 +4,7 @@
 -export([connect_or_exit/2]).
 -export([send_presence_available/1]).
 -export([send_presence_unavailable/1]).
+-export([pick_server/0]).
 
 %% @doc connects and authenticates a user with given id and additional properties
 %% If the passed proplist is empty, a default user spec a created by
@@ -44,6 +45,32 @@ send_presence_unavailable(Client) ->
     Pres = escalus_stanza:presence(<<"unavailable">>),
     escalus_connection:send(Client, Pres).
 
+%% @doc Picks a random server based on config var `xmpp_servers`
+%% This function expect a list of proplists defining the endpoint
+%% to which an XMPP client can connect, for instance:
+%% [[{host, "127.0.0.1"}, {port, 5222}], [{host, "127.0.0.1"}, {port, 5223}]]
+%% One of the above proplists is picked and can be added to user's spec.
+%% It's required that the proplists contains at least the `host` property.
+%% Since the `xmpp_servers` config option is read via `amoc_config` API,
+%% it's possible to pass it as an ENV var when starting amoc:
+%% > AMOC_xmpp_servers="[[{host,\"127.0.0.2\"}, {port, 5222}],[{host, \"127.0.0.1\"}, {port, 5223}]]" make console
+%% Default value, if xmpp_servers option is not set, is [{host, "127.0.0.1"}]
+-spec pick_server() -> [proplists:property()].
+pick_server() ->
+    Servers = amoc_config:get(xmpp_servers, [[{host, "127.0.0.1"}]]),
+    verify(Servers),
+    S = length(Servers),
+    N = erlang:phash2(self(), S) + 1,
+    lists:nth(N, Servers).
+
+verify(Servers) ->
+    lists:foreach(
+      fun(Proplist) ->
+              true = proplists:is_defined(host, Proplist)
+      end,
+      Servers
+     ).
+
 make_user(Id, Props) ->
     BinId = integer_to_binary(Id),
     ProfileId = <<"user_", BinId/binary>>,
@@ -62,3 +89,4 @@ default_user_spec(ProfileId, Password) ->
       {carbons, false},
       {stream_management, false},
       {resource, base64:encode(crypto:strong_rand_bytes(5))}].
+
