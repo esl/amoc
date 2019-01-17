@@ -41,14 +41,14 @@ start(MyId) ->
     do(IsChecker, MyId, Client),
 
     timer:sleep(?SLEEP_TIME_AFTER_SCENARIO),
-    amoc_xmpp:send_presence_unavailable(Client),
+    escalus_session:send_presence_unavailable(Client),
     escalus_connection:stop(Client).
 
 -spec do(boolean(), amoc_scenario:user_id(), escalus:client()) -> any().
 do(false, MyId, Client) ->
     escalus_connection:set_filter_predicate(Client, none),
 
-    amoc_xmpp:send_presence_available(Client),
+    escalus_session:send_presence_available(Client),
     timer:sleep(5000),
 
     NeighbourIds = lists:delete(MyId, lists:seq(max(1,MyId-?NUMBER_OF_PREV_NEIGHBOURS),
@@ -56,7 +56,7 @@ do(false, MyId, Client) ->
     send_messages_many_times(Client, ?SLEEP_TIME_AFTER_EVERY_MESSAGE, NeighbourIds);
 do(_Other, MyId, Client) ->
     lager:info("checker ~p", [MyId]),
-    amoc_xmpp:send_presence_available(Client),
+    escalus_session:send_presence_available(Client),
     escalus_connection:wait_forever(Client).
 
 -spec send_messages_many_times(escalus:client(), timeout(), [amoc_scenario:user_id()]) -> ok.

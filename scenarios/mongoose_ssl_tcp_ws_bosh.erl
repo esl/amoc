@@ -31,7 +31,7 @@ start(MyId) ->
     %%Drop all stanzas
     %escalus_connection:set_filter_predicate(Client, none),
 
-    amoc_xmpp:send_presence_available(Client),
+    escalus_session:send_presence_available(Client),
 
     lager:info("~p presence resp ~p", [Transport, escalus_client:wait_for_stanza(Client)]),
     timer:sleep(5000),
@@ -40,7 +40,7 @@ start(MyId) ->
     send_messages_many_times(Client, 20000, NeighbourIds),
 
     timer:sleep(10*1000),
-    amoc_xmpp:send_presence_unavailable(Client),
+    escalus_session:send_presence_unavailable(Client),
     escalus_connection:stop(Client).
 
 -spec send_messages_many_times(escalus:client(), timeout(), [amoc_scenario:user_id()]) -> ok.

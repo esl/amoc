@@ -2,8 +2,6 @@
 
 -export([connect_or_exit/1]).
 -export([connect_or_exit/2]).
--export([send_presence_available/1]).
--export([send_presence_unavailable/1]).
 -export([pick_server/0]).
 
 %% @doc connects and authenticates a user with given id and additional properties
@@ -34,16 +32,6 @@ connect_or_exit(Spec) ->
             lager:error("Could not connect user=~p, reason=~p", [Spec, Error]),
             exit(connection_failed)
     end.
-
--spec send_presence_available(escalus:client()) -> ok.
-send_presence_available(Client) ->
-    Pres = escalus_stanza:presence(<<"available">>),
-    escalus_connection:send(Client, Pres).
-
--spec send_presence_unavailable(escalus:client()) -> ok.
-send_presence_unavailable(Client) ->
-    Pres = escalus_stanza:presence(<<"unavailable">>),
-    escalus_connection:send(Client, Pres).
 
 %% @doc Picks a random server based on config var `xmpp_servers`
 %% This function expect a list of proplists defining the endpoint

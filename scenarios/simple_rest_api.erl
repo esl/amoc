@@ -23,7 +23,7 @@ do_start(xmpp, MyId) ->
 
     {ok, Client, _} = amoc_xmpp:connect_or_exit(MyId, ExtraProps),
 
-    amoc_xmpp:send_presence_available(Client),
+    escalus_session:send_presence_available(Client),
 
     escalus_connection:wait_forever(Client),
 

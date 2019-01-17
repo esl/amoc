@@ -146,7 +146,7 @@ connect_amoc_user(MyId) ->
     ExtraProps = amoc_xmpp:pick_server(),
     {ok, Client0, _} = amoc_xmpp:connect_or_exit(MyId, ExtraProps),
     Client = Client0#client{jid = amoc_xmpp_stanzas:make_jid(MyId)},
-    amoc_xmpp:send_presence_available(Client),
+    escalus_session:send_presence_available(Client),
     receive_presence(Client, Client),
     Client.
 
