@@ -12,20 +12,6 @@
 -define(DELAY_BETWEEN_MESSAGES, 100).
 -define(WAIT_FOR_NODES, 10000).
 
--define(NODE_CREATE_TIME, [amoc, times, node_create_time]).
--define(SUBSCRIBE_TIME, [amoc, times, subscribe_time]).
--define(PUBLISH_TIME, [amoc, times, publish_time]).
-
--define(NODE_CREATE_FAILS_COUTER, [amoc, counters, node_create_failed]).
--define(SUBSCRIBE_FAILS_COUTER, [amoc, counters, subscribe_failed]).
--define(PUBLISH_FAILS_COUTER, [amoc, counters, publish_failed]).
-
--define(NODE_CREATE_SUCCESS_COUTER, [amoc, counters, node_create_success]).
--define(SUBSCRIBE_SUCCESS_COUTER, [amoc, counters, subscribe_success]).
--define(PUBLISH_SUCCESS_COUTER, [amoc, counters, publish_success]).
--define(MESSAGE_TTD_CT, [amoc, times, message_ttd]).
-
-
 -export([init/0]).
 -export([start/1]).
 
@@ -55,28 +41,13 @@ start(Id) ->
 %% --- Metrics ---------------------------------------------------------------------------------------------
 
 init_metrics() ->
-    Stats =
-    [
-        {?NODE_CREATE_FAILS_COUTER, spiral},
-        {?SUBSCRIBE_FAILS_COUTER, spiral},
-        {?PUBLISH_FAILS_COUTER, spiral},
-        {?NODE_CREATE_SUCCESS_COUTER, spiral},
-        {?SUBSCRIBE_SUCCESS_COUTER, spiral},
-        {?PUBLISH_SUCCESS_COUTER, spiral},
-        {?NODE_CREATE_TIME, histogram},
-        {?SUBSCRIBE_TIME, histogram},
-        {?PUBLISH_TIME, histogram},
-        {?MESSAGE_TTD_CT, histogram}
-    ],
-    [create_stat(Path, GraphType) ||  {Path, GraphType} <- Stats].
-
-create_stat(Path, spiral) ->
-    exometer:new(Path, spiral),
-    exometer_report:subscribe(exometer_report_graphite, Path, [one, count], 1000);
-
-create_stat(Path, histogram) ->
-    exometer:new(Path, histogram),
-    exometer_report:subscribe(exometer_report_graphite, Path, [mean, min, max, median, 95, 99, 999], 1000).
+    Counters = [ node_creation_success, node_creation_failure, subscription_failure,
+                 publication_failure, subscription_success, publication_success ],
+    Times = [ node_creation, subscription, publication, message_ttd ],
+    lists:foreach(fun(Metric) ->
+                          amoc_metrics:init(counters, Metric) end, Counters),
+    lists:foreach(fun(Metric) ->
+                          amoc_metrics:init(times, Metric) end, Times).
 %% ----------------------------------------------------------------------------------------------------------
 
 assign_role(Id, CreatorsNumber) when Id < CreatorsNumber ->
@@ -143,7 +114,7 @@ subscriber_loop(Client) ->
             TimeStampBin = exml_query:attr(Item, <<"id">>),
             TimeStamp = binary_to_integer(TimeStampBin),
             TTD =  os:system_time(microsecond) - TimeStamp,
-            exometer:update(?MESSAGE_TTD_CT, TTD),
+            amoc_metrics:update_time(message_ttd, TTD),
             lager:info("~n~n~p~n~n", [Stanza])
     catch
         Error:Reason ->
@@ -236,10 +207,10 @@ create_pubsub_node(Client) ->
 
     case escalus_pred:is_iq_result(CreateNodeResult) of
         true ->
-            exometer:update(?NODE_CREATE_SUCCESS_COUTER, 1),
-            exometer:update(?NODE_CREATE_TIME, CreateNodeTime);
+            amoc_metrics:update_counter(node_create_success, 1),
+            amoc_metrics:update_time(node_create_time, CreateNodeTime);
         Error ->
-            exometer:update(?NODE_CREATE_FAILS_COUTER, 1),
+            amoc_metrics:update_counter(node_create_fails, 1),
             lager:error("Error creating node: ~p", [Error]),
             exit(connection_failed)
     end,
@@ -271,10 +242,10 @@ subscribe(Client, Node) ->
         end),
     case escalus_pred:is_iq_result(SubscribeResult) of
         true ->
-            exometer:update(?SUBSCRIBE_SUCCESS_COUTER, 1),
-            exometer:update(?SUBSCRIBE_TIME, SubscribeTime);
+            amoc_metrics:update_counter(subscribe_success, 1),
+            amoc_metrics:update_time(subscribe_time, SubscribeTime);
         Error ->
-            exometer:update(?SUBSCRIBE_FAILS_COUTER, 1),
+            amoc_metrics:update_counter(subscribe_fails, 1),
             lager:error("Error subscribing node ~p filed: ~p", [Node, Error]),
             exit(connection_failed)
         end.
@@ -290,10 +261,10 @@ publish_pubsub_item(Client, Node) ->
         end),
     case escalus_pred:is_iq_result(PublishResult) of
         true ->
-            exometer:update(?PUBLISH_SUCCESS_COUTER, 1),
-            exometer:update(?PUBLISH_TIME, PublishTime);
+            amoc_metrics:update_counter(publish_success, 1),
+            amoc_metrics:update_time(publish_time, PublishTime);
         Error ->
-            exometer:update(?PUBLISH_FAILS_COUTER, 1),
+            amoc_metrics:update_counter(publish_fails, 1),
             lager:error("Error subscribing node ~p filed: ~p", [Node, Error]),
             exit(connection_failed)
         end.
