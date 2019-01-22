@@ -50,7 +50,7 @@ init_metrics() ->
                           amoc_metrics:init(times, Metric) end, Times).
 %% ----------------------------------------------------------------------------------------------------------
 
-assign_role(Id, CreatorsNumber) when Id < CreatorsNumber ->
+assign_role(Id, CreatorsNumber) when Id =< CreatorsNumber ->
     creator;
 assign_role(Id, _CreatorsNumber) ->
     Numerator = amoc_config:get('PUBLISHERS_RATIO', 4),
