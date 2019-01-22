@@ -147,6 +147,7 @@ id(Client, {NodeAddr, NodeName}, Suffix) ->
 connect_amoc_user(MyId) ->
     User = make_user(MyId, <<"res1">>),
     {ok, Client0, _} = amoc_xmpp:connect_or_exit(User),
+
     Client = Client0#client{jid = make_jid(MyId)},
     send_presence_available(Client),
     receive_presence(Client, Client),
