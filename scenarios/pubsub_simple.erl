@@ -50,7 +50,7 @@ init_metrics() ->
                           amoc_metrics:init(times, Metric) end, Times).
 %% ----------------------------------------------------------------------------------------------------------
 
-assign_role(Id, CreatorsNumber) when Id < CreatorsNumber ->
+assign_role(Id, CreatorsNumber) when Id =< CreatorsNumber ->
     creator;
 assign_role(Id, _CreatorsNumber) ->
     Numerator = amoc_config:get('PUBLISHERS_RATIO', 4),
@@ -207,10 +207,10 @@ create_pubsub_node(Client) ->
 
     case escalus_pred:is_iq_result(CreateNodeResult) of
         true ->
-            amoc_metrics:update_counter(node_create_success, 1),
-            amoc_metrics:update_time(node_create_time, CreateNodeTime);
+            amoc_metrics:update_counter(node_creation_success, 1),
+            amoc_metrics:update_time(node_creation, CreateNodeTime);
         Error ->
-            amoc_metrics:update_counter(node_create_fails, 1),
+            amoc_metrics:update_counter(node_creation_failure, 1),
             lager:error("Error creating node: ~p", [Error]),
             exit(connection_failed)
     end,
@@ -242,10 +242,10 @@ subscribe(Client, Node) ->
         end),
     case escalus_pred:is_iq_result(SubscribeResult) of
         true ->
-            amoc_metrics:update_counter(subscribe_success, 1),
-            amoc_metrics:update_time(subscribe_time, SubscribeTime);
+            amoc_metrics:update_counter(subscription_success, 1),
+            amoc_metrics:update_time(subscription, SubscribeTime);
         Error ->
-            amoc_metrics:update_counter(subscribe_fails, 1),
+            amoc_metrics:update_counter(subscription_failure, 1),
             lager:error("Error subscribing node ~p filed: ~p", [Node, Error]),
             exit(connection_failed)
         end.
@@ -261,10 +261,10 @@ publish_pubsub_item(Client, Node) ->
         end),
     case escalus_pred:is_iq_result(PublishResult) of
         true ->
-            amoc_metrics:update_counter(publish_success, 1),
-            amoc_metrics:update_time(publish_time, PublishTime);
+            amoc_metrics:update_counter(publication_success, 1),
+            amoc_metrics:update_time(publication, PublishTime);
         Error ->
-            amoc_metrics:update_counter(publish_fails, 1),
+            amoc_metrics:update_counter(publication_failure, 1),
             lager:error("Error subscribing node ~p filed: ~p", [Node, Error]),
             exit(connection_failed)
         end.
