@@ -117,7 +117,6 @@ ns(bundle, DeviceId) -> <<"eu.siacs.conversations.axolotl.bundles:", DeviceId/bi
 
 send_iq_and_get_result(Client, Req, MetricName) ->
     Resp = send_request_and_get_response(Client, Req, fun escalus_pred:is_iq_result/2, MetricName),
-    amoc_metrics:update_counter(MetricName),
     Resp.
 
 send_iq_and_get_result_or_error(Client, Req, MetricName) ->
@@ -125,9 +124,10 @@ send_iq_and_get_result_or_error(Client, Req, MetricName) ->
     amoc_metrics:update_counter(MetricName),
     Resp.
 
-send_request_and_get_response(Client, Req, Pred, TimeMetric) ->
+send_request_and_get_response(Client, Req, Pred, MetricName) ->
+    amoc_metrics:update_counter(MetricName),
     escalus_client:send(Client, Req),
-    get_response(Client, fun(Stanza) -> Pred(Req, Stanza) end, TimeMetric).
+    get_response(Client, fun(Stanza) -> Pred(Req, Stanza) end, MetricName).
 
 get_response(Client, Pred, TimeMetric) ->
     {Time, Resp} = timer:tc(fun do_get_response/2, [Client, Pred]),
@@ -343,13 +343,24 @@ encryption_element() ->
                     {<<"name">>, <<"OMEMO">>}]}.
 
 prepare_handlers(HandlerSpec) ->
-    [fun(Client, Stanza) ->
+    [create_wrapper_fun(Pred, Handler) || {Pred, Handler} <- HandlerSpec].
+
+create_wrapper_fun(Pred, Handler) when is_function(Handler, 2) ->
+    fun(Client, Stanza) ->
              case Pred(Stanza) of
                  true -> Handler(Client, Stanza),
                          true;
                  false -> false
              end
-     end || {Pred, Handler} <- HandlerSpec].
+     end;
+create_wrapper_fun(Pred, Handler) when is_function(Handler, 3) ->
+    fun(Client, Stanza, Metadata) ->
+             case Pred(Stanza) of
+                 true -> Handler(Client, Stanza, Metadata),
+                         true;
+                 false -> false
+             end
+    end.
 
 sent_stanza_handlers() ->
     [{fun is_omemo_message/1, fun(_, _) -> amoc_metrics:update_counter(?MESSAGES_SENT, 1) end},
@@ -360,7 +371,7 @@ sent_stanza_handlers() ->
 received_stanza_handlers() ->
     [{fun is_presence_subscribe/1, fun handle_presence_subscribe/2},
      {fun escalus_pred:is_presence/1, fun(_, _) -> amoc_metrics:update_counter(?PRESENCES_RECEIVED, 1) end},
-     {fun is_omemo_message/1, fun handle_omemo_message/2},
+     {fun is_omemo_message/1, fun handle_omemo_message/3},
      {fun escalus_pred:is_roster_set/1, fun(_, _) -> amoc_metrics:update_counter(?SET_ROSTER) end},
      {fun(_) -> true end, fun skip_stanza/2}].
 
@@ -378,8 +389,8 @@ handle_presence_subscribe(Client, Stanza) ->
     amoc_metrics:update_counter(?PRESENCES_RECEIVED_SUBSCRIBE, 1),
     escalus_client:send(Client, escalus_stanza:presence_direct(Jid, <<"subscribed">>)).
 
-handle_omemo_message(_Client, Stanza) ->
-    Now = os:system_time(microsecond),
+handle_omemo_message(_Client, Stanza, Metadata) ->
+    Now = maps:get(recv_timestamp, Metadata),
     Sent = exml_query:path(Stanza, [{element, <<"body">>}, cdata]),
     TTD = (Now - binary_to_integer(Sent)),
     amoc_metrics:update_time(?MESSAGE_TTD, TTD),
