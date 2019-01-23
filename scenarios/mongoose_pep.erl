@@ -13,7 +13,7 @@
 
 -define(GET_OMEMO_DEVICE_ID, get_omemo_device_id).
 -define(CONFIGURE_PUBSUB_NODE, configure_pubsub_node).
--define(CREATE_NODE, node_create).
+-define(SET_OMEMO_DEVICE_LIST, set_omemo_device_list).
 -define(SET_OMEMO_BUNDLE, set_omemo_bundle).
 -define(GET_ROSTER, get_roster).
 -define(SET_ROSTER, set_roster).
@@ -31,41 +31,15 @@
 -define(MESSAGES_RECEIVED, messages_received).
 -define(MESSAGE_TTD, amoc_metrics:message_ttd_histogram_name()).
 
+-required_variable({'MESSAGE_INTERVAL', <<"Specifies the wait time (in seconds) between sent messages"/utf8>>}).
+-required_variable({'WAIT_AFTER_SETUP', <<"Specifies the wait time (in seconds) after setting up omemo and roster"/utf8>>}).
+-required_variable({'NUMBER_OF_PREV_USERS', <<"Specifies the number of users before current one to use."/utf8>>}).
+-required_variable({'NUMBER_OF_NEXT_USERS', <<"Specifies the number of users after current one to use."/utf8>>}).
+
 -spec init() -> ok.
 init() ->
     lager:info("init metrics"),
-    Counters = [
-        ?MESSAGES_SENT,
-        ?STANZAS_SKIPPED,
-        ?CREATE_NODE,
-        ?CONFIGURE_PUBSUB_NODE,
-        ?SET_OMEMO_BUNDLE,
-        ?GET_ROSTER,
-        ?SET_ROSTER,
-        ?GET_OMEMO_BUNDLE,
-        ?GET_OMEMO_DEVICE_ID,
-        ?REQUEST_TIMEOUTS,
-        ?PRESENCES_SENT,
-        ?SUBS_SUCCESS,
-        ?SUBS_FAIL,
-        ?PRESENCE_AVIALABLE,
-        ?SUB,
-        ?PRESENCES_RECEIVED,
-        ?MESSAGES_RECEIVED,
-        ?PRESENCES_RECEIVED_SUBSCRIBE
-    ],
-    [ amoc_metrics:init(counters, Counter) || Counter <- Counters ],
-    Timers = [
-        ?MESSAGE_TTD,
-        ?GET_OMEMO_DEVICE_ID,
-        ?CONFIGURE_PUBSUB_NODE,
-        ?CREATE_NODE,
-        ?SET_OMEMO_BUNDLE,
-        ?GET_ROSTER,
-        ?GET_OMEMO_BUNDLE,
-        ?PRESENCE_AVIALABLE
-    ],
-    [amoc_metrics:init(times, Timer) || Timer <- Timers],
+    init_metrics(),
     ok.
 
 -spec start(amoc_scenario:user_id()) -> any().
@@ -85,11 +59,12 @@ start(MyId) ->
 
     befriend_neighbours(Client, NeighbourJIDs),
 
-    timer:sleep(10000),
+    WaitTime = amoc_config:get('WAIT_AFTER_SETUP', 300),
 
-    lager:info("Time to send messages"),
+    timer:sleep(timer:seconds(WaitTime)),
 
-    send_messages_to_neighbours(Client, DeviceId, 10000, 100, NeighbourJIDs),
+    MessageInterval = amoc_config:get('MESSAGE_INTERVAL', 30),
+    send_messages_to_neighbours(Client, DeviceId, timer:seconds(MessageInterval), 100, NeighbourJIDs),
 
     escalus_connection:wait_forever(Client).
 
@@ -134,7 +109,7 @@ set_omemo_devicelist(Client, DeviceId) ->
                     },
     Req = escalus_pubsub_stanza:publish(Client, Content, escalus_stanza:id(),
                                         {escalus_client:short_jid(Client), ns(devicelist)}),
-    send_iq_and_get_result(Client, Req, ?CREATE_NODE).
+    send_iq_and_get_result(Client, Req, ?SET_OMEMO_DEVICE_LIST).
 
 ns(devicelist) -> <<"eu.siacs.conversations.axolotl.devicelist">>.
 
@@ -253,12 +228,10 @@ neighbours(MyId) ->
     lists:delete(MyId, lists:seq(max(1, MyId - number_of_prev_neighbours()),
                                  MyId + number_of_next_neighbours())).
 
-%%TODO req var
 number_of_prev_neighbours() ->
-    5.
-%%TODO req var
+    amoc_config:get('NUMBER_OF_PREV_USERS', 5).
 number_of_next_neighbours() ->
-    5.
+    amoc_config:get('NUMBER_OF_NEXT_USERS', 5).
 
 -spec make_jid(amoc_scenario:user_id()) -> binjid().
 make_jid(Id) ->
@@ -275,7 +248,7 @@ befriend_neighbours(Client, NeighbourJids) ->
             done;
         _ ->
             [request_presence_subscription(Client, UserJid) || UserJid <- MissingJids],
-            timer:sleep(10000),
+            timer:sleep(30000),
             befriend_neighbours(Client, MissingJids)
     end.
 
@@ -401,7 +374,6 @@ is_presence_subscribe(Stanza = #xmlel{name = <<"presence">>}) ->
 is_presence_subscribe(_) -> false.
 
 handle_presence_subscribe(Client, Stanza) ->
-    lager:info("~p: handle subscribe ~p", [Client, Stanza]),
     Jid = escalus_utils:jid_to_lower(exml_query:attr(Stanza, <<"from">>)),
     amoc_metrics:update_counter(?PRESENCES_RECEIVED_SUBSCRIBE, 1),
     escalus_client:send(Client, escalus_stanza:presence_direct(Jid, <<"subscribed">>)).
@@ -437,3 +409,38 @@ get_omemo_device_id(Client, JID) ->
         false ->
             undefined
     end.
+
+init_metrics() ->
+    Counters = [
+        ?MESSAGES_SENT,
+        ?STANZAS_SKIPPED,
+        ?SET_OMEMO_DEVICE_LIST,
+        ?CONFIGURE_PUBSUB_NODE,
+        ?SET_OMEMO_BUNDLE,
+        ?GET_ROSTER,
+        ?SET_ROSTER,
+        ?GET_OMEMO_BUNDLE,
+        ?GET_OMEMO_DEVICE_ID,
+        ?REQUEST_TIMEOUTS,
+        ?PRESENCES_SENT,
+        ?SUBS_SUCCESS,
+        ?SUBS_FAIL,
+        ?PRESENCE_AVIALABLE,
+        ?SUB,
+        ?PRESENCES_RECEIVED,
+        ?MESSAGES_RECEIVED,
+        ?PRESENCES_RECEIVED_SUBSCRIBE
+    ],
+    [ amoc_metrics:init(counters, Counter) || Counter <- Counters ],
+    Timers = [
+        ?MESSAGE_TTD,
+        ?GET_OMEMO_DEVICE_ID,
+        ?CONFIGURE_PUBSUB_NODE,
+        ?SET_OMEMO_DEVICE_LIST,
+        ?SET_OMEMO_BUNDLE,
+        ?GET_ROSTER,
+        ?GET_OMEMO_BUNDLE,
+        ?PRESENCE_AVIALABLE
+    ],
+    [amoc_metrics:init(times, Timer) || Timer <- Timers].
+
