@@ -9,18 +9,63 @@
 
 -type binjid() :: binary().
 
+-define(STANZAS_SKIPPED, skipped_stanzas).
+
+-define(GET_OMEMO_DEVICE_ID, get_omemo_device_id).
+-define(CONFIGURE_PUBSUB_NODE, configure_pubsub_node).
+-define(CREATE_NODE, node_create).
+-define(SET_OMEMO_BUNDLE, set_omemo_bundle).
+-define(GET_ROSTER, get_roster).
+-define(SET_ROSTER, set_roster).
+-define(GET_OMEMO_BUNDLE, get_omemo_bundle).
+-define(REQUEST_TIMEOUTS, timeouts).
+-define(SUBS_SUCCESS, subscription_success).
+-define(SUB, subscription).
+-define(SUBS_FAIL, subscription_failure).
+-define(PRESENCES_SENT, presences_sent).
+-define(PRESENCE_AVIALABLE, presence_avilable).
+-define(PRESENCES_RECEIVED, presences_received).
+-define(PRESENCES_RECEIVED_SUBSCRIBE, presences_received_subscribe).
+
+-define(MESSAGES_SENT, amoc_metrics:messages_spiral_name()).
+-define(MESSAGES_RECEIVED, messages_received).
+-define(MESSAGE_TTD, amoc_metrics:message_ttd_histogram_name()).
+
 -spec init() -> ok.
 init() ->
     lager:info("init metrics"),
-    amoc_metrics:init(counters, amoc_metrics:messages_spiral_name()),
-    amoc_metrics:init(times, amoc_metrics:message_ttd_histogram_name()),
-    amoc_metrics:init(counters, stanzas_skipped),
-    amoc_metrics:init(counters, iqs_received),
-    amoc_metrics:init(counters, iqs_sent),
-    amoc_metrics:init(times, response),
-    amoc_metrics:init(counters, timeouts),
-    amoc_metrics:init(counters, presences_sent),
-    amoc_metrics:init(counters, presences_received),
+    Counters = [
+        ?MESSAGES_SENT,
+        ?STANZAS_SKIPPED,
+        ?CREATE_NODE,
+        ?CONFIGURE_PUBSUB_NODE,
+        ?SET_OMEMO_BUNDLE,
+        ?GET_ROSTER,
+        ?SET_ROSTER,
+        ?GET_OMEMO_BUNDLE,
+        ?GET_OMEMO_DEVICE_ID,
+        ?REQUEST_TIMEOUTS,
+        ?PRESENCES_SENT,
+        ?SUBS_SUCCESS,
+        ?SUBS_FAIL,
+        ?PRESENCE_AVIALABLE,
+        ?SUB,
+        ?PRESENCES_RECEIVED,
+        ?MESSAGES_RECEIVED,
+        ?PRESENCES_RECEIVED_SUBSCRIBE
+    ],
+    [ amoc_metrics:init(counters, Counter) || Counter <- Counters ],
+    Timers = [
+        ?MESSAGE_TTD,
+        ?GET_OMEMO_DEVICE_ID,
+        ?CONFIGURE_PUBSUB_NODE,
+        ?CREATE_NODE,
+        ?SET_OMEMO_BUNDLE,
+        ?GET_ROSTER,
+        ?GET_OMEMO_BUNDLE,
+        ?PRESENCE_AVIALABLE
+    ],
+    [amoc_metrics:init(times, Timer) || Timer <- Timers],
     ok.
 
 -spec start(amoc_scenario:user_id()) -> any().
@@ -72,7 +117,7 @@ make_user(Id, R) ->
 send_presence_available_with_caps(Client) ->
     Pres = escalus_stanza:presence(<<"available">>, [caps()]),
     PresWithId = escalus_stanza:set_id(Pres, escalus_stanza:id()),
-    send_request_and_get_response(Client, PresWithId, fun is_own_presence_response/2).
+    send_request_and_get_response(Client, PresWithId, fun is_own_presence_response/2, ?PRESENCE_AVIALABLE).
 
 initialize_omemo(Client, DeviceId) ->
     set_omemo_devicelist(Client, DeviceId),
@@ -89,24 +134,21 @@ set_omemo_devicelist(Client, DeviceId) ->
                     },
     Req = escalus_pubsub_stanza:publish(Client, Content, escalus_stanza:id(),
                                         {escalus_client:short_jid(Client), ns(devicelist)}),
-    send_iq_and_get_result(Client, Req).
+    send_iq_and_get_result(Client, Req, ?CREATE_NODE).
 
 ns(devicelist) -> <<"eu.siacs.conversations.axolotl.devicelist">>.
 
 ns(bundle, DeviceId) -> <<"eu.siacs.conversations.axolotl.bundles:", DeviceId/binary>>.
 
-send_iq_and_get_result(Client, Req) ->
-    Resp = send_request_and_get_response(Client, Req, fun escalus_pred:is_iq_result/2),
-    amoc_metrics:update_counter(iqs_received),
+send_iq_and_get_result(Client, Req, MetricName) ->
+    Resp = send_request_and_get_response(Client, Req, fun escalus_pred:is_iq_result/2, MetricName),
+    amoc_metrics:update_counter(MetricName),
     Resp.
 
-send_iq_and_get_result_or_error(Client, Req) ->
-    Resp = send_request_and_get_response(Client, Req, fun escalus_pred:is_iq_result_or_error/2),
-    amoc_metrics:update_counter(iqs_received),
+send_iq_and_get_result_or_error(Client, Req, MetricName) ->
+    Resp = send_request_and_get_response(Client, Req, fun escalus_pred:is_iq_result_or_error/2, MetricName),
+    amoc_metrics:update_counter(MetricName),
     Resp.
-
-send_request_and_get_response(Client, Req, Pred) ->
-    send_request_and_get_response(Client, Req, Pred, response).
 
 send_request_and_get_response(Client, Req, Pred, TimeMetric) ->
     escalus_client:send(Client, Req),
@@ -120,7 +162,7 @@ get_response(Client, Pred, TimeMetric) ->
 do_get_response(Client, Pred) ->
     case escalus_connection:get_stanza_safe(Client, 10000, Pred) of
         {error, timeout} ->
-            amoc_metrics:update_counter(timeouts),
+            amoc_metrics:update_counter(?REQUEST_TIMEOUTS),
             error(timeout_when_waiting_for_response, [Client, Pred]);
         {Stanza, _} ->
             Stanza
@@ -165,7 +207,7 @@ configure_pubsub_node(Client, Node) ->
     Req = escalus_pubsub_stanza:set_configuration(Client, <<"configure1">>,
                                                   {escalus_client:short_jid(Client), Node},
                                                   Fields),
-    send_iq_and_get_result(Client, Req).
+    send_iq_and_get_result(Client, Req, ?CONFIGURE_PUBSUB_NODE).
 
 pubsub_config_fields() ->
     [{<<"pubsub#access_model">>, <<"open">>},
@@ -199,7 +241,7 @@ set_omemo_bundle(Client, DeviceId) ->
                                         children = [pre_key(integer_to_binary(Id)) || Id <- lists:seq(1, 100)]}]},
     Req = escalus_pubsub_stanza:publish(Client, Content, escalus_stanza:id(),
                                         {escalus_client:short_jid(Client), ns(bundle, DeviceId)}),
-    send_iq_and_get_result(Client, Req).
+    send_iq_and_get_result(Client, Req, ?SET_OMEMO_BUNDLE).
 
 pre_key(Id) ->
     #xmlel{name = <<"preKeyPublic">>,
@@ -211,8 +253,10 @@ neighbours(MyId) ->
     lists:delete(MyId, lists:seq(max(1, MyId - number_of_prev_neighbours()),
                                  MyId + number_of_next_neighbours())).
 
+%%TODO req var
 number_of_prev_neighbours() ->
     5.
+%%TODO req var
 number_of_next_neighbours() ->
     5.
 
@@ -237,7 +281,7 @@ befriend_neighbours(Client, NeighbourJids) ->
 
 get_roster(Client) ->
     Req = escalus_stanza:roster_get(),
-    Result = send_iq_and_get_result(Client, Req),
+    Result = send_iq_and_get_result(Client, Req, ?GET_ROSTER),
     escalus:assert(is_iq_with_ns, [<<"jabber:iq:roster">>], Result),
     Query = exml_query:subelement(Result, <<"query">>),
     [escalus_utils:jid_to_lower(exml_query:attr(Element, <<"jid">>)) || Element <- Query#xmlel.children,
@@ -250,15 +294,22 @@ is_subscribed_to(RosterItem) ->
 
 request_presence_subscription(Client, UserJID) ->
     Req = escalus_stanza:presence_direct(UserJID, <<"subscribe">>, []),
-    PushReq = send_request_and_get_response(Client, Req, fun(_Req, Stanza) -> escalus_pred:is_roster_set(Stanza) end),
+    PushReq = send_request_and_get_response(Client, Req, fun(_Req, Stanza) -> escalus_pred:is_roster_set(Stanza) end, ?SUB),
+    %TODO replace this couter depending on result like in comment below
     amoc_metrics:update_counter(iqs_received, 1),
     escalus_client:send(Client, escalus_stanza:iq_result(PushReq)).
+    %TODO check for sesult
+    % case escalus_client:send(Client, escalus_stanza:iq_result(PushReq)) of
+    %   sth ->   amoc_metrics:update_counter(?SUBS_SUCCESS, 1);
+    %   sth ->   amoc_metrics:update_counter(?SUBS_FAIL, 1)
+    % end.
 
 -spec send_messages_to_neighbours(escalus:client(), binary(), timeout(), non_neg_integer(), [{binjid(), binary()}]) -> ok.
 send_messages_to_neighbours(Client, DeviceId, MessageInterval, Count, [Neighbour | RemNeighbours])
   when Count > 0 ->
     {ToJID, ToDevId} = ensure_omemo_session(Client, Neighbour),
     send_message(Client, DeviceId, <<"chat">>, ToJID, [ToDevId]),
+    %%TODO req var MessageInterval
     escalus_connection:wait(Client, MessageInterval),
     send_messages_to_neighbours(Client, DeviceId, MessageInterval, Count - 1, RemNeighbours ++ [{ToJID, ToDevId}]);
 send_messages_to_neighbours(_Client, _DeviceId, _Messageinterval, 0, _Neighbours) -> ok.
@@ -328,15 +379,16 @@ prepare_handlers(HandlerSpec) ->
      end || {Pred, Handler} <- HandlerSpec].
 
 sent_stanza_handlers() ->
-    [{fun is_omemo_message/1, fun(_, _) -> amoc_metrics:update_counter(messages_sent, 1) end},
+    [{fun is_omemo_message/1, fun(_, _) -> amoc_metrics:update_counter(?MESSAGES_SENT, 1) end},
+    %TODO iqs_sent needs to be devided to all sort of iqs types
      {fun escalus_pred:is_iq/1, fun(_, _) -> amoc_metrics:update_counter(iqs_sent, 1) end},
-     {fun escalus_pred:is_presence/1, fun(_, _) -> amoc_metrics:update_counter(presences_sent, 1) end}].
+     {fun escalus_pred:is_presence/1, fun(_, _) -> amoc_metrics:update_counter(?PRESENCES_SENT, 1) end}].
 
 received_stanza_handlers() ->
     [{fun is_presence_subscribe/1, fun handle_presence_subscribe/2},
-     {fun escalus_pred:is_presence/1, fun(_, _) -> amoc_metrics:update_counter(presences_received, 1) end},
+     {fun escalus_pred:is_presence/1, fun(_, _) -> amoc_metrics:update_counter(?PRESENCES_RECEIVED, 1) end},
      {fun is_omemo_message/1, fun handle_omemo_message/2},
-     {fun escalus_pred:is_roster_set/1, fun(_, _) -> amoc_metrics:update_counter(iqs_received) end},
+     {fun escalus_pred:is_roster_set/1, fun(_, _) -> amoc_metrics:update_counter(?SET_ROSTER) end},
      {fun(_) -> true end, fun skip_stanza/2}].
 
 is_omemo_message(Message = #xmlel{name = <<"message">>}) ->
@@ -351,29 +403,29 @@ is_presence_subscribe(_) -> false.
 handle_presence_subscribe(Client, Stanza) ->
     lager:info("~p: handle subscribe ~p", [Client, Stanza]),
     Jid = escalus_utils:jid_to_lower(exml_query:attr(Stanza, <<"from">>)),
-    amoc_metrics:update_counter(presences_received, 1),
+    amoc_metrics:update_counter(?PRESENCES_RECEIVED_SUBSCRIBE, 1),
     escalus_client:send(Client, escalus_stanza:presence_direct(Jid, <<"subscribed">>)).
 
 handle_omemo_message(_Client, Stanza) ->
     Now = os:system_time(microsecond),
     Sent = exml_query:path(Stanza, [{element, <<"body">>}, cdata]),
     TTD = (Now - binary_to_integer(Sent)),
-    amoc_metrics:update_time(message_ttd, TTD),
-    amoc_metrics:update_counter(messages_received, 1).
+    amoc_metrics:update_time(?MESSAGE_TTD, TTD),
+    amoc_metrics:update_counter(?MESSAGES_RECEIVED, 1).
 
 skip_stanza(_Client, Stanza) ->
-    amoc_metrics:update_counter(stanzas_skipped, 1),
+    amoc_metrics:update_counter(?STANZAS_SKIPPED, 1),
     lager:warning("Skipping received stanza ~p", [Stanza]).
 
 get_omemo_bundle(Client, JID, DeviceId) ->
     Req = escalus_pubsub_stanza:get_all_items(Client, <<"getDevice">>,
                                               {JID, ns(bundle, DeviceId)}),
-    send_iq_and_get_result(Client, Req).
+    send_iq_and_get_result(Client, Req, ?GET_OMEMO_BUNDLE).
 
 get_omemo_device_id(Client, JID) ->
     Req = escalus_pubsub_stanza:get_items(Client, escalus_stanza:id(),
                                           {JID, ns(devicelist)}, 1),
-    Resp = send_iq_and_get_result_or_error(Client, Req),
+    Resp = send_iq_and_get_result_or_error(Client, Req, ?GET_OMEMO_DEVICE_ID),
     case escalus_pred:is_iq_result(Resp) of
         true ->
             exml_query:path(Resp, [{element, <<"pubsub">>},
