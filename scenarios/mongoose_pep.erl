@@ -31,6 +31,11 @@
 -define(MESSAGES_RECEIVED, messages_received).
 -define(MESSAGE_TTD, amoc_metrics:message_ttd_histogram_name()).
 
+%%TODO add descrition
+-required_variable({'NUMBER_OF_PREV_NEIGHBOURS', <<""/utf8>>}).
+-required_variable({'NUMBER_OF_NEXT_NEIGHBOURS', <<""/utf8>>}).
+-required_variable({'MESSAGE_INTERVAL', <<""/utf8>>}).
+
 -spec init() -> ok.
 init() ->
     lager:info("init metrics"),
@@ -88,8 +93,8 @@ start(MyId) ->
     timer:sleep(10000),
 
     lager:info("Time to send messages"),
-
-    send_messages_to_neighbours(Client, DeviceId, 10000, 100, NeighbourJIDs),
+    MessageInterval = amoc_config:get('MESSAGE_INTERVAL', 10000),
+    send_messages_to_neighbours(Client, DeviceId, MessageInterval, 100, NeighbourJIDs),
 
     escalus_connection:wait_forever(Client).
 
@@ -250,15 +255,12 @@ pre_key(Id) ->
 
 neighbours(MyId) ->
     %lager:info("users: ~p", [amoc_controller:users()]),
-    lists:delete(MyId, lists:seq(max(1, MyId - number_of_prev_neighbours()),
-                                 MyId + number_of_next_neighbours())).
+    NeighboursPrev = amoc_config:get('NUMBER_OF_PREV_NEIGHBOURS', 5),
+    NeighboursNext = amoc_config:get('NUMBER_OF_NEXT_NEIGHBOURS', 5),
+    lists:delete(MyId, lists:seq(max(1, MyId - NeighboursPrev),
+                                 MyId + NeighboursNext)).
 
-%%TODO req var
-number_of_prev_neighbours() ->
-    5.
-%%TODO req var
-number_of_next_neighbours() ->
-    5.
+
 
 -spec make_jid(amoc_scenario:user_id()) -> binjid().
 make_jid(Id) ->
