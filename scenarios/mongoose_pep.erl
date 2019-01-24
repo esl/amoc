@@ -31,10 +31,11 @@
 -define(MESSAGES_RECEIVED, messages_received).
 -define(MESSAGE_TTD, amoc_metrics:message_ttd_histogram_name()).
 
--required_variable({'MESSAGE_INTERVAL', <<"Specifies the wait time (in seconds) between sent messages"/utf8>>}).
--required_variable({'WAIT_AFTER_SETUP', <<"Specifies the wait time (in seconds) after setting up omemo and roster"/utf8>>}).
--required_variable({'NUMBER_OF_PREV_USERS', <<"Specifies the number of users before current one to use."/utf8>>}).
--required_variable({'NUMBER_OF_NEXT_USERS', <<"Specifies the number of users after current one to use."/utf8>>}).
+-required_variable({'MESSAGE_INTERVAL', <<"Wait time (in seconds) between sent messages"/utf8>>}).
+-required_variable({'WAIT_AFTER_OMEMO', <<"Wait time (in seconds) after setting up omemo"/utf8>>}).
+-required_variable({'WAIT_AFTER_ROSTER', <<"Wait time (in seconds) after setting up roster"/utf8>>}).
+-required_variable({'NUMBER_OF_PREV_USERS', <<"Number of users before current one to use."/utf8>>}).
+-required_variable({'NUMBER_OF_NEXT_USERS', <<"Number of users after current one to use."/utf8>>}).
 
 -spec init() -> ok.
 init() ->
@@ -54,14 +55,16 @@ start(MyId) ->
     DeviceId = base16:encode(crypto:strong_rand_bytes(6)),
     initialize_omemo(Client, DeviceId),
 
+    WaitAfterOMEMO = amoc_config:get('WAIT_AFTER_OMEMO', 300),
+    escalus_connection:wait(Client, timer:seconds(WaitAfterOMEMO)),
+
     NeighbourIds = neighbours(MyId),
     NeighbourJIDs = [make_jid(UserId) || UserId <- NeighbourIds],
 
     befriend_neighbours(Client, NeighbourJIDs),
 
-    WaitTime = amoc_config:get('WAIT_AFTER_SETUP', 300),
-
-    timer:sleep(timer:seconds(WaitTime)),
+    WaitAfterRoster = amoc_config:get('WAIT_AFTER_ROSTER', 300),
+    escalus_connection:wait(Client, timer:seconds(WaitAfterRoster)),
 
     MessageInterval = amoc_config:get('MESSAGE_INTERVAL', 30),
     send_messages_to_neighbours(Client, DeviceId, timer:seconds(MessageInterval), 100, NeighbourJIDs),
