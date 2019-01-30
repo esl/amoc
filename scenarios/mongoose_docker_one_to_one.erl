@@ -34,7 +34,7 @@ init() ->
 
 -spec start(amoc_scenario:user_id()) -> any().
 start(MyId) ->
-    ExtraProps = amoc_xmpp:pick_server() ++
+    ExtraProps = amoc_xmpp:pick_server([[{host, "127.0.0.1"}]]) ++
     send_and_recv_escalus_handlers() ++
     [{socket_opts, socket_opts()}],
     {ok, Client, _} = amoc_xmpp:connect_or_exit(MyId, ExtraProps),

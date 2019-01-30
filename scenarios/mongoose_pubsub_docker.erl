@@ -143,7 +143,7 @@ id(Client, {NodeAddr, NodeName}, Suffix) ->
     list_to_binary(io_lib:format("~s-~s-~s-~s", [UserName, NodeAddr, NodeName, Suffix])).
 
 connect_amoc_user(MyId) ->
-    ExtraProps = amoc_xmpp:pick_server(),
+    ExtraProps = amoc_xmpp:pick_server([[{host, "127.0.0.1"}]]),
     {ok, Client0, _} = amoc_xmpp:connect_or_exit(MyId, ExtraProps),
     Client = Client0#client{jid = amoc_xmpp_users:make_jid(MyId)},
     escalus_session:send_presence_available(Client),

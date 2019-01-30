@@ -2,7 +2,7 @@
 
 -export([connect_or_exit/1]).
 -export([connect_or_exit/2]).
--export([pick_server/0]).
+-export([pick_server/1]).
 
 %% @doc connects and authenticates a user with given id and additional properties
 %% If the passed proplist is empty, a default user spec a created by
@@ -42,10 +42,9 @@ connect_or_exit(Spec) ->
 %% Since the `xmpp_servers` config option is read via `amoc_config` API,
 %% it's possible to pass it as an ENV var when starting amoc:
 %% > AMOC_xmpp_servers="[[{host,\"127.0.0.2\"}, {port, 5222}],[{host, \"127.0.0.1\"}, {port, 5223}]]" make console
-%% Default value, if xmpp_servers option is not set, is [{host, "127.0.0.1"}]
--spec pick_server() -> [proplists:property()].
-pick_server() ->
-    Servers = amoc_config:get(xmpp_servers, [[{host, "127.0.0.1"}]]),
+-spec pick_server([[proplists:property()]]) -> [proplists:property()].
+pick_server(DefaultServers) ->
+    Servers = amoc_config:get(xmpp_servers, DefaultServers),
     verify(Servers),
     S = length(Servers),
     N = erlang:phash2(self(), S) + 1,
