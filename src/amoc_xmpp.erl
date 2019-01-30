@@ -10,7 +10,7 @@
 %% If the proplist is not empty it will be merged with the default props.
 %% When a property is defined both in default and passed props,
 %% the one from passed props is used.
--spec connect_or_exit(amoc_scenario:user_id(), [{atom(), any()}]) ->
+-spec connect_or_exit(amoc_scenario:user_id(), escalus_users:user_spec()) ->
     {ok, escalus_connection:client(), escalus_users:user_spec()}.
 connect_or_exit(Id, ExtraSpec) ->
     Spec = make_user(Id, ExtraSpec),
@@ -59,10 +59,10 @@ verify(Servers) ->
       Servers
      ).
 
+-spec make_user(amoc_scenario:user_id(), escalus_users:user_spec()) -> escalus_users:user_spec().
 make_user(Id, Props) ->
-    BinId = integer_to_binary(Id),
-    ProfileId = <<"user_", BinId/binary>>,
-    Password = <<"password_", BinId/binary>>,
+    ProfileId = amoc_xmpp_users:username(Id),
+    Password = amoc_xmpp_users:password(Id),
     DefaultSpec = maps:from_list(default_user_spec(ProfileId, Password)),
     ExtraSpec = maps:from_list(Props),
     Merged = maps:merge(DefaultSpec, ExtraSpec),

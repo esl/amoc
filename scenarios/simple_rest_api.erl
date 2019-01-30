@@ -34,7 +34,7 @@ log_message(_Client, Stanza) ->
     true.
 
 send_message(AuthHeader, Id) ->
-    Msg = #{to => ampc_xmpp_stanzas:make_jid(Id),
+    Msg = #{to => amoc_xmpp_users:make_jid(Id),
             body => <<"Hello, It's me">>
            },
     Headers = [AuthHeader,
