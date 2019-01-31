@@ -28,7 +28,6 @@ start(Id) ->
     pg2:create(?GROUPNAME),
     CreatorsNumber = amoc_config:get('NUMBER_OF_NODE_CREATORS', 3),
     Client = connect_amoc_user(Id),
-    lager:info("~p~p", [Id, Client]),
     case assign_role(Id, CreatorsNumber) of
         creator ->
             creator_start(Client);
@@ -64,7 +63,6 @@ assign_role(Id, _CreatorsNumber) ->
 creator_start(Client) ->
     pg2:join(?GROUPNAME, self()),
     Nodes = [create_pubsub_node(Client)],
-    lager:info("Created, node: ~p~n", [Nodes]),
     schedule(start_publishing_items, ?DELAY_BETWEEN_MESSAGES),
     creator_loop(Client, Nodes).
 
@@ -83,7 +81,6 @@ creator_loop(Client, Nodes) ->
 %% --- Publisher --------------------------------------------------------------------------------------------
 publisher_start(Client) ->
     Nodes = get_nodes(3, Client),
-    lager:info("Publisher, node: ~p~n", [Nodes]),
     schedule({publish_item, 1}, ?DELAY_BETWEEN_MESSAGES),
     publisher_loop(Client, Nodes).
 
@@ -96,13 +93,11 @@ publisher_loop(Client, Nodes) ->
     publisher_loop(Client, Nodes).
 
 publish(Client, Nodes) ->
-    lager:debug("Published ~p ~n", [Nodes]),
     [ publish_pubsub_item(Client, Node) || Node <- Nodes ].
 
 %% --- Subscriber -------------------------------------------------------------------------------------------
 subscriber_start(Client) ->
     Nodes = get_nodes(3, Client),
-    lager:info("Subscriber, node: ~p~n", [Nodes]),
     [subscribe(Client, Node) || Node <- Nodes],
     subscriber_loop(Client).
 
@@ -114,8 +109,7 @@ subscriber_loop(Client) ->
             TimeStampBin = exml_query:attr(Item, <<"id">>),
             TimeStamp = binary_to_integer(TimeStampBin),
             TTD =  os:system_time(microsecond) - TimeStamp,
-            amoc_metrics:update_time(message_ttd, TTD),
-            lager:info("~n~n~p~n~n", [Stanza])
+            amoc_metrics:update_time(message_ttd, TTD)
     catch
         Error:Reason ->
             lager:error("No items received! ~p~n ~p~n", [Error, Reason])
