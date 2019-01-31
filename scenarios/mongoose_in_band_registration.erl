@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2015 Erlang Solutions Ltd.
+%% Copyright 2019 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(mongoose_in_band_registration).
@@ -9,8 +9,6 @@
 
 -export([start/1]).
 -export([init/0]).
-
--type binjid() :: binary().
 
 -spec init() -> ok.
 init() ->
@@ -50,7 +48,7 @@ start(MyId) ->
     %%Drop all stanzas
     %escalus_connection:set_filter_predicate(Client, none),
 
-    send_presence_available(Client),
+    escalus_session:send_presence_available(Client),
     lager:info("presence resp ~p", [escalus_client:wait_for_stanza(Client)]),
 
     timer:sleep(10000),
@@ -59,7 +57,7 @@ start(MyId) ->
     send_messages_many_times(Client, 20000, NeighbourIds),
 
     timer:sleep(10000),
-    send_presence_unavailable(Client),
+    escalus_session:send_presence_unavailable(Client),
     escalus_connection:stop(Client).
 
 -spec maybe_register(escalus_users:user_spec()) -> ok | already_registered.
@@ -74,17 +72,7 @@ maybe_register(Cfg) ->
             already_registered
     end.
 
--spec send_presence_available(escalus:client()) -> ok.
-send_presence_available(Client) ->
-    Pres = escalus_stanza:presence(<<"available">>),
-    escalus_connection:send(Client, Pres).
-
--spec send_presence_unavailable(escalus:client()) -> ok.
-send_presence_unavailable(Client) ->
-    Pres = escalus_stanza:presence(<<"unavailable">>),
-    escalus_connection:send(Client, Pres).
-
--spec send_messages_many_times(escalus:client(), timeout(), [binjid()]) -> ok.
+-spec send_messages_many_times(escalus:client(), timeout(), [amoc_scenario:user_id()]) -> ok.
 send_messages_many_times(Client, MessageInterval, NeighbourIds) ->
     S = fun(_) ->
                 send_messages_to_neighbors(Client, NeighbourIds, MessageInterval)
@@ -92,27 +80,15 @@ send_messages_many_times(Client, MessageInterval, NeighbourIds) ->
     lists:foreach(S, lists:seq(1, 5)).
 
 
--spec send_messages_to_neighbors(escalus:client(), [binjid()], timeout()) -> list().
+-spec send_messages_to_neighbors(escalus:client(), [amoc_scenario:user_id()], timeout()) -> list().
 send_messages_to_neighbors(Client,TargetIds, SleepTime) ->
-    [send_message(Client, make_jid(TargetId), SleepTime)
+    [send_message(Client, TargetId, SleepTime)
      || TargetId <- TargetIds].
 
--spec send_message(escalus:client(), binjid(), timeout()) -> ok.
+-spec send_message(escalus:client(), amoc_scenario:user_id(), timeout()) -> ok.
 send_message(Client, ToId, SleepTime) ->
-    Msg = make_message(ToId),
+    Body = <<"hello sir, you are a gentelman and a scholar.">>,
+    Msg = escalus_stanza:chat_to_with_id_and_timestamp(amoc_xmpp_users:make_jid(ToId), Body),
     escalus_connection:send(Client, Msg),
     timer:sleep(SleepTime).
-
--spec make_message(binjid()) -> exml:element().
-make_message(ToId) ->
-    Body = <<"hello sir, you are a gentelman and a scholar.">>,
-    Id = escalus_stanza:id(),
-    escalus_stanza:set_id(escalus_stanza:chat_to(ToId, Body), Id).
-
--spec make_jid(amoc_scenario:user_id()) -> binjid().
-make_jid(Id) ->
-    BinInt = integer_to_binary(Id),
-    ProfileId = <<"user_", BinInt/binary>>,
-    Host = ?HOST,
-    << ProfileId/binary, "@", Host/binary >>.
 

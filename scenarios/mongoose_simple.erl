@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2015 Erlang Solutions Ltd.
+%% Copyright 2015-2019 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(mongoose_simple).

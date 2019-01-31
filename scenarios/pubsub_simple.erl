@@ -159,7 +159,7 @@ connect_amoc_user(Id, Resource) ->
     Client.
 
 user_spec(ProfileId, Password, Res) ->
-    ConnectionDetails = pick_server(),
+    ConnectionDetails = amoc_xmpp:pick_server([[{host, "127.0.0.1"}]]),
     [ {username, ProfileId},
       {server, ?HOST},
       {password, Password},
@@ -173,22 +173,6 @@ make_user(Id, R) ->
     ProfileId = <<"user_", BinId/binary>>,
     Password = <<"password_", BinId/binary>>,
     user_spec(ProfileId, Password, R).
-
--spec pick_server() -> [proplists:property()].
-pick_server() ->
-    Servers = amoc_config:get(xmpp_servers),
-    verify(Servers),
-    S = length(Servers),
-    N = erlang:phash2(self(), S) + 1,
-    lists:nth(N, Servers).
-
-verify(Servers) ->
-    lists:foreach(
-      fun(Proplist) ->
-              true = proplists:is_defined(host, Proplist)
-      end,
-      Servers
-     ).
 
 %% ----------------------------------------------------------------------------------------------------------
 create_pubsub_node(Client) ->
