@@ -7,6 +7,7 @@
 
 -define(SERVER, ?MODULE).
 -define(INTERARRIVAL_DEFAULT, 50).
+-define(CHECKING_INTERVAL_DEFAULT, 60*1000).
 -define(TABLE, amoc_users).
 
 -record(state, {scenario :: amoc:scenario() | undefined,
@@ -38,7 +39,8 @@
          remove/2,
          remove/3,
          users/0,
-         test_status/1]).
+         test_status/1,
+         start_scenario_checking/1]).
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
@@ -97,6 +99,10 @@ users() ->
 test_status(ScenarioName) ->
     gen_server:call(?SERVER, {status, ScenarioName}).
 
+-spec start_scenario_checking(amoc:scenario()) -> ok | skip | {error, term()}.
+start_scenario_checking(Scenario) ->
+    gen_server:call(?SERVER, {start_scenario_checking, Scenario}).
+
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -116,6 +122,9 @@ handle_call(users, _From, State) ->
     Reply = [{count, ets:info(?TABLE, size)},
              {last, ets:last(?TABLE)}],
     {reply, {ok, Reply}, State};
+handle_call({start_scenario_checking, Scenario}, _From, State) ->
+    Reply = maybe_start_scenario_checking(Scenario),
+    {reply, Reply, State};
 handle_call({status, Scenario}, _From, State) ->
     Res = case does_scenario_exist(Scenario) of
         true -> check_test(Scenario, State#state.scenario);
@@ -138,6 +147,9 @@ handle_cast(_Msg, State) ->
 -spec handle_info(any(), state()) -> {noreply, state()}.
 handle_info({start_scenario, Scenario, UserIds, ScenarioState}, State) ->
     start_scenario(Scenario, UserIds, ScenarioState),
+    {noreply, State};
+handle_info({check, Scenario, Interval}, State) ->
+    handle_check(Scenario, Interval),
     {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -214,6 +226,21 @@ handle_do(Scenario, UserIds, State) ->
             {reply, {error, Error}, State}
     end.
 
+-spec handle_check(amoc:scenario(), non_neg_integer()) -> any().
+handle_check(Scenario, Interval) ->
+    case apply_safely(Scenario, continue, []) of
+        {ok, continue} ->
+            schedule_scenario_checking(Scenario, Interval),
+            continue;
+        {ok, {stop, Reason}} ->
+            lager:info("scenario should be terminated, reason=~p", [Reason]),
+            try_terminate_scenario(Scenario, Reason);
+        {error, Error, Reason} ->
+            lager:error("continue/1 callback failed, scenario should be"
+                       " terminated, error=~p, reason=~p", [Error, Reason]),
+            try_terminate_scenario(Scenario, {Error, Reason})
+    end.
+
 %% ------------------------------------------------------------------
 %% helpers
 %% ------------------------------------------------------------------
@@ -238,6 +265,49 @@ init_scenario(Scenario) ->
             end;
         false ->
             {ok, skip}
+    end.
+
+-spec maybe_start_scenario_checking(amoc:scenario()) -> ok | skip.
+maybe_start_scenario_checking(Scenario) ->
+    Callbacks = [{continue, 0}, {terminate, 1}],
+    case are_callbacks_exported(Scenario, Callbacks) of
+        true ->
+            schedule_scenario_checking(Scenario, checking_interval()),
+            lager:info("checking has been started", []),
+            ok;
+        false ->
+            lager:info("checking is not started as callbacks=~p are not"
+                       " exported", [Callbacks]),
+            skip
+    end.
+
+-spec are_callbacks_exported(amoc:scenario(), proplists:proplist()) -> boolean().
+are_callbacks_exported(Scenario, Callbacks) ->
+    case code:ensure_loaded(Scenario) of
+        {module, Scenario} ->
+            lists:all(fun({Func, Arity}) ->
+                              erlang:function_exported(Scenario, Func, Arity)
+                      end, Callbacks);
+        Error ->
+            lager:error("scenario module ~p cannot be found, reason: ~p",
+                        [Scenario, Error]),
+            false
+    end.
+
+-spec schedule_scenario_checking(amoc:scenario(), non_neg_integer()) ->
+    reference().
+schedule_scenario_checking(Scenario, Interval) ->
+    erlang:send_after(Interval, ?SERVER, {check, Scenario, Interval}).
+
+-spec try_terminate_scenario(amoc:scenario(), term()) -> term().
+try_terminate_scenario(Scenario, Reason) ->
+    case apply_safely(Scenario, terminate, [Reason]) of
+        {ok, _} ->
+            ok;
+        {error, E, R} ->
+            lager:error("terminate/1 callback failed, scenario cannot be"
+                       " terminated, error=~p, reason=~p", [E, R]),
+            application:stop(amoc)
     end.
 
 -spec start_users(amoc:scenario(), [amoc_scenario:user_id()], state()) ->
@@ -297,6 +367,10 @@ node_userids(Start, End, Nodes, NodeId) when is_integer(Nodes), Nodes > 0,
 interarrival() ->
     amoc_config:get(interarrival, ?INTERARRIVAL_DEFAULT).
 
+-spec checking_interval() -> integer().
+checking_interval() ->
+    amoc_config:get(scenario_checking_interval, ?CHECKING_INTERVAL_DEFAULT).
+
 -spec get_test_status() -> scenario_status().
 get_test_status() ->
     case supervisor:which_children(amoc_users_sup) of
@@ -317,4 +391,14 @@ check_test(Scenario, CurrentScenario) ->
     case Scenario =:= CurrentScenario of
         true -> get_test_status();
         false -> loaded
+    end.
+
+-spec apply_safely(atom(), atom(), [term()]) -> term().
+apply_safely(M, F, A) ->
+    try erlang:apply(M, F, A) of
+        Result ->
+            {ok, Result}
+    catch
+        Error:Reason ->
+            {error, Error, Reason}
     end.
