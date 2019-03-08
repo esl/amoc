@@ -52,6 +52,7 @@ do(Scenario, Start, End, Opts) ->
     _Step = proplists:get_value(step, Opts, 1),
 
     amoc_event:notify({dist_do, Scenario, Start, End, Opts}),
+    amoc_controller:start_scenario_checking(Scenario),
     Count = length(Nodes),
     [ amoc_controller:do(Node, Scenario, Start, End, Count, Id, Opts) ||
       {Id, Node} <- lists:zip(lists:seq(1, Count), Nodes) ].
