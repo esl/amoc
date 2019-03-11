@@ -5,7 +5,7 @@
 -module(amoc_scenario).
 
 -export_type([user_id/0, state/0]).
--optional_callbacks([continue/0, terminate/1]).
+-optional_callbacks([continue/0, terminate/1, next_user_batch/2]).
 
 -type user_id() :: non_neg_integer().
 -type state() :: any().
@@ -19,3 +19,6 @@
 
 -callback continue() -> continue | {stop, Reason :: term()}.
 -callback terminate(Reason :: term()) -> any().
+-callback next_user_batch(BatchIndex :: non_neg_integer(),
+                          PrevUserCount :: non_neg_integer()) ->
+    amoc_controller:user_batch_strategy().
