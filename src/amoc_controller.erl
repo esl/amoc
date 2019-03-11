@@ -35,6 +35,7 @@
          do/7,
          add/1,
          add/2,
+         add/3,
          remove/1,
          remove/2,
          remove/3,
@@ -77,6 +78,10 @@ add(Count) ->
 -spec add(node(), non_neg_integer()) -> ok.
 add(Node, Count) ->
     gen_server:cast({?SERVER, Node}, {add, Count}).
+
+-spec add(node(), non_neg_integer(), proplists:proplist()) -> ok.
+add(Node, Count, Opts) ->
+    gen_server:cast({?SERVER, Node}, {add, Count, Opts}).
 
 -spec remove(non_neg_integer()) -> ok.
 remove(Count) ->
@@ -136,7 +141,10 @@ handle_call(_Request, _From, State) ->
 
 -spec handle_cast(any(), state()) -> {noreply, state()}.
 handle_cast({add, Count}, State) ->
-    handle_add(Count, State),
+    handle_add(Count, State, []),
+    {noreply, State};
+handle_cast({add, Count, Opts}, State) ->
+    handle_add(Count, State, Opts),
     {noreply, State};
 handle_cast({remove, Count, Opts}, State) ->
     handle_remove(Count, Opts, State),
@@ -164,20 +172,22 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 %% callbacks handlers
 %% ------------------------------------------------------------------
--spec handle_add(non_neg_integer(), state()) -> ok | list({ok, pid()}).
-handle_add(_Count, #state{scenario=undefined}) ->
+-spec handle_add(non_neg_integer(), state(), proplists:proplist()) ->
+    ok | list({ok, pid()}).
+handle_add(_Count, #state{scenario=undefined}, _Opts) ->
     lager:error("add users invoked, but no scenario defined");
 handle_add(Count, #state{scenario=Scenario,
                          scenario_state=State,
                          nodes = Nodes,
-                         node_id = NodeId}) when
+                         node_id = NodeId}, Opts) when
       is_integer(Count), Count > 0 ->
     Last = case ets:last(?TABLE) of
                '$end_of_table' -> 0;
                Other -> Other
            end,
     UserIds = node_userids(Last+1, Last+Count, Nodes, NodeId),
-    start_users(Scenario, UserIds, State).
+    Interarrival = proplists:get_value(interarrival, Opts, interarrival()),
+    start_users(Scenario, UserIds, Interarrival, State).
 
 -spec handle_remove(non_neg_integer(), amoc:remove_opts(), state()) -> ok.
 handle_remove(_Count, _Opts, #state{scenario=undefined}) ->
@@ -247,7 +257,7 @@ start_scenario(Scenario, UserIds, State) ->
     Length = erlang:length(UserIds),
     lager:info("starting scenario begin_id=~p, end_id=~p, length=~p",
                [Start, End, Length]),
-    start_users(Scenario, UserIds, State).
+    start_users(Scenario, UserIds, interarrival(), State).
 
 -spec init_scenario(amoc:scenario()) -> any().
 init_scenario(Scenario) ->
@@ -301,16 +311,16 @@ try_terminate_scenario(Scenario, Reason) ->
             application:stop(amoc)
     end.
 
--spec start_users(amoc:scenario(), [amoc_scenario:user_id()], state()) ->
-    [term()].
-start_users(Scenario, UserIds, State) ->
-    [ start_user(Scenario, Id, State) || Id <- UserIds ].
+-spec start_users(amoc:scenario(), [amoc_scenario:user_id()], non_neg_integer(),
+                  state()) -> [term()].
+start_users(Scenario, UserIds, Interarrival, State) ->
+    [ start_user(Scenario, Id, Interarrival, State) || Id <- UserIds ].
 
--spec start_user(amoc:scenario(), amoc_scenario:user_id(), state()) ->
-    supervisor:startchild_ret().
-start_user(Scenario, Id, State) ->
+-spec start_user(amoc:scenario(), amoc_scenario:user_id(), non_neg_integer(),
+                 state()) -> supervisor:startchild_ret().
+start_user(Scenario, Id, Interarrival, State) ->
     R = supervisor:start_child(amoc_users_sup, [Scenario, Id, State]),
-    timer:sleep(interarrival()),
+    timer:sleep(Interarrival),
     R.
 
 -spec stop_users([amoc_scenario:user_id()], boolean()) -> [true | stop].
