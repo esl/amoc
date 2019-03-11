@@ -115,7 +115,7 @@ start_scenario_checking(Scenario) ->
 init([]) ->
     process_flag(priority, max),
     State = #state{scenario = undefined,
-                   nodes = 0},
+                   nodes = undefined},
     {ok, State}.
 
 -spec handle_call(any(), any(), state()) -> {reply, handle_call_res(), state()}.
