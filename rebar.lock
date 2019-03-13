@@ -18,7 +18,7 @@
   3},
  {<<"escalus">>,
   {git,"git://github.com/esl/escalus.git",
-       {ref,"58c2bf8d0196e45f759e7139fda44c2091343b70"}},
+       {ref,"8911491ef6bb9397ec8501fe2511ace85b98cdfc"}},
   0},
  {<<"exml">>,
   {git,"https://github.com/esl/exml.git",
