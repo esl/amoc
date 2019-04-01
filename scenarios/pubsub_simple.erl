@@ -39,19 +39,19 @@
 -define(COORDINATOR_ID, 1).
 -define(COORDINATOR_TIMEOUT, 100000).
 
--export([init/0, start/1]).
+-export([init/0, start/2]).
 
--spec init() -> ok.
+-spec init() -> {ok, amoc_scenario:state()} | {error, Reason :: term()}.
 init() ->
     init_metrics(),
-    verify_scenario_settings().
+    config:get_scenario_settings(?ALL_PARAMETERS).
 
--spec start(amoc_scenario:user_id()) -> any().
-start(Id) ->
-    set_scenario_settings(),
+-spec start(amoc_scenario:user_id(), amoc_scenario:state()) -> any().
+start(Id, Settings) ->
+    config:store_scenario_settings(Settings),
     Client = connect_amoc_user(Id),
     case get_role(Id) of
-        coordinator -> start_coordinator(Client);
+        coordinator -> start_coordinator(Client, Settings);
         helper -> start_helper(Client);
         user -> start_user(Client)
     end.
@@ -81,16 +81,17 @@ get_role(Id) ->
 %%------------------------------------------------------------------------------------------------
 %% Coordinator
 %%------------------------------------------------------------------------------------------------
-start_coordinator(Client) ->
+start_coordinator(Client, Settings) ->
     pg2:create(?GROUP_NAME),
     pg2:create(?HELPERS_GROUP_NAME),
-    Coordinator = spawn(fun coordinator_fn/0),
+    Coordinator = spawn(fun() -> coordinator_fn(Settings) end),
     pg2:join(?GROUP_NAME, Coordinator),
     start_helper(Client).
 
-coordinator_fn() ->
+coordinator_fn(Settings) ->
     lager:debug("coordinator process ~p", [self()]),
-    set_scenario_settings(),
+    config:store_scenario_settings(Settings),
+    config:dump_settings(),
     coordinator_loop([]).
 
 coordinator_loop(AllPids) ->
@@ -453,67 +454,12 @@ random_suffix() ->
 %% Config helpers
 %%------------------------------------------------------------------------------------------------
 
-set_scenario_settings() ->
-    [set_parameter(P) || P <- ?ALL_PARAMETERS].
-
-verify_scenario_settings() ->
-    ParametersVerification = [begin
-                                  set_parameter(P),
-                                  verify_parameter(P)
-                              end || P <- ?ALL_PARAMETERS],
-    dump_settings(),
-    case lists:all(fun(El) -> El end, ParametersVerification) of
-        false -> exit(invalid_settings);
-        _ -> ok
-    end.
-
-set_parameter({Name, Env, DefaultValue, _VerificationMethod}) ->
-    erlang:put(Name, amoc_config:get(Env, DefaultValue)).
-
-verify_parameter({Name, _Env, DefaultValue, VerificationMethod}) ->
-    DefaultValueVerification = verify_parameter(DefaultValue, VerificationMethod),
-    ValueVerification = verify_parameter(erlang:get(Name), VerificationMethod),
-    case {DefaultValueVerification, ValueVerification} of
-        {true, true} -> true;
-        {true, false} ->
-            lager:error("Invalid default value for ~p", [Name]),
-            false;
-        {false, true} ->
-            lager:error("Invalid value for ~p", [Name]),
-            false;
-        {false, false} ->
-            lager:error("Invalid default value & value for ~p", [Name]),
-            false
-    end.
-
-verify_parameter(Value, positive_integer) ->
-    is_positive_integer(Value);
-verify_parameter(Value, nonnegative_integer) ->
-    is_nonnegative_integer(Value);
-verify_parameter(Value, bitstring) ->
-    is_bitstring(Value);
-verify_parameter(Value, [_ | _] = NonemptyList) ->
-    is_one_of(Value, NonemptyList);
-verify_parameter(_Value, VerificationMethod) ->
-    lager:error("invalid verification method ~p", [VerificationMethod]),
-    false.
-
-is_positive_integer(I) -> is_integer(I) andalso I > 0.
-
-is_nonnegative_integer(I) -> is_integer(I) andalso I >= 0.
-
-is_one_of(Element, List) -> lists:any(fun(El) -> El =:= Element end, List).
-
-dump_settings() ->
-    Settings = [{Name, erlang:get(Name)} || {Name, _, _, _} <- ?ALL_PARAMETERS],
-    lager:info("scenario settings: ~p", [Settings]).
-
 get_parameter(Name) ->
-    case is_one_of(Name, [N || {N, _, _, _} <- ?ALL_PARAMETERS]) of
-        true -> erlang:get(Name);
-        false ->
-            lager:error("invalid parameter name ~p", [Name]),
-            exit(invalid_parameter)
+    case config:get_parameter(Name) of
+        {error,Err} ->
+            lager:error("config:get_parameter/1 failed ~p", [Err]),
+            exit(Err);
+        {ok,Value} -> Value
     end.
 
 get_no_of_node_subscribers() ->
