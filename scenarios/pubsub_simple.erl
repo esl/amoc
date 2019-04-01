@@ -7,34 +7,29 @@
 
 -required_variable({'IQ_TIMEOUT',         <<"IQ timeout (milliseconds, def: 10000ms)"/utf8>>}).
 -reqeired_variable({'COORDINATOR_DELAY',  <<"Delay after N subscriptions (milliseconds, def: 0ms)"/utf8>>}).
--reqeired_variable({'ACTIVATION_DELAY',   <<"Delay between users activation (milliseconds, def: 100ms)"/utf8>>}).
--required_variable({'PUBLICATION_DELAY',  <<"Delay between items publishing (milliseconds, def: 30000ms)"/utf8>>}).
+-required_variable({'NODE_CREATION_RATE', <<"Rate of node creations (per minute, def:600)">>}).
 -required_variable({'PUBLICATION_SIZE',   <<"Size of additional payload (bytes, def:300)">>}).
+-required_variable({'PUBLICATION_RATE',   <<"Rate of publications (per minute, def:1500)">>}).
 -required_variable({'N_OF_SUBSCRIBERS',   <<"Number of subscriptions for each node (def: 50)"/utf8>>}).
--required_variable({'HELPERS_POOL_SIZE',  <<"Number of helper processes in the pool (def: 10)"/utf8>>}).
--required_variable({'CREATION_POLICY',    <<"Nodes created by (def: helper | user)"/utf8>>}).
--required_variable({'ACTIVATION_POLICY',  <<"Publish after subscribtion of (def: all_nodes | n_nodes | one_node)"/utf8>>}).
--required_variable({'SCHEDULING_POLICY',  <<"Scheduling policy (def: sync_rcv | syn_req | async)"/utf8>>}).
+-required_variable({'ACTIVATION_POLICY',  <<"Publish after subscribtion of (def: all_nodes | n_nodes)"/utf8>>}).
 -required_variable({'MIM_HOST',           <<"The virtual host served by the server (def: <<\"localhost\">>)"/utf8>>}).
 -required_variable({'PUBSUB_ADDR',        <<"Pubsub service address (def: <<\"pubsub.localhost\">>"/utf8>>}).
 
 -define(ALL_PARAMETERS,[
-    {iq_timeout,         'IQ_TIMEOUT',                         10000, positive_integer},
-    {coordinator_delay,  'COORDINATOR_DELAY',                      0, nonnegative_integer},
-    {activation_delay,   'ACTIVATION_DELAY',                     100, positive_integer},
-    {publication_delay,  'PUBLICATION_DELAY',                  30000, nonnegative_integer},
-    {publication_size,   'PUBLICATION_SIZE',                     300, nonnegative_integer},
-    {n_of_subscribers,   'N_OF_SUBSCRIBERS',                      50, nonnegative_integer},
-    {helpers_pool_size,  'HELPERS_POOL_SIZE',                     10, nonnegative_integer},
-    {creation_policy,    'CREATION_POLICY',                   helper, [helper, user]},
-    {activation_policy,  'ACTIVATION_POLICY',              all_nodes, [all_nodes, n_nodes, one_node]},
-    {scheduling_policy,  'SCHEDULING_POLICY',               sync_rcv, [sync_rcv, sync_req, async]},
-    {mim_host,           'MIM_HOST',                 <<"localhost">>, bitstring},
-    {pubsub_addr,        'PUBSUB_ADDR',       <<"pubsub.localhost">>, bitstring}
+    {iq_timeout,         'IQ_TIMEOUT',                           10000, positive_integer},
+    {coordinator_delay,  'COORDINATOR_DELAY',                        0, nonnegative_integer},
+    {node_creation_rate, 'NODE_CREATION_RATE',                     600, positive_integer},
+    {publication_size,   'PUBLICATION_SIZE',                       300, nonnegative_integer},
+    {publication_rate,   'PUBLICATION_RATE',                      1500, positive_integer},
+    {n_of_subscribers,   'N_OF_SUBSCRIBERS',                        50, nonnegative_integer},
+    {activation_policy,  'ACTIVATION_POLICY',                all_nodes, [all_nodes, n_nodes]},
+    {mim_host,           'MIM_HOST',                   <<"localhost">>, bitstring},
+    {pubsub_addr,        'PUBSUB_ADDR',         <<"pubsub.localhost">>, bitstring}
 ]).
 
 -define(GROUP_NAME, <<"pubsub_simple_coordinator">>).
--define(HELPERS_GROUP_NAME, <<"pubsub_simple_helpers">>).
+-define(NODE_CREATION_THROTTLING, <<"node_creation">>).
+-define(PUBLICATION_THROTTLING, <<"publication">>).
 
 -define(COORDINATOR_ID, 1).
 -define(COORDINATOR_TIMEOUT, 100000).
@@ -44,7 +39,15 @@
 -spec init() -> {ok, amoc_scenario:state()} | {error, Reason :: term()}.
 init() ->
     init_metrics(),
-    config:get_scenario_settings(?ALL_PARAMETERS).
+    case config:get_scenario_settings(?ALL_PARAMETERS) of
+        {ok, Settings} ->
+            [PublicationRate, NodeCreationRate] = [proplists:get_value(Key, Settings) ||
+                                                      Key <- [publication_rate, node_creation_rate]],
+            throttle:start(?NODE_CREATION_THROTTLING, NodeCreationRate),
+            throttle:start(?PUBLICATION_THROTTLING, PublicationRate),
+            {ok, Settings};
+        Error -> Error
+    end.
 
 -spec start(amoc_scenario:user_id(), amoc_scenario:state()) -> any().
 start(Id, Settings) ->
@@ -52,7 +55,6 @@ start(Id, Settings) ->
     Client = connect_amoc_user(Id),
     case get_role(Id) of
         coordinator -> start_coordinator(Client, Settings);
-        helper -> start_helper(Client);
         user -> start_user(Client)
     end.
 
@@ -70,23 +72,17 @@ init_metrics() ->
     [amoc_metrics:init(counters, Metric) || Metric <- Counters],
     [amoc_metrics:init(times, Metric) || Metric <- Times].
 
-get_role(Id) ->
-    HelpersPoolSize = get_parameter(helpers_pool_size),
-    if
-        Id =:= 1 -> coordinator;
-        Id =< HelpersPoolSize -> helper;
-        true -> user
-    end.
+get_role(1) -> coordinator;
+get_role(_) -> user.
 
 %%------------------------------------------------------------------------------------------------
 %% Coordinator
 %%------------------------------------------------------------------------------------------------
 start_coordinator(Client, Settings) ->
     pg2:create(?GROUP_NAME),
-    pg2:create(?HELPERS_GROUP_NAME),
     Coordinator = spawn(fun() -> coordinator_fn(Settings) end),
     pg2:join(?GROUP_NAME, Coordinator),
-    start_helper(Client).
+    start_user(Client).
 
 coordinator_fn(Settings) ->
     lager:debug("coordinator process ~p", [self()]),
@@ -136,17 +132,9 @@ subscribe_msg(Pid, Node) ->
 activate_users(Pids, ActivationPolicy) ->
     case get_parameter(activation_policy) of
         ActivationPolicy ->
-            ActivationDelay = get_parameter(activation_delay),
-            spawn(fun() -> activate_users_with_delay(Pids, ActivationDelay) end);
+            [schedule_publishing(Pid)||Pid<-Pids];
         _ -> ok
     end.
-
-activate_users_with_delay([], _) -> ok;
-activate_users_with_delay([Pid | T], ActivationDelay) ->
-    lager:debug("activate user ~p", [Pid]),
-    Pid ! publish_item,
-    timer:sleep(ActivationDelay),
-    activate_users_with_delay(T, ActivationDelay).
 
 get_coordinator_pid() ->
     case pg2:get_members(?GROUP_NAME) of
@@ -154,43 +142,6 @@ get_coordinator_pid() ->
         _ -> %% [] or {error, {no_such_group, ?GROUP_NAME}}
             timer:sleep(100),
             get_coordinator_pid()
-    end.
-
-
-%%------------------------------------------------------------------------------------------------
-%% Helper
-%%------------------------------------------------------------------------------------------------
-
-start_helper(Client) ->
-    get_coordinator_pid(), %% ensure than coordinator is created
-    Self = self(),
-    lager:debug("helper process ~p", [Self]),
-    pg2:join(?HELPERS_GROUP_NAME, Self),
-    helper_loop(Client).
-
-helper_loop(Client) ->
-    receive
-        {create_node_for_user, UserPid} ->
-            Node = create_pubsub_node(Client),
-            UserPid ! {node, Node}
-    end,
-    helper_loop(Client).
-
-get_helper() ->
-    case pg2:get_members(?HELPERS_GROUP_NAME) of
-        [_ | _] = List -> %% nonempty list
-            N = rand:uniform(length(List)),
-            lists:nth(N, List);
-        _ -> %% [] or {error, {no_such_group, ?GROUP_NAME}}
-            timer:sleep(100),
-            get_helper()
-    end.
-
-create_pubsub_node_for_user() ->
-    Helper = get_helper(),
-    Helper ! {create_node_for_user, self()},
-    receive
-        {node, Node} -> Node
     end.
 
 %%------------------------------------------------------------------------------------------------
@@ -205,12 +156,8 @@ start_user(Client) ->
 
 create_new_node(Client) ->
     Coordinator = get_coordinator_pid(),
-    Node = case get_parameter(creation_policy) of
-               user ->
-                   create_pubsub_node(Client);
-               helper ->
-                   create_pubsub_node_for_user()
-           end,
+    throttle:send_and_wait(?NODE_CREATION_THROTTLING, create_node),
+    Node = create_pubsub_node(Client),
     Coordinator ! {new_node, self(), Node},
     Node.
 
@@ -230,7 +177,6 @@ user_loop(Client, Node, Requests) ->
         publish_item ->
             {TS, Id} = publish_pubsub_item(Client, Node),
             amoc_metrics:update_counter(publication_query, 1),
-            schedule_publishing(async),
             user_loop(Client, Node, Requests#{Id=>{new, TS}});
         {'DOWN', _, process, Pid, Info} when Pid =:= Client#client.rcv_pid ->
             lager:error("TCP connection process ~p down: ~p", [Pid, Info]);
@@ -261,14 +207,8 @@ update_timeout_metrics(<<"subscribe", _/binary>>) ->
 update_timeout_metrics(Id) ->
     lager:error("unknown iq id ~p", Id).
 
-schedule_publishing(SchedulingPolicy) ->
-    case get_parameter(scheduling_policy) of
-        SchedulingPolicy ->
-            DelayBetweenMessages = get_parameter(publication_delay),
-            erlang:send_after(DelayBetweenMessages, self(), publish_item);
-        _ -> ok
-    end.
-
+schedule_publishing(Pid) ->
+    throttle:send(?PUBLICATION_THROTTLING, Pid, publish_item).
 
 %%------------------------------------------------------------------------------------------------
 %% User connection
@@ -374,7 +314,7 @@ process_msg(#xmlel{name = <<"message">>} = Stanza, TS) ->
     Entry = exml_query:path(Stanza, [{element, <<"event">>}, {element, <<"items">>},
                                      {element, <<"item">>}, {element, <<"entry">>}]),
     case {exml_query:attr(Entry, <<"jid">>), erlang:get(jid)} of
-        {JID, JID} -> schedule_publishing(sync_rcv);
+        {JID, JID} -> schedule_publishing(self());
         _ -> ok
     end,
     TimeStampBin = exml_query:attr(Entry, <<"timestamp">>),
@@ -400,7 +340,6 @@ handle_publish_resp(PublishResult, {Tag, PublishTime}) ->
     IqTimeout = get_parameter(iq_timeout),
     case escalus_pred:is_iq_result(PublishResult) of
         true ->
-            schedule_publishing(sync_req),
             lager:debug("publish time ~p", [PublishTime]),
             amoc_metrics:update_counter(publication_result, 1),
             amoc_metrics:update_time(publication, PublishTime),
