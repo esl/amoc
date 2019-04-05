@@ -28,8 +28,8 @@
 ]).
 
 -define(GROUP_NAME, <<"pubsub_simple_coordinator">>).
--define(NODE_CREATION_THROTTLING, <<"node_creation">>).
--define(PUBLICATION_THROTTLING, <<"publication">>).
+-define(NODE_CREATION_THROTTLING, node_creation).
+-define(PUBLICATION_THROTTLING, publication).
 
 -define(COORDINATOR_ID, 1).
 -define(COORDINATOR_TIMEOUT, 100000).

@@ -23,6 +23,11 @@
 -define(DEFAULT_INTERVAL, 60000).%% one minute
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
+-define(RATE(Name), [throttle, Name, rate]).
+-define(EXEC_RATE(Name), [throttle, Name, exec_rate]).
+-define(REQ_RATE(Name), [throttle, Name, req_rate]).
+
+
 
 -record(state, {can_run_fn = true :: boolean(),%%ms
                 n :: non_neg_integer(),
@@ -31,49 +36,61 @@
                 schedule = [] :: [fun(()-> any())],
                 schedule_reversed = [] :: [fun(()-> any())]}).
 
--spec start(any(), pos_integer()) -> ok|{error, any()}.
+-type name() :: atom().
+
+-spec start(name(), pos_integer()) -> ok|{error, any()}.
 start(Name, Rate) ->
     start(Name, Rate, ?DEFAULT_INTERVAL).
 
--spec start(any(), pos_integer(), non_neg_integer()) -> ok | {error, any()}.
+-spec start(name(), pos_integer(), non_neg_integer()) -> ok | {error, any()}.
 start(Name, Rate, Interval) ->
     start(Name, Rate, Interval, 10).
 
--spec start(any(), pos_integer(), non_neg_integer(), pos_integer()) -> ok | {error, any()}.
+-spec start(name(), pos_integer(), non_neg_integer(), pos_integer()) -> ok | {error, any()}.
 start(Name, Rate, Interval, NoOfProcesses) ->
     case pg2:get_members(Name) of
         {error, {no_such_group, Name}} ->
             pg2:create(Name),
+            amoc_metrics:init(gauge, ?RATE(Name)),
+            [amoc_metrics:init(counters, E) || E <- [?EXEC_RATE(Name), ?REQ_RATE(Name)]],
+            RatePerMinute = rate_per_minute(Rate, Interval),
+            amoc_metrics:update_gauge(?RATE(Name), RatePerMinute),
             RealNoOfProcesses = min(Rate, NoOfProcesses),
             start_throttle_processes(Name, Interval, Rate, RealNoOfProcesses);
         List when is_list(List) ->
             {error, {name_is_already_used, Name}}
     end.
 
--spec run(any(), fun(()-> any())) -> ok | {error, any()}.
+-spec run(name(), fun(()-> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
     case get_throttle_process(Name) of
         {ok, Pid} ->
-            Pid ! {run, Fn};
+            amoc_metrics:update_counter(?REQ_RATE(Name)),
+            Fun =
+                fun() ->
+                    amoc_metrics:update_counter(?EXEC_RATE(Name)),
+                    Fn()
+                end,
+            Pid ! {run, Fun};
         Error -> Error
     end.
 
--spec send(any(), pid(), any()) -> ok | {error, any()}.
+-spec send(name(), pid(), any()) -> ok | {error, any()}.
 send(Name, Pid, Msg) ->
     run(Name, fun() -> Pid ! Msg end).
 
--spec send(any(), any()) -> ok | {error, any()}.
+-spec send(name(), any()) -> ok | {error, any()}.
 send(Name, Msg) ->
     send(Name, self(), Msg).
 
--spec send_and_wait(any(), any()) -> ok | {error, any()}.
+-spec send_and_wait(name(), any()) -> ok | {error, any()}.
 send_and_wait(Name, Msg) ->
     send(Name, Msg),
     receive
         Msg -> ok
     end.
 
--spec stop(any()) -> ok|{error, any()}.
+-spec stop(name()) -> ok|{error, any()}.
 stop(Name) ->
     case pg2:get_members(Name) of
         List when is_list(List) ->
@@ -81,6 +98,10 @@ stop(Name) ->
             [P ! stop_process || P <- List], ok;
         Error -> Error
     end.
+
+rate_per_minute(_, 0) -> 0;
+rate_per_minute(Rate, Interval) ->
+    (Rate * 60000) div Interval.
 
 start_throttle_processes(Name, Interval, Rate, 1) ->
     start_throttle_process(Name, Interval, Rate);

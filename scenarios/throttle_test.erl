@@ -13,7 +13,7 @@
 -behavior(amoc_scenario).
 -export([start/1, init/0]).
 
--define(GROUP_NAME, throttle_testing).
+-define(GROUP_NAME, testing).
 
 init() ->
     init_metrics(),
@@ -22,22 +22,12 @@ init() ->
 start(_Id) -> publish_loop().
 
 init_metrics() ->
-    amoc_metrics:init(counters, publications),
     amoc_metrics:init(times, publication).
 
 publish_loop() ->
-    Self = self(), Time = os:system_time(microsecond),
-    throttle:run(?GROUP_NAME,
-                 fun() ->
-                     publish(),
-                     Self ! published
-                 end),
-    receive
-        published ->
-            TimeDiff=os:system_time(microsecond) -Time,
-            amoc_metrics:update_time(publication, TimeDiff)
-    end,
+    {TimeDiff, _} = timer:tc(fun publish/0),
+    amoc_metrics:update_time(publication, TimeDiff),
     publish_loop().
 
 publish() ->
-    amoc_metrics:update_counter(publications, 1).
+    throttle:send_and_wait(?GROUP_NAME, publish).
