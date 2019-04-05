@@ -13,6 +13,8 @@
 
 %% Room distribution by buckets
 
+%% Returns the IDs of rooms joined by the specified user, intended for MUC
+%% The order is important for equal distribution of created rooms
 -spec rooms_to_join(amoc_scenario:user_id(), pos_integer(), pos_integer()) -> [pos_integer()].
 rooms_to_join(UserId, RoomsPerUser, UsersPerRoom) ->
     BasicRoom = round_id((UserId - 1) * RoomsPerUser / UsersPerRoom, RoomsPerUser > UsersPerRoom),
@@ -21,11 +23,14 @@ rooms_to_join(UserId, RoomsPerUser, UsersPerRoom) ->
     lists:seq(BasicRoom + 1, RoomBucketStartId + RoomsPerUser - 1)
         ++ lists:seq(RoomBucketStartId, BasicRoom).
 
+%% Returns the IDs of rooms created by the specified user, intended for MUC Light
 -spec rooms_to_create(amoc_scenario:user_id(), pos_integer(), pos_integer()) -> [pos_integer()].
 rooms_to_create(UserId, RoomsPerUser, UsersPerRoom) ->
     MyRooms = rooms_to_join(UserId, RoomsPerUser, UsersPerRoom),
     lists:filter(fun(R) -> creator(R, RoomsPerUser, UsersPerRoom) =:= UserId end, MyRooms).
 
+%% Returns the list of member IDs for any room created by the specified user, intended for MUC Light
+%% The list does not contain the creator ID
 -spec room_members(amoc_scenario:user_id(), pos_integer()) -> [amoc_scenario:user_id()].
 room_members(CreatorId, UsersPerRoom) ->
     Occupants = bucket_ids(CreatorId, UsersPerRoom),
@@ -42,11 +47,25 @@ bucket_ids(Id, BucketSize) ->
     BucketStartId = Id - Position,
     lists:seq(BucketStartId, BucketStartId + BucketSize - 1).
 
-%% Debug - print rooms
+%% Debug - print user distribution in rooms
 
+%% @doc Print a matrix specifying the relation between users and rooms
+%%   Each row means one user, each column means one room.
+%%   For each user: the first room to join is shown as 'x'
+%%                  other rooms to join are shown as '.'
+%%
+%% Example: amoc_xmpp_muc:print_rooms_to_join(6, 3, 2).
+%% x..         <-- User 1 joins rooms 1, 2, 3
+%% ..x         <-- User 2 joins rooms 3, 1, 2
+%%    x..      <-- User 3 joins rooms 4, 5, 6
+%%    ..x          (...)
+%%       x..
+%%       ..x
+-spec print_rooms_to_join(pos_integer(), pos_integer(), pos_integer()) -> ok.
 print_rooms_to_join(UserCount, RoomsPerUser, UsersPerRoom) ->
     [print_my_rooms_to_join(UserId, RoomsPerUser, UsersPerRoom)
-     || UserId <- lists:seq(1, UserCount)].
+     || UserId <- lists:seq(1, UserCount)],
+    ok.
 
 print_my_rooms_to_join(UserId, RoomsPerUser, UsersPerRoom) ->
     RoomsToJoin = rooms_to_join(UserId, RoomsPerUser, UsersPerRoom),
@@ -72,9 +91,23 @@ room_column(RoomId, RoomsPerUser, UsersPerRoom) ->
     Occupants = bucket_ids(Creator, UsersPerRoom),
     {Creator, Occupants}.
 
+%% @doc Print a matrix specifying the relation between users and rooms
+%%   Each row means one user, each column means one room.
+%%   For each room: the creator is shown as 'x'
+%%                  other members are shown as '.'
+%%
+%% Example: amoc_xmpp_muc:print_rooms_to_create(6, 3, 2).
+%% xx.       <-- User 1 creates rooms 1, 2
+%% ..x       <-- User 2 creates room 3
+%%    xx.    <-- User 3 creates rooms 4, 5
+%%    ..x        (...)
+%%       xx.
+%%       ..x
+-spec print_rooms_to_create(pos_integer(), pos_integer(), pos_integer()) -> ok.
 print_rooms_to_create(UserCount, RoomsPerUser, UsersPerRoom) ->
     AllRoomUsers = all_room_users(UserCount, RoomsPerUser, UsersPerRoom),
-    [print_my_rooms_to_create(UserId, AllRoomUsers) || UserId <- lists:seq(1, UserCount)].
+    [print_my_rooms_to_create(UserId, AllRoomUsers) || UserId <- lists:seq(1, UserCount)],
+    ok.
 
 print_my_rooms_to_create(UserId, AllRoomUsers) ->
     io:put_chars([room_to_create_char(UserId, Creator, Occupants)
