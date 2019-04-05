@@ -26,17 +26,17 @@ start(Id) ->
     {ok, Client, _Spec} = amoc_xmpp:connect_or_exit(Id, extra_user_spec()),
     escalus_session:send_presence_available(Client),
 
-    RoomIds = amoc_xmpp_muc:rooms_to_join(Id, rooms_per_user(), users_per_room()),
+    RoomIds = amoc_xmpp_muc:rooms_to_join(Id, cfg(rooms_per_user), cfg(users_per_room)),
     RoomJids = [room_jid(RoomId) || RoomId <- RoomIds],
     enter_rooms(Client, RoomJids),
 
-    escalus_connection:wait(Client, delay_before_sending_messages()),
+    escalus_connection:wait(Client, cfg(delay_before_sending_messages)),
 
-    %% rooms_to_create/3 assigns exactly one user to each room
-    RoomJidsToSend = amoc_xmpp_muc:rooms_to_create(Id, rooms_per_user(), users_per_room()),
+    %% we need one sender per room, so let's use 'rooms_to_create/3' here
+    RoomJidsToSend = amoc_xmpp_muc:rooms_to_create(Id, cfg(rooms_per_user), cfg(users_per_room)),
     send_messages(Client, my_timetable(RoomJidsToSend), 0),
 
-    escalus_connection:wait(Client, delay_after_sending_messages()).
+    escalus_connection:wait(Client, cfg(delay_after_sending_messages)).
 
 extra_user_spec() ->
     [{sent_stanza_handlers, sent_stanza_handlers()},
@@ -45,7 +45,7 @@ extra_user_spec() ->
 enter_rooms(_Client, []) -> ok;
 enter_rooms(Client, [RoomJid | Rest]) ->
     enter_room(Client, RoomJid),
-    escalus_connection:wait(Client, delay_after_entering_room()),
+    escalus_connection:wait(Client, cfg(delay_after_entering_room)),
     enter_rooms(Client, Rest).
 
 enter_room(Client, RoomJid) ->
@@ -82,8 +82,8 @@ my_timetable(RoomJidsToSend) ->
     lists:merge([room_message_timetable(RoomJid) || RoomJid <- RoomJidsToSend]).
 
 room_message_timetable(RoomJid) ->
-    Count = messages_to_send_per_room(),
-    Interval = message_interval_per_room(),
+    Count = cfg(messages_to_send_per_room),
+    Interval = cfg(message_interval_per_room),
     Offset = rand:uniform(Interval),
     timetable({muc_message, RoomJid}, Count, Interval, Offset).
 
@@ -157,26 +157,8 @@ is_muc_message(_) -> false.
 
 %% Helpers
 
-delay_after_entering_room() ->
-    20000.
-
-delay_before_sending_messages() ->
-    60000.
-
-messages_to_send_per_room() ->
-    100.
-
-message_interval_per_room() ->
-    1000.
-
-delay_after_sending_messages() ->
-    60000.
-
-rooms_per_user() ->
-    20.
-
-users_per_room() ->
-    10.
+cfg(Name) ->
+    amoc_config:get(Name, default_cfg(Name)).
 
 room_full_jid(RoomJid, Nick) ->
     <<RoomJid/binary, $/, Nick/binary>>.
@@ -192,3 +174,11 @@ muc_host() ->
 
 ns(muc_user) ->
     <<"http://jabber.org/protocol/muc#user">>.
+
+default_cfg(delay_after_entering_room) -> 20000;
+default_cfg(delay_before_sending_messages) -> 60000;
+default_cfg(messages_to_send_per_room) -> 100;
+default_cfg(message_interval_per_room) -> 1000;
+default_cfg(delay_after_sending_messages) -> 60000;
+default_cfg(rooms_per_user) -> 20;
+default_cfg(users_per_room) -> 10.

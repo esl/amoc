@@ -24,15 +24,15 @@ start(Id) ->
     {ok, Client, _Spec} = amoc_xmpp:connect_or_exit(Id, extra_user_spec()),
     escalus_session:send_presence_available(Client),
 
-    RoomsToCreate = amoc_xmpp_muc:rooms_to_create(Id, rooms_per_user(), users_per_room()),
+    RoomsToCreate = amoc_xmpp_muc:rooms_to_create(Id, cfg(rooms_per_user), cfg(users_per_room)),
     create_rooms(Client, Id, RoomsToCreate),
 
-    escalus_connection:wait(Client, delay_before_sending_messages()),
+    escalus_connection:wait(Client, cfg(delay_before_sending_messages)),
 
     RoomJids = [room_jid(RoomId) || RoomId <- RoomsToCreate],
     send_messages(Client, my_timetable(RoomJids), 0),
 
-    escalus_connection:wait(Client, delay_after_sending_messages()).
+    escalus_connection:wait(Client, cfg(delay_after_sending_messages)).
 
 extra_user_spec() ->
     [{sent_stanza_handlers, sent_stanza_handlers()},
@@ -41,11 +41,11 @@ extra_user_spec() ->
 create_rooms(_Client, _Id, []) -> ok;
 create_rooms(Client, Id, [RoomName | Rest]) ->
     create_room(Client, Id, RoomName),
-    escalus_connection:wait(Client, delay_after_creating_room()),
+    escalus_connection:wait(Client, cfg(delay_after_creating_room)),
     create_rooms(Client, Id, Rest).
 
 create_room(Client, CreatorId, RoomName) ->
-    MemberIds = amoc_xmpp_muc:room_members(CreatorId, users_per_room()),
+    MemberIds = amoc_xmpp_muc:room_members(CreatorId, cfg(users_per_room)),
     MemberJids = [amoc_xmpp_users:make_jid(MemberId) || MemberId <- MemberIds],
     Req = stanza_create_room(RoomName, MemberJids),
     amoc_xmpp:send_request_and_get_response(
@@ -72,8 +72,8 @@ my_timetable(RoomJidsToSend) ->
     lists:merge([room_message_timetable(RoomJid) || RoomJid <- RoomJidsToSend]).
 
 room_message_timetable(RoomJid) ->
-    Count = messages_to_send_per_room(),
-    Interval = message_interval_per_room(),
+    Count = cfg(messages_to_send_per_room),
+    Interval = cfg(message_interval_per_room),
     Offset = rand:uniform(Interval),
     timetable({muc_message, RoomJid}, Count, Interval, Offset).
 
@@ -122,26 +122,8 @@ is_muc_message(_) -> false.
 
 %% Helpers
 
-delay_after_creating_room() ->
-    10000.
-
-delay_before_sending_messages() ->
-    10000.
-
-messages_to_send_per_room() ->
-    100.
-
-message_interval_per_room() ->
-    1000.
-
-delay_after_sending_messages() ->
-    60000.
-
-rooms_per_user() ->
-    20.
-
-users_per_room() ->
-    10.
+cfg(Name) ->
+    amoc_config:get(Name, default_cfg(Name)).
 
 room_jid(RoomId) ->
     <<(room_name(RoomId))/binary, $@, (muc_host())/binary>>.
@@ -154,3 +136,11 @@ muc_host() ->
 
 ns(muc_light_create) ->
     <<"urn:xmpp:muclight:0#create">>.
+
+default_cfg(delay_after_creating_room) -> 10000;
+default_cfg(delay_before_sending_messages) -> 10000;
+default_cfg(messages_to_send_per_room) -> 100;
+default_cfg(message_interval_per_room) -> 1000;
+default_cfg(delay_after_sending_messages) -> 60000;
+default_cfg(rooms_per_user) -> 20;
+default_cfg(users_per_room) -> 10.
