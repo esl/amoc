@@ -18,6 +18,10 @@
          send/2,
          send_and_wait/2,
          run/2,
+         pause/1,
+         resume/1,
+         change_rate/3,
+         change_rate_gradually/6,
          stop/1]).
 
 -define(DEFAULT_INTERVAL, 60000).%% one minute
@@ -29,16 +33,17 @@
 
 
 
--record(state, {can_run_fn = true :: boolean(),%%ms
+-record(state, {can_run_fn = true :: boolean(),
+                pause = false :: boolean(),
                 n :: non_neg_integer(),
-                interval = ?DEFAULT_INTERVAL :: non_neg_integer(),
-                delay_between_executions = 0 :: non_neg_integer(),
+                interval = ?DEFAULT_INTERVAL :: non_neg_integer(),  %%ms
+                delay_between_executions = 0 :: non_neg_integer(),  %%ms
                 schedule = [] :: [fun(()-> any())],
                 schedule_reversed = [] :: [fun(()-> any())]}).
 
 -type name() :: atom().
 
--spec start(name(), pos_integer()) -> ok|{error, any()}.
+-spec start(name(), pos_integer()) -> ok | {error, any()}.
 start(Name, Rate) ->
     start(Name, Rate, ?DEFAULT_INTERVAL).
 
@@ -56,10 +61,44 @@ start(Name, Rate, Interval, NoOfProcesses) ->
             RatePerMinute = rate_per_minute(Rate, Interval),
             amoc_metrics:update_gauge(?RATE(Name), RatePerMinute),
             RealNoOfProcesses = min(Rate, NoOfProcesses),
-            start_throttle_processes(Name, Interval, Rate, RealNoOfProcesses);
+            start_throttle_processes(Name, Interval, Rate, RealNoOfProcesses),
+            ok;
         List when is_list(List) ->
             {error, {name_is_already_used, Name}}
     end.
+
+-spec pause(name()) -> ok | {error, any()}.
+pause(Name) ->
+    send_to_all_processes(Name, pause_process).
+
+-spec resume(name()) -> ok | {error, any()}.
+resume(Name) ->
+    send_to_all_processes(Name, resume_process).
+
+-spec change_rate(name(), pos_integer(), non_neg_integer()) -> ok | {error, any()}.
+change_rate(Name, Rate, Interval) ->
+    case pg2:get_members(Name) of
+        {error, Err} -> {error, Err};
+        List when is_list(List) ->
+            RatePerMinute = rate_per_minute(Rate, Interval),
+            amoc_metrics:update_gauge(?RATE(Name), RatePerMinute),
+            update_throttle_processes(List, Interval, Rate, length(List))
+    end.
+
+-spec change_rate_gradually(name(), pos_integer(), pos_integer(),
+                            non_neg_integer(), pos_integer(), pos_integer()) -> ok | {error, any()}.
+change_rate_gradually(Name, _, HighRate, RateInterval, _, 1) ->
+    change_rate(Name, HighRate, RateInterval), ok;
+change_rate_gradually(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps) ->
+    change_rate(Name, LowRate, RateInterval),
+    Step = (HighRate - LowRate) div (NoOfSteps - 1),
+    NewLowRate = LowRate + Step,
+    spawn(
+        fun() ->
+            timer:sleep(StepInterval),
+            change_rate_gradually(Name, NewLowRate, HighRate, RateInterval, StepInterval, NoOfSteps - 1)
+        end),
+    ok.
 
 -spec run(name(), fun(()-> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
@@ -71,7 +110,8 @@ run(Name, Fn) ->
                     amoc_metrics:update_counter(?EXEC_RATE(Name)),
                     Fn()
                 end,
-            Pid ! {run, Fun};
+            Pid ! {run, Fun},
+            ok;
         Error -> Error
     end.
 
@@ -90,12 +130,16 @@ send_and_wait(Name, Msg) ->
         Msg -> ok
     end.
 
--spec stop(name()) -> ok|{error, any()}.
+-spec stop(name()) -> ok | {error, any()}.
 stop(Name) ->
+    send_to_all_processes(Name, stop_process),
+    pg2:delete(Name),
+    ok.
+
+send_to_all_processes(Name, Msg) ->
     case pg2:get_members(Name) of
         List when is_list(List) ->
-            pg2:delete(Name),
-            [P ! stop_process || P <- List], ok;
+            [P ! Msg || P <- List], ok;
         Error -> Error
     end.
 
@@ -110,10 +154,20 @@ start_throttle_processes(Name, Interval, Rate, N) when is_integer(N), N > 1 ->
     start_throttle_process(Name, Interval, ProcessRate),
     start_throttle_processes(Name, Interval, Rate - ProcessRate, N - 1).
 
-
 start_throttle_process(Name, Interval, Rate) ->
     Pid = spawn(fun() -> init_throttle_process(Interval, Rate) end),
     pg2:join(Name, Pid).
+
+update_throttle_processes([Pid], Interval, Rate, 1) ->
+    update_throttle_process(Pid, Interval, Rate);
+update_throttle_processes([Pid | Tail], Interval, Rate, N) when N > 1 ->
+    ProcessRate = Rate div N,
+    update_throttle_process(Pid, Interval, ProcessRate),
+    update_throttle_processes(Tail, Interval, Rate - ProcessRate, N - 1).
+
+update_throttle_process(Pid, Interval, Rate) ->
+    NewState = initial_state(Interval, Rate),
+    Pid ! {update, NewState}.
 
 get_throttle_process(Name) ->
     case pg2:get_members(Name) of
@@ -127,27 +181,32 @@ get_throttle_process(Name) ->
     end.
 
 init_throttle_process(Interval, Rate) ->
+    InitialState = initial_state(Interval, Rate),
+    throttle_process(InitialState).
+
+initial_state(Interval, Rate) ->
     if
         Rate < 5 -> lager:error("too low rate, please reduce NoOfProcesses");
         true -> ok
     end,
-    InitialState = case {Interval, Interval div Rate} of
-                       {0, 0} -> %% limit only No of simultaneous executions
-                           #state{interval                 = Interval,
-                                  delay_between_executions = 0,
-                                  n                        = Rate};
-                       {_, I} when I < 10 ->
-                           lager:error("too high rate, please increase NoOfProcesses"),
-                           #state{interval                 = Interval,
-                                  delay_between_executions = 10,
-                                  n                        = Rate};
-                       {_, DelayBetweenExecutions} ->
-                           #state{interval                 = Interval,
-                                  delay_between_executions = DelayBetweenExecutions,
-                                  n                        = Rate}
-                   end,
-    throttle_process(InitialState).
+    case {Interval, Interval div Rate} of
+        {0, 0} -> %% limit only No of simultaneous executions
+            #state{interval                 = Interval,
+                   delay_between_executions = 0,
+                   n                        = Rate};
+        {_, I} when I < 10 ->
+            lager:error("too high rate, please increase NoOfProcesses"),
+            #state{interval                 = Interval,
+                   delay_between_executions = 10,
+                   n                        = Rate};
+        {_, DelayBetweenExecutions} ->
+            #state{interval                 = Interval,
+                   delay_between_executions = DelayBetweenExecutions,
+                   n                        = Rate}
+    end.
 
+merge_state(#state{interval = I, delay_between_executions = D, n = N}, OldState) ->
+    OldState#state{interval = I, delay_between_executions = D, n = N}.
 
 throttle_process(State) ->
     NewState = maybe_run_fn(State),
@@ -159,7 +218,7 @@ maybe_run_fn(#state{schedule = [], schedule_reversed = SchRev} = State) ->
     NewSchedule = lists:reverse(SchRev),
     NewState = State#state{schedule = NewSchedule, schedule_reversed = []},
     maybe_run_fn(NewState);
-maybe_run_fn(#state{can_run_fn = true, n = N} = State) when N > 0 ->
+maybe_run_fn(#state{can_run_fn = true, pause = false, n = N} = State) when N > 0 ->
     NewState = run_fn(State),
     NewState#state{can_run_fn = false, n = N - 1};
 maybe_run_fn(State) ->
@@ -182,12 +241,18 @@ run_and_wait(Fn, Interval) ->
 wait_for_msg(#state{n = N, schedule_reversed = SchRev} = State) ->
     receive
         stop_process -> ok;
+        pause_process ->
+            throttle_process(State#state{pause = true});
+        resume_process ->
+            throttle_process(State#state{pause = false});
         {run, Fn} ->
             throttle_process(State#state{schedule_reversed = [Fn | SchRev]});
         increase_n ->
             throttle_process(State#state{n = N + 1});
         delay_between_executions ->
-            throttle_process(State#state{can_run_fn = true})
+            throttle_process(State#state{can_run_fn = true});
+        {update, NewState} ->
+            throttle_process(merge_state(NewState, State))
     after State#state.interval + ?DEFAULT_MSG_TIMEOUT ->
         lager:debug("throttle process is inactive (n=~p)", [State#state.n]),
         throttle_process(State)

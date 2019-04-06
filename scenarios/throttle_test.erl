@@ -17,7 +17,20 @@
 
 init() ->
     init_metrics(),
-    throttle:start(?GROUP_NAME, 20000, 120000, 20). %% 20k per 2 min
+    throttle:start(?GROUP_NAME, 20000, 120000, 20), %% 20k per 2 min
+    spawn(
+        fun() ->
+            timer:sleep(200000),
+            throttle:change_rate_gradually(?GROUP_NAME, 1750, 21500, 60000, 200000, 5),
+            timer:sleep(100000),
+            throttle:pause(?GROUP_NAME),
+            timer:sleep(150000),
+            throttle:resume(?GROUP_NAME),
+            timer:sleep(800000),
+            throttle:change_rate_gradually(?GROUP_NAME, 21500, 1750, 50000, 200000, 3)
+        end),
+    ok.
+
 
 start(_Id) -> publish_loop().
 
