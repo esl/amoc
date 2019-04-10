@@ -78,19 +78,6 @@ print_my_rooms_to_join(UserId, RoomsPerUser, UsersPerRoom) ->
 room_char(1) -> $x;
 room_char(R) when R > 1 -> $..
 
-all_rooms(UserCount, RoomsPerUser, UsersPerRoom) ->
-    lists:flatmap(fun(UserId) -> rooms_to_create(UserId, RoomsPerUser, UsersPerRoom) end,
-                  lists:seq(1, UserCount)).
-
-all_room_users(UserCount, RoomsPerUser, UsersPerRoom) ->
-    [room_column(RoomId, RoomsPerUser, UsersPerRoom)
-     || RoomId <- all_rooms(UserCount, RoomsPerUser, UsersPerRoom)].
-
-room_column(RoomId, RoomsPerUser, UsersPerRoom) ->
-    Creator = creator(RoomId, RoomsPerUser, UsersPerRoom),
-    Occupants = bucket_ids(Creator, UsersPerRoom),
-    {Creator, Occupants}.
-
 %% @doc Print a matrix specifying the relation between users and rooms
 %%   Each row means one user, each column means one room.
 %%   For each room: the creator is shown as 'x'
@@ -109,14 +96,27 @@ print_rooms_to_create(UserCount, RoomsPerUser, UsersPerRoom) ->
     [print_my_rooms_to_create(UserId, AllRoomUsers) || UserId <- lists:seq(1, UserCount)],
     ok.
 
+all_room_users(UserCount, RoomsPerUser, UsersPerRoom) ->
+    [room_column(RoomId, RoomsPerUser, UsersPerRoom)
+     || RoomId <- all_rooms(UserCount, RoomsPerUser, UsersPerRoom)].
+
+all_rooms(UserCount, RoomsPerUser, UsersPerRoom) ->
+    lists:flatmap(fun(UserId) -> rooms_to_create(UserId, RoomsPerUser, UsersPerRoom) end,
+                  lists:seq(1, UserCount)).
+
+room_column(RoomId, RoomsPerUser, UsersPerRoom) ->
+    CreatorId = creator(RoomId, RoomsPerUser, UsersPerRoom),
+    Members = room_members(CreatorId, UsersPerRoom),
+    {CreatorId, Members}.
+
 print_my_rooms_to_create(UserId, AllRoomUsers) ->
-    io:put_chars([room_to_create_char(UserId, Creator, Occupants)
-                  || {Creator, Occupants} <- AllRoomUsers]),
+    io:put_chars([room_to_create_char(UserId, CreatorId, Members)
+                  || {CreatorId, Members} <- AllRoomUsers]),
     io:nl().
 
 room_to_create_char(UserId, UserId, _) -> $x;
-room_to_create_char(UserId, _, Occ) ->
-    case lists:member(UserId, Occ) of
+room_to_create_char(UserId, _, Members) ->
+    case lists:member(UserId, Members) of
         true -> $.;
         false -> ($ )
     end.
