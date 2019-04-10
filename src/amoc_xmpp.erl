@@ -79,12 +79,11 @@ default_user_spec(ProfileId, Password) ->
       {resource, base64:encode(crypto:strong_rand_bytes(5))}].
 
 -spec send_request_and_get_response(
-        escalus:client(), Req, fun((Req, Resp) -> boolean()), amoc_metrics:name(), timeout()
-       ) -> Resp when Req :: exml:element(),
-                      Resp :: exml:element().
+        escalus:client(), exml:element(), escalus_connection:stanza_pred(), amoc_metrics:name(), timeout()
+       ) -> exml_stream:element().
 send_request_and_get_response(Client, Req, Pred, TimeMetric, Timeout) ->
     SendTimestamp = os:system_time(microsecond),
-    Options = #{pred => fun(Resp) -> Pred(Req, Resp) end,
+    Options = #{pred => Pred,
                 timeout => Timeout,
                 safe => true,
                 with_metadata => true},
