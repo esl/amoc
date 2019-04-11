@@ -39,8 +39,12 @@ room_members(CreatorId, UsersPerRoom) ->
 creator(RoomId, RoomsPerUser, UsersPerRoom) ->
     round_id((RoomId - 1) * UsersPerRoom / RoomsPerUser + 1, RoomsPerUser =< UsersPerRoom).
 
-round_id(FloatId, true) -> round(math:ceil(FloatId));
-round_id(FloatId, false) -> round(math:floor(FloatId)).
+round_id(FloatId, RoundUp) when FloatId >= 0 ->
+    IntId = trunc(FloatId),
+    case FloatId > IntId andalso RoundUp of
+        true -> IntId + 1;
+        false -> IntId
+    end.
 
 bucket_ids(Id, BucketSize) ->
     Position = (Id - 1) rem BucketSize,
