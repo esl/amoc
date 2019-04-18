@@ -164,7 +164,7 @@ patch_scenario_returns_200_when_request_with_user_batches_ok_and_module_exists(_
     %% then
     %% Maybe check Body, as answer format will be ready
     meck:wait(amoc_dist, do, ['sample_test1', 1, 10], 2000),
-    meck:wait(amoc_controller, add_batches, ['sample_test1', 10], 2000),
+    meck:wait(amoc_controller, add_batches, [10, 'sample_test1'], 2000),
     ?assertEqual(200, CodeHttp).
 
 %% Helpers
@@ -207,7 +207,9 @@ mock_amoc_dist_do() ->
 -spec mock_amoc_controller_add_batches() -> ok.
 mock_amoc_controller_add_batches() ->
     ok = meck:new(amoc_controller, [unstick]),
-    Fun = fun(_,_) -> ok end,
+    Fun = fun(BatchCount, Scenario)
+                when is_integer(BatchCount) and is_atom(Scenario) -> ok
+          end,
     ok = meck:expect(amoc_controller, add_batches, Fun).
 
 -spec cleanup_amoc_dist() -> ok.
