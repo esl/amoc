@@ -187,6 +187,6 @@ get_result(Result) ->
 -spec maybe_add_batches(amoc:scenario(), non_neg_integer()) -> ok | skip |
                                                                {error, term()}.
 maybe_add_batches(Scenario, Batches) when is_integer(Batches) ->
-    amoc_controller:add_batches(Scenario, Batches);
+    amoc_controller:add_batches(Batches, Scenario);
 maybe_add_batches(_, _) ->
     skip.
