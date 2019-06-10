@@ -49,8 +49,8 @@ init() ->
 
             [PublicationRate, NodeCreationRate] = [proplists:get_value(Key, Settings) ||
                                                       Key <- [publication_rate, node_creation_rate]],
-            throttle:start(?NODE_CREATION_THROTTLING, NodeCreationRate),
-            throttle:start(?PUBLICATION_THROTTLING, PublicationRate),
+            amoc_throttle:start(?NODE_CREATION_THROTTLING, NodeCreationRate),
+            amoc_throttle:start(?PUBLICATION_THROTTLING, PublicationRate),
             {ok, Settings};
         Error -> Error
     end.
@@ -160,7 +160,7 @@ start_user(Client) ->
 
 create_new_node(Client) ->
     Coordinator = get_coordinator_pid(),
-    throttle:send_and_wait(?NODE_CREATION_THROTTLING, create_node),
+    amoc_throttle:send_and_wait(?NODE_CREATION_THROTTLING, create_node),
     create_pubsub_node(Client),
     Coordinator ! {new_client, self(), Client}.
 
@@ -208,7 +208,7 @@ update_timeout_metrics(Id) ->
     lager:error("unknown iq id ~p", Id).
 
 schedule_publishing(Pid) ->
-    throttle:send(?PUBLICATION_THROTTLING, Pid, publish_item).
+    amoc_throttle:send(?PUBLICATION_THROTTLING, Pid, publish_item).
 
 %%------------------------------------------------------------------------------------------------
 %% User connection

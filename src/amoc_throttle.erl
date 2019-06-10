@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 27. Mar 2019 14:24
 %%%-------------------------------------------------------------------
--module(throttle).
+-module(amoc_throttle).
 -author("denys").
 
 
