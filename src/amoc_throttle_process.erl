@@ -3,6 +3,7 @@
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(amoc_throttle_process).
+-behaviour(gen_server).
 
 %% API
 -export([start/2,
@@ -11,6 +12,13 @@
          update/3,
          pause/1,
          resume/1]).
+
+%% gen_server behaviour
+-export([init/1,
+         handle_call/3,
+         handle_info/2,
+         handle_cast/2,
+         handle_continue/2]).
 
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
@@ -28,31 +36,60 @@
 %%------------------------------------------------------------------------------
 
 start(Interval, Rate) ->
-    spawn(fun() -> init_throttle_process(Interval, Rate) end).
+    gen_server:start(?MODULE, [Interval, Rate], []).
 
 stop(Pid) ->
-    Pid ! stop_process.
+    gen_server:cast(Pid, stop_process).
 
 run(Pid, Fun) ->
-    Pid ! {run, Fun}.
+    gen_server:cast(Pid, {run, Fun}).
 
 update(Pid, Interval, Rate) ->
-    NewState = initial_state(Interval, Rate),
-    Pid ! {update, NewState}.
+    gen_server:cast(Pid, {update, Interval, Rate}).
 
 pause(Pid) ->
-    Pid ! pause_process.
+    gen_server:cast(Pid, pause_process).
 
 resume(Pid) ->
-    Pid ! resume_process.
+    gen_server:cast(Pid, resume_process).
 
+
+%%------------------------------------------------------------------------------
+%% gen_server behaviour
+%%------------------------------------------------------------------------------
+init([Interval, Rate]) ->
+    InitialState = initial_state(Interval, Rate),
+    {ok, InitialState, timeout(InitialState)}.
+
+handle_info(increase_n, #state{n = N} = State) ->
+    {noreply, State#state{n = N + 1}, {continue, maybe_run_fn}};
+handle_info(delay_between_executions, State) ->
+    {noreply, State#state{can_run_fn = true}, {continue, maybe_run_fn}};
+handle_info(timeout, State) ->
+    lager:debug("throttle process is inactive (n=~p)", [State#state.n]),
+    {noreply, State, {continue, maybe_run_fn}}.
+
+handle_cast(stop_process, State) ->
+    {stop, normal, State};
+handle_cast(pause_process, State) ->
+    {noreply, State#state{pause = true}, {continue, maybe_run_fn}};
+handle_cast(resume_process, State) ->
+    {noreply, State#state{pause = false}, {continue, maybe_run_fn}};
+handle_cast({run, Fn}, #state{schedule_reversed = SchRev} = State) ->
+    {noreply, State#state{schedule_reversed = [Fn | SchRev]}, {continue, maybe_run_fn}};
+handle_cast({update, Interval, Rate}, State) ->
+    NewState = merge_state(initial_state(Interval, Rate), State),
+    {noreply, NewState, {continue, maybe_run_fn}}.
+
+handle_call(_, _, State) ->
+    {reply, {error, not_implemented}, State, {continue, maybe_run_fn}}.
+
+handle_continue(maybe_run_fn, State) ->
+    NewState = maybe_run_fn(State),
+    {noreply, NewState, timeout(NewState)}.
 %%------------------------------------------------------------------------------
 %% internal functions
 %%------------------------------------------------------------------------------
-init_throttle_process(Interval, Rate) ->
-    InitialState = initial_state(Interval, Rate),
-    throttle_process(InitialState).
-
 initial_state(Interval, Rate) ->
     if
         Rate < 5 -> lager:error("too low rate, please reduce NoOfProcesses");
@@ -76,10 +113,6 @@ initial_state(Interval, Rate) ->
 
 merge_state(#state{interval = I, delay_between_executions = D, n = N}, OldState) ->
     OldState#state{interval = I, delay_between_executions = D, n = N}.
-
-throttle_process(State) ->
-    NewState = maybe_run_fn(State),
-    wait_for_msg(NewState).
 
 maybe_run_fn(#state{schedule = [], schedule_reversed = []} = State) ->
     State;
@@ -107,23 +140,5 @@ run_and_wait(Fn, Interval) ->
         _ -> ok
     end.
 
-wait_for_msg(#state{n = N, schedule_reversed = SchRev} = State) ->
-    receive
-        stop_process -> ok;
-        pause_process ->
-            throttle_process(State#state{pause = true});
-        resume_process ->
-            throttle_process(State#state{pause = false});
-        {run, Fn} ->
-            throttle_process(State#state{schedule_reversed = [Fn | SchRev]});
-        increase_n ->
-            throttle_process(State#state{n = N + 1});
-        delay_between_executions ->
-            throttle_process(State#state{can_run_fn = true});
-        {update, NewState} ->
-            throttle_process(merge_state(NewState, State))
-    after State#state.interval + ?DEFAULT_MSG_TIMEOUT ->
-        lager:debug("throttle process is inactive (n=~p)", [State#state.n]),
-        throttle_process(State)
-    end.
-
+timeout(State) ->
+    State#state.interval + ?DEFAULT_MSG_TIMEOUT.

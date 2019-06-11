@@ -145,7 +145,7 @@ start_throttle_processes(Name, Interval, Rate, N) when is_integer(N), N > 1 ->
     start_throttle_processes(Name, Interval, Rate - ProcessRate, N - 1).
 
 start_throttle_process(Name, Interval, Rate) ->
-    Pid = amoc_throttle_process:start(Interval, Rate),
+    {ok, Pid} = amoc_throttle_process:start(Interval, Rate),
     pg2:join(Name, Pid).
 
 update_throttle_processes([Pid], Interval, Rate, 1) ->
