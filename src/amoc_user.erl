@@ -36,8 +36,8 @@ init(Parent, Scenario, Id, State) ->
                 normal;
             %% {R, get_stack()} will result in a compact error message
             %% {E, R, get_stack()} will result in a full stack report
-            E:Reason ->
-                {E, {abnormal_exit, Reason}, erlang:get_stacktrace()}
+            E:Reason:Stacktrace ->
+                {E, {abnormal_exit, Reason}, Stacktrace}
         after
             ets:delete(amoc_users, Id)
         end,

@@ -15,6 +15,7 @@
 
 -define(GROUP_NAME, testing).
 
+-spec init() -> ok.
 init() ->
     init_metrics(),
     amoc_throttle:start(?GROUP_NAME, 20000, 120000, 20), %% 20k per 2 min
@@ -31,7 +32,7 @@ init() ->
         end),
     ok.
 
-
+-spec start(amoc_scenario:user_id()) -> any().
 start(_Id) -> publish_loop().
 
 init_metrics() ->

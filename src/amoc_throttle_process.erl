@@ -35,21 +35,27 @@
 %% Exported functions
 %%------------------------------------------------------------------------------
 
+-spec start(non_neg_integer(), pos_integer()) -> {ok, pid()}.
 start(Interval, Rate) ->
     gen_server:start(?MODULE, [Interval, Rate], []).
 
+-spec stop(pid()) -> ok.
 stop(Pid) ->
     gen_server:cast(Pid, stop_process).
 
+-spec run(pid(), fun(()-> any())) -> ok.
 run(Pid, Fun) ->
     gen_server:cast(Pid, {run, Fun}).
 
+-spec update(pid(), non_neg_integer(), pos_integer()) -> ok.
 update(Pid, Interval, Rate) ->
     gen_server:cast(Pid, {update, Interval, Rate}).
 
+-spec pause(pid()) -> ok.
 pause(Pid) ->
     gen_server:cast(Pid, pause_process).
 
+-spec resume(pid()) -> ok.
 resume(Pid) ->
     gen_server:cast(Pid, resume_process).
 
@@ -57,10 +63,12 @@ resume(Pid) ->
 %%------------------------------------------------------------------------------
 %% gen_server behaviour
 %%------------------------------------------------------------------------------
+-spec init(list()) -> {ok, #state{}, timeout()}.
 init([Interval, Rate]) ->
     InitialState = initial_state(Interval, Rate),
     {ok, InitialState, timeout(InitialState)}.
 
+-spec handle_info(term(), #state{}) -> {noreply, #state{}, {continue, maybe_run_fn}}.
 handle_info(increase_n, #state{n = N} = State) ->
     {noreply, State#state{n = N + 1}, {continue, maybe_run_fn}};
 handle_info(delay_between_executions, State) ->
@@ -69,6 +77,8 @@ handle_info(timeout, State) ->
     lager:debug("throttle process is inactive (n=~p)", [State#state.n]),
     {noreply, State, {continue, maybe_run_fn}}.
 
+-spec handle_cast(term(), #state{}) ->
+    {noreply, #state{}, {continue, maybe_run_fn}} | {stop, normal, #state{}}.
 handle_cast(stop_process, State) ->
     {stop, normal, State};
 handle_cast(pause_process, State) ->
@@ -81,9 +91,12 @@ handle_cast({update, Interval, Rate}, State) ->
     NewState = merge_state(initial_state(Interval, Rate), State),
     {noreply, NewState, {continue, maybe_run_fn}}.
 
+-spec handle_call(term(), term(), #state{}) ->
+    {reply, {error, not_implemented}, #state{}, {continue, maybe_run_fn}}.
 handle_call(_, _, State) ->
     {reply, {error, not_implemented}, State, {continue, maybe_run_fn}}.
 
+-spec handle_continue(maybe_run_fn, #state{}) -> {noreply, #state{}, timeout()}.
 handle_continue(maybe_run_fn, State) ->
     NewState = maybe_run_fn(State),
     {noreply, NewState, timeout(NewState)}.
