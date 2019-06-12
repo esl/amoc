@@ -11,7 +11,8 @@
          run/2,
          update/3,
          pause/1,
-         resume/1]).
+         resume/1,
+         get_state/1]).
 
 %% gen_server behaviour
 -export([init/1,
@@ -25,7 +26,8 @@
 
 -record(state, {can_run_fn = true :: boolean(),
                 pause = false :: boolean(),
-                n :: non_neg_integer(),
+                max_n :: non_neg_integer(),
+                n :: integer(),
                 interval = 0 :: non_neg_integer(),  %%ms
                 delay_between_executions = 0 :: non_neg_integer(),  %%ms
                 schedule = [] :: [fun(()-> any())],
@@ -59,6 +61,10 @@ pause(Pid) ->
 resume(Pid) ->
     gen_server:cast(Pid, resume_process).
 
+-spec get_state(pid()) -> #state{}.
+get_state(Pid) ->
+    gen_server:call(Pid, get_state).
+
 
 %%------------------------------------------------------------------------------
 %% gen_server behaviour
@@ -69,12 +75,12 @@ init([Interval, Rate]) ->
     {ok, InitialState, timeout(InitialState)}.
 
 -spec handle_info(term(), #state{}) -> {noreply, #state{}, {continue, maybe_run_fn}}.
-handle_info(increase_n, #state{n = N} = State) ->
-    {noreply, State#state{n = N + 1}, {continue, maybe_run_fn}};
+handle_info(increase_n, State) ->
+    {noreply, inc_n(State), {continue, maybe_run_fn}};
 handle_info(delay_between_executions, State) ->
     {noreply, State#state{can_run_fn = true}, {continue, maybe_run_fn}};
 handle_info(timeout, State) ->
-    lager:debug("throttle process is inactive (n=~p)", [State#state.n]),
+    log_state("is inactive", State),
     {noreply, State, {continue, maybe_run_fn}}.
 
 -spec handle_cast(term(), #state{}) ->
@@ -89,10 +95,13 @@ handle_cast({run, Fn}, #state{schedule_reversed = SchRev} = State) ->
     {noreply, State#state{schedule_reversed = [Fn | SchRev]}, {continue, maybe_run_fn}};
 handle_cast({update, Interval, Rate}, State) ->
     NewState = merge_state(initial_state(Interval, Rate), State),
+    log_state("state update", NewState),
     {noreply, NewState, {continue, maybe_run_fn}}.
 
 -spec handle_call(term(), term(), #state{}) ->
-    {reply, {error, not_implemented}, #state{}, {continue, maybe_run_fn}}.
+    {reply, {error, not_implemented} | #state{}, #state{}, {continue, maybe_run_fn}}.
+handle_call(get_state, _, State) ->
+    {reply, printable_state(State), State, {continue, maybe_run_fn}};
 handle_call(_, _, State) ->
     {reply, {error, not_implemented}, State, {continue, maybe_run_fn}}.
 
@@ -108,24 +117,19 @@ initial_state(Interval, Rate) ->
         Rate < 5 -> lager:error("too low rate, please reduce NoOfProcesses");
         true -> ok
     end,
-    case {Interval, Interval div Rate} of
-        {0, 0} -> %% limit only No of simultaneous executions
-            #state{interval                 = Interval,
-                   delay_between_executions = 0,
-                   n                        = Rate};
-        {_, I} when I < 10 ->
-            lager:error("too high rate, please increase NoOfProcesses"),
-            #state{interval                 = Interval,
-                   delay_between_executions = 10,
-                   n                        = Rate};
-        {_, DelayBetweenExecutions} ->
-            #state{interval                 = Interval,
-                   delay_between_executions = DelayBetweenExecutions,
-                   n                        = Rate}
-    end.
+    Delay = case {Interval, Interval div Rate} of
+                {0, 0} -> 0; %% limit only No of simultaneous executions
+                {_, I} when I < 10 ->
+                    lager:error("too high rate, please increase NoOfProcesses"),
+                    10;
+                {_, DelayBetweenExecutions} -> DelayBetweenExecutions
+            end,
+    #state{interval = Interval, n = Rate, max_n = Rate, delay_between_executions = Delay}.
 
-merge_state(#state{interval = I, delay_between_executions = D, n = N}, OldState) ->
-    OldState#state{interval = I, delay_between_executions = D, n = N}.
+merge_state(#state{interval = I, delay_between_executions = D, n = N, max_n = MaxN},
+            #state{n = OldN, max_n = OldMaxN} = OldState) ->
+    NewN = N - (OldMaxN - OldN),
+    OldState#state{interval = I, delay_between_executions = D, n = NewN, max_n = MaxN}.
 
 maybe_run_fn(#state{schedule = [], schedule_reversed = []} = State) ->
     State;
@@ -155,3 +159,21 @@ run_and_wait(Fn, Interval) ->
 
 timeout(State) ->
     State#state.interval + ?DEFAULT_MSG_TIMEOUT.
+
+inc_n(#state{n = N, max_n = MaxN} = State) ->
+    NewN = N + 1,
+    if
+        MaxN < NewN ->
+            PrintableState = printable_state(State),
+            lager:error("~nthrottle process ~p: invalid N (~p)~n", [self(), PrintableState]),
+            State#state{n = MaxN};
+        true ->
+            State#state{n = NewN}
+    end.
+
+log_state(Msg, State) ->
+    PrintableState = printable_state(State),
+    lager:debug("~nthrottle process ~p: ~s (~p)~n", [self(), Msg, PrintableState]).
+
+printable_state(#state{schedule = L1, schedule_reversed = L2} = State) ->
+    State#state{schedule = length(L1), schedule_reversed = length(L2)}.
