@@ -175,5 +175,10 @@ log_state(Msg, State) ->
     PrintableState = printable_state(State),
     lager:debug("~nthrottle process ~p: ~s (~p)~n", [self(), Msg, PrintableState]).
 
-printable_state(#state{schedule = L1, schedule_reversed = L2} = State) ->
-    State#state{schedule = length(L1), schedule_reversed = length(L2)}.
+printable_state(#state{} = State) ->
+    Fields = record_info(fields, state),
+    [ _ | Values] = tuple_to_list(State#state{schedule = [], schedule_reversed = []}),
+    StateMap = maps:from_list(lists:zip(Fields, Values)),
+    StateMap#{
+        schedule:=length(State#state.schedule),
+        schedule_reversed:=length(State#state.schedule_reversed)}.
