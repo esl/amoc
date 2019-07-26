@@ -197,11 +197,17 @@ handle_dist_do(Scenario, Start, End, NodesCount, NodeId, _Opts, State) ->
 handle_do(Scenario, UserIds, State) ->
     case code:ensure_loaded(Scenario) of
         {module, Scenario} ->
-            ScenarioState = init_scenario(Scenario),
-            self() ! {start_scenario, Scenario, UserIds, ScenarioState},
-            State1 = State#state{scenario = Scenario,
-                                 scenario_state = ScenarioState},
-            {reply, ok, State1};
+            case init_scenario(Scenario) of
+                {ok, ScenarioState} ->
+                    self() ! {start_scenario, Scenario, UserIds, ScenarioState},
+                    State1 = State#state{scenario       = Scenario,
+                                         scenario_state = ScenarioState},
+                    {reply, ok, State1};
+                {error, Reason} ->
+                    lager:error("scenario  ~p initialisation failed, reason: ~p",
+                                [Scenario, Reason]),
+                    {reply, {error, Reason}, State}
+            end;
         Error ->
             lager:error("scenario module ~p cannot be found, reason: ~p",
                         [Scenario, Error]),
@@ -226,9 +232,12 @@ start_scenario(Scenario, UserIds, State) ->
 init_scenario(Scenario) ->
     case erlang:function_exported(Scenario, init, 0) of
         true ->
-            Scenario:init();
+            case Scenario:init() of
+                ok -> {ok, ok};
+                RetValue -> RetValue
+            end;
         false ->
-            skip
+            {ok, skip}
     end.
 
 -spec start_users(amoc:scenario(), [amoc_scenario:user_id()], state()) ->

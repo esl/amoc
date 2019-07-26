@@ -2,16 +2,16 @@
 
 -export([default_reporting_opts/0]).
 -export([init/2]).
--export([update_time/2, update_counter/2, update_counter/1]).
+-export([update_time/2, update_counter/2, update_counter/1, update_gauge/2]).
 -export([messages_spiral_name/0, message_ttd_histogram_name/0]).
 
--type name() :: atom().
+-type name() :: atom() | [atom()].
 
 -type reporting_opts() :: #{reporter := atom(),
-                            interval := non_neg_integer(),
-                            report => [atom()]}.
+interval := non_neg_integer(),
+report => [atom()]}.
 
--type type() :: counters | times.
+-type type() :: counters | times | gauge.
 
 -spec init(type(), name()) -> ok.
 init(Type, Name) ->
@@ -40,6 +40,11 @@ update_counter(Name, Value) ->
     ExName = make_name(counters, Name),
     exometer:update(ExName, Value).
 
+-spec update_gauge(name(), integer()) -> ok.
+update_gauge(Name, Value) ->
+    ExName = make_name(gauge, Name),
+    exometer:update(ExName, Value).
+
 -spec messages_spiral_name() -> name().
 messages_spiral_name() ->
     messages_sent.
@@ -54,9 +59,12 @@ default_reporting_opts() ->
       interval => timer:seconds(10)}.
 
 make_name(Type, Name) when is_atom(Name) ->
-    [amoc, Type, Name].
+    [amoc, Type, Name];
+make_name(Type, Name) when is_list(Name) ->
+    [amoc, Type | Name].
 
-metric_report_datapoints(spiral) -> [count, one];
+metric_report_datapoints(gauge)     -> [value];
+metric_report_datapoints(spiral)    -> [count, one];
 metric_report_datapoints(histogram) -> [mean, min, max, median, 95, 99, 999].
 
 create_metric_and_maybe_subscribe(ExName, Type, Reporter, Interval, Datapoints) ->
@@ -70,4 +78,5 @@ create_metric_and_maybe_subscribe(ExName, Type, Reporter, Interval, Datapoints) 
     end.
 
 exometer_metric_type(counters) -> spiral;
-exometer_metric_type(times) -> histogram.
+exometer_metric_type(times)    -> histogram;
+exometer_metric_type(gauge)    -> gauge.
