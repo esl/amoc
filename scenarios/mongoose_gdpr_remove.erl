@@ -15,6 +15,7 @@
 -required_variable({'N_OF_SUBSCRIBERS', <<"Number of subscriptions for each node (def: 50)"/utf8>>}).
 -required_variable({'ROOM_ACTIVATION_POLICY', <<"Publish after setup of (def: all_rooms | n_sers)"/utf8>>}).
 -required_variable({'NODE_ACTIVATION_POLICY', <<"Publish after setup of (def: all_nodes | n_nodes)"/utf8>>}).
+-required_variable({'GDPR_REMOVAL_RATE', <<"Rate of user removals (per minute, def:1)">>}).
 -required_variable({'PUBLICATION_SIZE', <<"Size of additional payload (bytes, def:300)">>}).
 -required_variable({'MIM_HOST', <<"The virtual host served by the server (def: <<\"localhost\">>)"/utf8>>}).
 -required_variable({'MUC_HOST', <<"The virtual MUC host served by the server (def: <<\"muclight.localhost\">>)"/utf8>>}).
@@ -27,17 +28,20 @@
     {node_publication_rate, 'NODE_PUBLICATION_RATE', 1500, positive_integer},
     {room_size, 'ROOM_SIZE', 10, positive_integer},
     %TODO n_of_subs was 50
-    {n_of_subscribers, 'N_OF_SUBSCRIBERS', 5, nonnegative_integer},
+    {n_of_subscribers, 'N_OF_SUBSCRIBERS', 10, nonnegative_integer},
     {room_activation_policy, 'ROOM_ACTIVATION_POLICY', all_rooms, [all_rooms, n_rooms]},
     {node_activation_policy, 'NODE_ACTIVATION_POLICY', all_nodes, [all_nodes, n_nodes]},
+    {gdpr_removal_rate, 'GDPR_REMOVAL_RATE', 1, positive_integer}, % TODO to be around 2
     {publication_size, 'PUBLICATION_SIZE', 300, nonnegative_integer},
     {mim_host, 'MIM_HOST', <<"localhost">>, bitstring},
     {muc_host, 'MUC_HOST', <<"muclight.localhost">>, bitstring}
 ]).
 
 -define(ROOM_CREATION_THROTTLING, room_creation).
--define(PUBLICATION_THROTTLING, publication).
 -define(NODE_CREATION_THROTTLING, node_creation).
+-define(ROOM_PUBLICATION_THROTTLING, room_publication).
+-define(NODE_PUBLICATION_THROTTLING, node_publication).
+-define(REMOVAL_THROTTLING, user_removal).
 
 -define(ROOM_CREATION_ID, <<"room_creation_id">>).
 -define(NODE_CREATION_ID, <<"node_creation_id">>).
@@ -45,6 +49,9 @@
 -define(PEP_NODE_NS, <<"just_some_random_namespace">>).
 -define(CAPS_HASH, <<"erNmVoMSwRBR4brUU/inYQ5NFr0=">>). %% mod_caps:make_disco_hash(feature_elems(), sha1).
 -define(NODE, {pep, ?PEP_NODE_NS}).
+
+-define(NS_MUC_LIGHT_AFFILIATIONS, <<"urn:xmpp:muclight:0#affiliations">>).
+-define(NS_MUC_LIGHT_CREATION, <<"urn:xmpp:muclight:0#create">>).
 
 -type client() :: #client{}.
 -type plan() :: [{EveryNClients :: pos_integer() | all,
@@ -57,12 +64,18 @@ init() ->
     init_metrics(),
     case config:get_scenario_settings(?ALL_PARAMETERS) of
         {ok, Settings} ->
-            config:store_scenario_settings(Settings), config:dump_settings(),
+            http_req:start(),
 
-            [PublicationRate, RoomCreationRate] = [proplists:get_value(Key, Settings) ||
-                Key <- [room_publication_rate, room_creation_rate]],
+            config:store_scenario_settings(Settings),
+            config:dump_settings(),
+
+            [RoomPublicationRate, NodePublicationRate, RoomCreationRate, NodeCreationRate, GDPRRemovalRate] = [proplists:get_value(Key, Settings) ||
+                Key <- [room_publication_rate, node_publication_rate, room_creation_rate, node_creation_rate, gdpr_removal_rate]],
             amoc_throttle:start(?ROOM_CREATION_THROTTLING, RoomCreationRate),
-            amoc_throttle:start(?PUBLICATION_THROTTLING, PublicationRate),
+            amoc_throttle:start(?ROOM_PUBLICATION_THROTTLING, RoomPublicationRate),
+            amoc_throttle:start(?NODE_CREATION_THROTTLING, NodeCreationRate),
+            amoc_throttle:start(?NODE_PUBLICATION_THROTTLING, NodePublicationRate),
+            amoc_throttle:start(?REMOVAL_THROTTLING, GDPRRemovalRate),
 
             start_coordinator(Settings),
             {ok, Settings};
@@ -76,8 +89,23 @@ start(Id, Settings) ->
     start_user(Client).
 
 init_metrics() ->
-    Counters = [message_received, room, message_published],
-    Times = [room_creation, publication_interval, message_ttd],
+    Counters = [pubsub_message, muc_light_message,
+        room_creation_success, room_creation_timeout, room_creation_failure,
+        node_creation_success, node_creation_timeout, node_creation_failure,
+        publication_query, publication_result, publication_error,
+        publication_success, publication_timeout,
+        muc_light_message_sent,
+
+        muc_light_affiliation_change_messages,
+
+        room_affiliation_change_success, room_affiliation_change_timeout, room_affiliation_change_failure,
+
+        gdpr_removal],
+    Times = [room_creation, node_creation,
+        pubsub_publication,
+        pubsub_message_ttd, muc_light_ttd,
+        room_affiliation_change,
+        gdpr_removal],
     [amoc_metrics:init(counters, Metric) || Metric <- Counters],
     [amoc_metrics:init(times, Metric) || Metric <- Times].
 
@@ -91,16 +119,21 @@ start_coordinator(Settings) ->
 node_activate_users(Pids, ActivationPolicy) ->
     case get_parameter(node_activation_policy) of
         ActivationPolicy ->
-            [schedule_publishing(Pid)||Pid<-Pids];
+            lager:debug("Node activate users running. Policy ~p. Pids: ~p", [ActivationPolicy, Pids]),
+            [schedule_node_publishing(Pid)||Pid<-Pids];
         _ -> ok
     end.
 
 room_activate_users(Pids, ActivationPolicy) ->
     case get_parameter(room_activation_policy) of
         ActivationPolicy ->
-            [schedule_publishing(Pid)||Pid<-Pids];
+            lager:debug("Room activate users running. Policy ~p. Pids: ~p", [ActivationPolicy, Pids]),
+            [schedule_room_publishing(Pid)||Pid<-Pids];
         _ -> ok
     end.
+
+activate_removal(Pids) ->
+    [schedule_removal(Pid)||Pid<-Pids].
 
 make_all_clients_friends(Clients) ->
     lager:debug("Make all clients friends."),
@@ -117,63 +150,58 @@ make_full_rooms(PidsAndClients) ->
          OwnerPid ! {add_users, MemberJids}
      end || {OwnerPid, OwnerJid} <- PidsAndJids].
 
+schedule_removal(Pid) ->
+    amoc_throttle:send(?REMOVAL_THROTTLING, Pid, remove_user).
+
 %%------------------------------------------------------------------------------------------------
 %% User
 %%------------------------------------------------------------------------------------------------
 start_user(Client) ->
     lager:debug("User process ~p", [self()]),
     erlang:monitor(process, Client#client.rcv_pid),
-    %create_new_node(Client),
-    set_presence(Client),
-    escalus_tcp:set_active(Client#client.rcv_pid, true),
-    request_muc_light_room(Client),
-    user_loop(Client, #{}, 0).
-
-set_presence(Client) ->
+    create_new_node(Client),
+    lager:debug("Node created User process ~p", [self()]),
     send_presence_with_caps(Client),
-    % waiting for presence sent to self
-    escalus:wait_for_stanza(Client).
+    escalus_tcp:set_active(Client#client.rcv_pid, true),
+    {TS, Id} = request_muc_light_room(Client),
+    user_loop(Client, #{Id=>{new, TS}}).
 
 create_new_node(Client) ->
     amoc_throttle:send_and_wait(?NODE_CREATION_THROTTLING, create_node),
     create_pubsub_node(Client).
 
-send_info_to_coordinator(Client) ->
-    lager:debug("Process ~p, sending info about myself to coordinator", [self()]),
-    coordinator:register_user(Client).
-
-user_loop(Client, Requests, Time) ->
+user_loop(Client, Requests) ->
     IqTimeout = get_parameter(iq_timeout),
     receive
-        publish_item ->
-            % publish to own room
-            % TODO publish pubsub item, it should also put stuff in "Requests"
-            amoc_metrics:update_counter(message_published, 1),
-            Now = os:system_time(microsecond),
-            send_message_to_room(Client),
-            update_publication_interval(Time, Now),
-            user_loop(Client, Requests, Now);
-        {publish_item, RoomJid} ->
-            % publish to room that client is a member of
-            amoc_metrics:update_counter(message_published, 1),
-            Now = os:system_time(microsecond),
+        {publish_item_room, RoomJid} ->
+            amoc_metrics:update_counter(muc_light_message_sent),
             send_message_to_room(Client, RoomJid),
-            update_publication_interval(Time, Now),
-            user_loop(Client, Requests, Now);
-        {stanza, _, #xmlel{name = <<"message">>} = Stanza, #{recv_timestamp := TimeStamp}} ->
-            process_message(Stanza, TimeStamp),
-            user_loop(Client, Requests, Time);
-        {stanza, _, #xmlel{name = <<"iq">>} = Stanza, #{recv_timestamp := TimeStamp}} ->
-            NewRequests = process_iq(Client, Stanza, TimeStamp, Requests),
-            user_loop(Client, NewRequests, Time);
+            user_loop(Client, Requests);
+        publish_item_node ->
+            {TS, Id} = publish_pubsub_item(Client),
+            amoc_metrics:update_counter(publication_query),
+            user_loop(Client, Requests#{Id=>{new, TS}});
+        {add_users, MemberJids} ->
+            {TS, Id} = add_users_to_room(Client, MemberJids),
+            user_loop(Client, Requests#{Id=>{new, TS}});
+        remove_user ->
+            lager:debug("GDPR: Removing myself ~p (~p)", [escalus_client:short_jid(Client), self()]),
+            remove_self(Client);
+        {stanza, _, #xmlel{name = <<"message">>} = Stanza, #{recv_timestamp := RecvTimeStamp}} ->
+            process_message(Stanza, RecvTimeStamp),
+            user_loop(Client, Requests);
+        {stanza, _, #xmlel{name = <<"iq">>} = Stanza, #{recv_timestamp := RecvTimeStamp}} ->
+            NewRequests = process_iq(Client, Stanza, RecvTimeStamp, Requests),
+            user_loop(Client, NewRequests);
         {stanza, _, #xmlel{name = <<"presence">>} = Stanza, _} ->
             process_presence(Client, Stanza),
-            user_loop(Client, Requests, Time);
-        {add_users, MemberJids} ->
-            add_users_to_room(Client, MemberJids),
-            user_loop(Client, Requests, Time)
+            user_loop(Client, Requests);
+        {'DOWN', _, process, Pid, Info} when Pid =:= Client#client.rcv_pid ->
+            lager:error("TCP connection process ~p down: ~p", [Pid, Info]);
+        Msg ->
+            lager:error("unexpected message ~p", [Msg])
     after IqTimeout ->
-        user_loop(Client, verify_request(Requests), Time)
+        user_loop(Client, verify_request(Requests))
     end.
 
 verify_request(Requests) ->
@@ -191,26 +219,30 @@ verify_request(Requests) ->
     maps:map(VerifyFN, Requests).
 
 update_timeout_metrics(<<"publish", _/binary>>) ->
-    amoc_metrics:update_counter(publication_timeout, 1);
+    amoc_metrics:update_counter(publication_timeout);
+update_timeout_metrics(<<"affiliation", _/binary>>) ->
+    amoc_metrics:update_counter(room_affiliation_change_timeout);
+update_timeout_metrics(?ROOM_CREATION_ID) ->
+    amoc_metrics:update_counter(room_creation_timeout);
 update_timeout_metrics(Id) ->
     lager:error("unknown iq id ~p", Id).
 
-schedule_publishing(Pid, RoomJid) ->
-    amoc_throttle:send(?PUBLICATION_THROTTLING, Pid, {publish_item, RoomJid}).
-schedule_publishing(Pid) ->
-    amoc_throttle:send(?PUBLICATION_THROTTLING, Pid, publish_item).
+schedule_room_publishing(Pid, RoomJid) ->
+    amoc_throttle:send(?ROOM_PUBLICATION_THROTTLING, Pid, {publish_item_room, RoomJid}).
+schedule_room_publishing(Pid) ->
+    amoc_throttle:send(?ROOM_PUBLICATION_THROTTLING, Pid, {publish_item_room, undefined}).
 
-update_publication_interval(0, _Now) ->
-    ok;
-update_publication_interval(Time, Now) ->
-    Interval = Now - Time,
-    amoc_metrics:update_time(publication_interval, Interval).
+schedule_node_publishing(Pid) ->
+    amoc_throttle:send(?NODE_PUBLICATION_THROTTLING, Pid, publish_item_node).
 
-update_message_ttd(0, _Now) ->
-    ok;
-update_message_ttd(Time, Now) ->
-    Interval = Now - Time,
-    amoc_metrics:update_time(message_ttd, Interval).
+remove_self(Client) ->
+    %TODO change to run on clt - remember to change cfg!!!
+    Path = list_to_binary(["/api/users/", get_parameter(mim_host), "/", escalus_client:username(Client)]),
+
+    {RemovalTime, {ok, _}} = timer:tc(fun() -> http_req:request("http://localhost:8088", Path, <<"DELETE">>, []) end),
+
+    amoc_metrics:update_counter(gdpr_removal),
+    amoc_metrics:update_time(gdpr_removal, RemovalTime).
 
 %%------------------------------------------------------------------------------------------------
 %% User connection
@@ -256,15 +288,15 @@ create_pubsub_node(Client) ->
 
     case {escalus_pred:is_iq_result(Request, CreateNodeResult), CreateNodeResult} of
         {true, _} ->
-            lager:debug("node creation ~p (~p)", [?NODE, self()]),
-            amoc_metrics:update_counter(node_creation_success, 1),
+%%            lager:debug("node creation ~p (~p)", [?NODE, self()]),
+            amoc_metrics:update_counter(node_creation_success),
             amoc_metrics:update_time(node_creation, CreateNodeTime);
         {false,{'EXIT',{timeout_when_waiting_for_stanza,_}}}->
-            amoc_metrics:update_counter(node_creation_timeout, 1),
+            amoc_metrics:update_counter(node_creation_timeout),
             lager:error("Timeout creating node: ~p", [CreateNodeResult]),
             exit(node_creation_timeout);
         {false, _} ->
-            amoc_metrics:update_counter(node_creation_failure, 1),
+            amoc_metrics:update_counter(node_creation_failure),
             lager:error("Error creating node: ~p", [CreateNodeResult]),
             exit(node_creation_failed)
     end.
@@ -272,12 +304,15 @@ create_pubsub_node(Client) ->
 %%------------------------------------------------------------------------------------------------
 %% User presence & caps
 %%------------------------------------------------------------------------------------------------
-send_presence(From, Type, To) ->
+send_presence(From, Type, To = #client{}) ->
     ToJid = escalus_client:short_jid(To),
-    Presence = escalus_stanza:presence_direct(ToJid, Type),
+    send_presence(From, Type, ToJid);
+send_presence(From, Type, To) ->
+    Presence = escalus_stanza:presence_direct(To, Type),
     escalus_client:send(From, Presence).
 
 send_presence_with_caps(Client) ->
+    lager:debug("Send presence with caps ~p, (~p).", [escalus_client:short_jid(Client), self()]),
     Presence = escalus_stanza:presence(<<"available">>, [caps()]),
     escalus:send(Client, Presence).
 
@@ -293,76 +328,137 @@ caps() ->
 %%------------------------------------------------------------------------------------------------
 request_muc_light_room(Client) ->
     amoc_throttle:send_and_wait(?ROOM_CREATION_THROTTLING, create_room),
-
+    Id = ?ROOM_CREATION_ID,
     MucHost = get_parameter(muc_host),
-    CreateRoomStanza = escalus_stanza:iq_set(<<"urn:xmpp:muclight:0#create">>, []),
+    CreateRoomStanza = escalus_stanza:iq_set(?NS_MUC_LIGHT_CREATION, []),
     CreateRoomStanzaWithTo = escalus_stanza:to(CreateRoomStanza, MucHost),
-    CreateRoomStanzaWithId = escalus_stanza:set_id(CreateRoomStanzaWithTo, ?ROOM_CREATION_ID),
-    lager:debug("Create stanza: ~p~n", [CreateRoomStanzaWithId]),
+    CreateRoomStanzaWithId = escalus_stanza:set_id(CreateRoomStanzaWithTo, Id),
+%%    lager:debug("Create stanza: ~p~n", [CreateRoomStanzaWithId]),
 
-    escalus:send(Client, CreateRoomStanzaWithId).
+    escalus:send(Client, CreateRoomStanzaWithId),
+    {os:system_time(microsecond), Id}.
 
 %%------------------------------------------------------------------------------------------------
 %% Room affiliation change
 %%------------------------------------------------------------------------------------------------
 add_users_to_room(Client, Jids) ->
+    Id = iq_id(affiliation, Client),
     RoomJid = erlang:get(room_jid),
     AffList = [#xmlel{name = <<"user">>,
         attrs = [{<<"affiliation">>, <<"member">>}],
         children = [#xmlcdata{content = Jid}]} || Jid <- Jids],
-    AffChangeStanza = escalus_stanza:iq_set(<<"urn:xmpp:muclight:0#affiliations">>, AffList),
-    lager:debug("Adding users: ~p", [Jids]),
-    escalus:send(Client, escalus_stanza:to(AffChangeStanza, RoomJid)).
+    AffChangeStanza = escalus_stanza:iq_set(?NS_MUC_LIGHT_AFFILIATIONS, AffList),
+    AffChangeStanzaWithId = escalus_stanza:set_id(AffChangeStanza, Id),
+    lager:debug("Adding users to room: ~p", [Jids]),
+    escalus:send(Client, escalus_stanza:to(AffChangeStanzaWithId, RoomJid)),
+    {os:system_time(microsecond), Id}.
 
 %%------------------------------------------------------------------------------------------------
-%% Sending messages
+%% Sending muc_light messages
 %%------------------------------------------------------------------------------------------------
-send_message_to_room(Client) ->
+send_message_to_room(Client, undefined) ->
     RoomJid = erlang:get(room_jid),
-    send_message_to_room(Client, RoomJid).
+    send_message_to_room(Client, RoomJid);
 send_message_to_room(Client, RoomJid) ->
-    MessageBody = io_lib:format("Hello from ~p", [self()]),
+    PayloadSize = get_parameter(publication_size),
+    MessageBody = item_content(PayloadSize),
     Message = #xmlel{name = <<"message">>,
         attrs = [{<<"to">>, RoomJid},
             {<<"type">>, <<"groupchat">>}],
-        children = [#xmlcdata{content = MessageBody}]},
+        children = [MessageBody]},
     escalus:send(Client, Message).
-
 
 %%------------------------------------------------------------------------------------------------
 %% Item publishing
 %%------------------------------------------------------------------------------------------------
 
+publish_pubsub_item(Client) ->
+    Id = iq_id(publish, Client),
+    PayloadSize = get_parameter(publication_size),
+    Content = item_content(PayloadSize),
+    Request = publish_pubsub_stanza(Client, Id, Content),
+    escalus:send(Client, Request),
+    {os:system_time(microsecond), Id}.
+
 publish_pubsub_stanza(Client, Id, Content) ->
     ItemId = <<"current">>,
     escalus_pubsub_stanza:publish(Client, ItemId, Content, Id, ?NODE).
+
+item_content(PayloadSize) ->
+    Payload = #xmlcdata{content = <<<<"A">> || _ <- lists:seq(1, PayloadSize)>>},
+    #xmlel{
+        name     = <<"entry">>,
+        attrs    = [{<<"timestamp">>, integer_to_binary(os:system_time(microsecond))},
+            {<<"jid">>, erlang:get(jid)}],
+        children = [Payload]}.
 
 %%------------------------------------------------------------------------------------------------
 %% Item processing
 %%------------------------------------------------------------------------------------------------
 
-process_message(Stanza, TimeStamp) ->
-    %TODO process normal message
-    case exml_query:attr(Stanza, <<"id">>) of
-        ?ROOM_CREATION_ID -> process_affiliation_message(Stanza);
-        _ -> process_normal_message_to_room(Stanza, TimeStamp)
+process_message(Stanza, RecvTimeStamp) ->
+    {Id, Type} = {exml_query:attr(Stanza, <<"id">>), exml_query:attr(Stanza, <<"type">>)},
+
+    case {Id, Type} of
+        {?ROOM_CREATION_ID, <<"groupchat">>} -> process_first_affiliation_message(Stanza);
+        {_, <<"groupchat">>} -> process_muc_light_message(Stanza, RecvTimeStamp);
+        {_, _} -> process_pubsub_msg(Stanza, RecvTimeStamp)
     end.
 
-process_affiliation_message(Stanza) ->
+
+process_pubsub_msg(#xmlel{name = <<"message">>} = Stanza, TS) ->
+    Entry = exml_query:path(Stanza, [{element, <<"event">>}, {element, <<"items">>},
+        {element, <<"item">>}, {element, <<"entry">>}]),
+    case Entry of
+        undefined -> ok;
+        _ ->
+            case {exml_query:attr(Entry, <<"jid">>), erlang:get(jid)} of
+                {JID, JID} -> schedule_node_publishing(self());
+                _ -> ok
+            end,
+            TimeStampBin = exml_query:attr(Entry, <<"timestamp">>),
+            TimeStamp = binary_to_integer(TimeStampBin),
+            TTD = TS - TimeStamp,
+%%            lager:debug("pubsub time to delivery ~p", [TTD]),
+            amoc_metrics:update_counter(pubsub_message),
+            amoc_metrics:update_time(pubsub_message_ttd, TTD)
+    end.
+
+
+process_first_affiliation_message(Stanza) ->
+    amoc_metrics:update_counter(muc_light_affiliation_change_messages),
+    lager:debug("First aff message: ~p", [self()]),
     RoomJid = exml_query:attr(Stanza, <<"from">>),
     erlang:put(room_jid, RoomJid).
 
-process_normal_message_to_room(Stanza, TimeStamp) ->
-    Now = os:system_time(microsecond),
+process_muc_light_message(Stanza, RecvTimeStamp) ->
+%%    lager:debug("MUC LIGHT MESSAGE: ~p", [Stanza]),
+    case exml_query:subelement(Stanza, <<"x">>) of
+        undefined -> process_normal_muc_light_message(Stanza, RecvTimeStamp);
+        _ ->         amoc_metrics:update_counter(muc_light_affiliation_change_messages)
+%%                        lager:debug("MUCL aff message: ~p, ~p", [self(), Stanza]) %% affiliation messages
+
+end.
+
+process_normal_muc_light_message(Stanza, RecvTimeStamp) ->
+    % lager:debug("Normal MUCL message: ~p", [self()]),
+    ReqTimeStampBin = exml_query:path(Stanza, [{element, <<"entry">>}, {attr, <<"timestamp">>}]),
+    ReqTimeStamp = binary_to_integer(ReqTimeStampBin),
+
     BareJid = get_sender_bare_jid(Stanza),
-    schedule_publishing(self(), BareJid),
-    amoc_metrics:update_counter(message_received, 1),
-    update_message_ttd(TimeStamp, Now).
+    % TODO schedule only after own messages or something like that, queue cannot grow exp
+    schedule_room_publishing(self(), BareJid),
+    TTD = RecvTimeStamp - ReqTimeStamp,
+%%    lager:debug("muc light time to delivery ~p", [TTD]),
+
+    amoc_metrics:update_counter(muc_light_message),
+    amoc_metrics:update_time(muc_light_ttd, TTD).
 
 process_presence(Client, Stanza) ->
+%%    lager:debug("Process presence: ~p", [Stanza]),
     case exml_query:attr(Stanza, <<"type">>) of
-        subscribe ->
-            lager:debug("presence subscribe stanza ~p", [Stanza]),
+        <<"subscribe">> ->
+%%            lager:debug("presence subscribe stanza ~p", [Stanza]),
             From = exml_query:attr(Stanza, <<"from">>),
             send_presence(Client, <<"subscribed">>, From);
         _ ->
@@ -374,11 +470,12 @@ process_iq(Client, #xmlel{name = <<"iq">>} = Stanza, TS, Requests) ->
     Type = exml_query:attr(Stanza, <<"type">>),
     NS = exml_query:path(Stanza, [{element, <<"query">>}, {attr, <<"xmlns">>}]),
     case {Type, NS, Id, maps:get(Id, Requests, undefined)} of
-        %TODO process IQs from adding users to rooms
-        {<<"result">>, undefined, ?ROOM_CREATION_ID, undefined} ->
-            %TODO maybe metric with room creation timeouts like requests timeouts?
-            true = (undefined =/= erlang:get(room_jid)),
+        {<<"result">>, undefined, ?ROOM_CREATION_ID, {Tag, ReqTS}} ->
+            handle_muc_light_room_iq_result(Stanza, {Tag, TS - ReqTS}),
             send_info_to_coordinator(Client);
+        {<<"result">>, _, <<"affiliation", _/binary>>, {Tag, ReqTS}} ->
+            lager:debug("User ~p got IQ result for affiliations change. (~p)", [escalus_client:short_jid(Client), self()]),
+            handle_affiliation_change_iq(Stanza, {Tag, TS - ReqTS});
         {<<"get">>, ?NS_DISCO_INFO, _, undefined} ->
             handle_disco_query(Client, Stanza);
         {<<"set">>, ?NS_ROSTER, _, undefined} ->
@@ -392,28 +489,95 @@ process_iq(Client, #xmlel{name = <<"iq">>} = Stanza, TS, Requests) ->
     end,
     maps:remove(Id, Requests).
 
+handle_muc_light_room_iq_result(CreateRoomResult, {Tag, RoomCreationTime}) ->
+    case {escalus_pred:is_iq_result(CreateRoomResult), CreateRoomResult} of
+        {true, _} ->
+            lager:debug("Room creation ~p took ~p", [self(), RoomCreationTime]),
+            amoc_metrics:update_time(room_creation, RoomCreationTime),
+            IqTimeout = get_parameter(iq_timeout),
+            case Tag of
+                new when IqTimeout * 1000 > RoomCreationTime ->
+                    amoc_metrics:update_counter(room_creation_success);
+                new ->
+                    amoc_metrics:update_counter(room_creation_timeout);
+                timeout -> ok %% do nothing, it's already reported as timeout
+            end;
+        {false,{'EXIT',{timeout_when_waiting_for_stanza,_}}}->
+            amoc_metrics:update_counter(room_creation_timeout),
+            lager:error("Timeout creating room: ~p", [CreateRoomResult]),
+            exit(room_creation_timeout);
+        {false, _} ->
+            amoc_metrics:update_counter(room_creation_failure),
+            lager:error("Error creating room: ~p", [CreateRoomResult]),
+            exit(room_creation_failed)
+    end.
+
+send_info_to_coordinator(Client) ->
+    lager:debug("Process ~p, sending info about myself to coordinator", [self()]),
+    coordinator:register_user(Client).
+
+handle_affiliation_change_iq(AffiliationChangeResult, {Tag, AffiliationChangeTime}) ->
+    case {escalus_pred:is_iq_result(AffiliationChangeResult), AffiliationChangeResult} of
+        {true, _} ->
+            lager:debug("Room creation ~p took ~p", [self(), AffiliationChangeTime]),
+            amoc_metrics:update_time(room_affiliation_change, AffiliationChangeTime),
+            IqTimeout = get_parameter(iq_timeout),
+            case Tag of
+                new when IqTimeout * 1000 > AffiliationChangeTime ->
+                    amoc_metrics:update_counter(room_affiliation_change_success);
+                new ->
+                    amoc_metrics:update_counter(room_affiliation_change_timeout);
+                timeout -> ok %% do nothing, it's already reported as timeout
+            end;
+        {false,{'EXIT',{timeout_when_waiting_for_stanza,_}}}->
+            amoc_metrics:update_counter(room_affiliation_change_timeout),
+            lager:error("Timeout affiliation change: ~p", [AffiliationChangeTime]),
+            exit(affiliation_change_timeout);
+        {false, _} ->
+            amoc_metrics:update_counter(room_affiliation_change_failure),
+            lager:error("Error affiliation change: ~p", [AffiliationChangeTime]),
+            exit(affiliation_change_timeout)
+    end.
 
 handle_publish_resp(PublishResult, {Tag, PublishTime}) ->
-    %TODO read and make this work
-    ok.
-%%    IqTimeout = get_parameter(iq_timeout),
-%%    case escalus_pred:is_iq_result(PublishResult) of
-%%        true ->
-%%            lager:debug("publish time ~p", [PublishTime]),
-%%            amoc_metrics:update_counter(publication_result, 1),
-%%            amoc_metrics:update_time(publication, PublishTime),
-%%            case Tag of
-%%                new when IqTimeout * 1000 > PublishTime ->
-%%                    amoc_metrics:update_counter(publication_success, 1);
-%%                new ->
-%%                    amoc_metrics:update_counter(publication_timeout, 1);
-%%                timeout -> ok %% do nothing, it's already reported as timeout
-%%            end;
-%%        _ ->
-%%            amoc_metrics:update_counter(publication_error, 1),
-%%            lager:error("Error publishing failed: ~p", [PublishResult]),
-%%            exit(publication_failed)
-%%    end.
+    IqTimeout = get_parameter(iq_timeout),
+    case escalus_pred:is_iq_result(PublishResult) of
+        true ->
+%%            lager:debug("pubsub publish time ~p", [PublishTime]),
+            amoc_metrics:update_counter(publication_result), % is it needed? it is a sum of success and timeout
+            amoc_metrics:update_time(pubsub_publication, PublishTime),
+            case Tag of
+                new when IqTimeout * 1000 > PublishTime ->
+                    amoc_metrics:update_counter(publication_success);
+                new ->
+                    amoc_metrics:update_counter(publication_timeout);
+                timeout -> ok %% do nothing, it's already reported as timeout
+            end;
+        _ ->
+            amoc_metrics:update_counter(publication_error),
+            lager:error("Error publishing failed: ~p", [PublishResult]),
+            exit(publication_failed)
+    end.
+
+handle_generic_iq_result(ResultStanza, {Tag, ExecutionTime}, TimeMetric, SuccessMetric, TimeoutMetric, ErrorMetric) ->
+    IqTimeout = get_parameter(iq_timeout),
+    case escalus_pred:is_iq_result(ResultStanza) of
+        true ->
+%%            lager:debug("pubsub publish time ~p", [PublishTime]),
+%%            amoc_metrics:update_counter(publication_result), % is it needed? it is a sum of success and timeout
+            amoc_metrics:update_time(TimeMetric, ExecutionTime),
+            case Tag of
+                new when IqTimeout * 1000 > ExecutionTime ->
+                    amoc_metrics:update_counter(SuccessMetric);
+                new ->
+                    amoc_metrics:update_counter(TimeoutMetric);
+                timeout -> ok %% do nothing, it's already reported as timeout
+            end;
+        _ ->
+            amoc_metrics:update_counter(ErrorMetric),
+            lager:error("Error: ~p : ~p", [ErrorMetric, ResultStanza]),
+            exit(ErrorMetric)
+    end.
 
 handle_disco_query(Client, DiscoRequest) ->
     lager:debug("handle_disco_query ~p", [self()]),
@@ -438,6 +602,17 @@ feature_elems() ->
 %%------------------------------------------------------------------------------------------------
 %% Stanza helpers
 %%------------------------------------------------------------------------------------------------
+
+iq_id(Type, Client) ->
+    UserName = escalus_utils:get_username(Client),
+    Suffix = random_suffix(),
+    list_to_binary(io_lib:format("~s-~s-~p",
+        [Type, UserName, Suffix])).
+
+random_suffix() ->
+    Suffix = base64:encode(crypto:strong_rand_bytes(5)),
+    re:replace(Suffix, "/", "_", [global, {return, binary}]).
+
 get_sender_bare_jid(Stanza) ->
     From = exml_query:attr(Stanza, <<"from">>),
     [BareJid | _] = binary:split(From, <<"/">>),
@@ -462,16 +637,14 @@ get_plan() ->
     [{get_room_size(), fun(PidsAndClients) ->
         make_full_rooms(PidsAndClients),
         room_activate_users(pids(PidsAndClients), n_rooms) end},
-        {get_parameter(n_of_subscribers), fun(PidsAndClients) ->
+    {get_parameter(n_of_subscribers), fun(PidsAndClients) ->
             make_all_clients_friends(clients(PidsAndClients)),
             node_activate_users(pids(PidsAndClients), n_nodes) end},
-        {all, fun(PidsAndClients) ->
+    {all, fun(PidsAndClients) ->
             room_activate_users(pids(PidsAndClients), all_rooms),
-            node_activate_users(pids(PidsAndClients), all_nodes) end}].
-
-print_execute(PidsAndClients) ->
-    lager:debug("Executing plan."),
-    [lager:debug("Pid: ~p, client: ~p~n", [Pid, Client]) || {Pid, Client} <- PidsAndClients].
+            node_activate_users(pids(PidsAndClients), all_nodes),
+            activate_removal(pids(PidsAndClients))
+          end}].
 
 clients(PidsAndClients) ->
     {_Pids, Clients} = lists:unzip(PidsAndClients),
