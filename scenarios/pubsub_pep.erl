@@ -271,9 +271,11 @@ create_pubsub_node(Client) ->
 %%------------------------------------------------------------------------------------------------
 %% User presence & caps
 %%------------------------------------------------------------------------------------------------
-send_presence(From, Type, To) ->
+send_presence(From, Type, To = #client{}) ->
     ToJid = escalus_client:short_jid(To),
-    Presence = escalus_stanza:presence_direct(ToJid, Type),
+    send_presence(From, Type, ToJid);
+send_presence(From, Type, To) ->
+    Presence = escalus_stanza:presence_direct(To, Type),
     escalus_client:send(From, Presence).
 
 send_presence_with_caps(Client) ->
@@ -334,7 +336,7 @@ process_msg(#xmlel{name = <<"message">>} = Stanza, TS) ->
 
 process_presence(Client, Stanza) ->
     case exml_query:attr(Stanza, <<"type">>) of
-        subscribe ->
+        <<"subscribe">> ->
             lager:debug("presence subscribe stanza ~p", [Stanza]),
             From = exml_query:attr(Stanza, <<"from">>),
             send_presence(Client, <<"subscribed">>, From);
