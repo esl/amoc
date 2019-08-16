@@ -67,7 +67,7 @@ handle_call(_Request, _From, State) ->
     {noreply, NewState :: state(), timeout()} |
     {stop, Reason :: term(), NewState :: state()}).
 handle_cast({new_user, Pid, Client}, State) ->
-    lager:debug("Handle cast new_user ~p, client: ~p", [Pid, Client]),
+%%    lager:debug("Handle cast new_user ~p, client: ~p", [Pid, Client]),
 
     NewUser = {Pid, Client},
     ToExecute = [{N, [NewUser | Users], Fun} || {N, Users, Fun} <- State, is_integer(N), N == length(Users) + 1],
