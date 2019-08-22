@@ -3,6 +3,7 @@
 -export([connect_or_exit/1]).
 -export([connect_or_exit/2]).
 -export([pick_server/1]).
+-export([send_request_and_get_response/5]).
 
 %% @doc connects and authenticates a user with given id and additional properties
 %% If the passed proplist is empty, a default user spec a created by
@@ -77,3 +78,20 @@ default_user_spec(ProfileId, Password) ->
       {stream_management, false},
       {resource, base64:encode(crypto:strong_rand_bytes(5))}].
 
+-spec send_request_and_get_response(
+        escalus:client(), exml:element(), escalus_connection:stanza_pred(), amoc_metrics:name(), timeout()
+       ) -> exml_stream:element().
+send_request_and_get_response(Client, Req, Pred, TimeMetric, Timeout) ->
+    SendTimestamp = os:system_time(microsecond),
+    Options = #{pred => Pred,
+                timeout => Timeout,
+                safe => true,
+                with_metadata => true},
+    case escalus_connection:send_and_receive(Client, Req, Options) of
+        {error, timeout} ->
+            amoc_metrics:update_counter(timeouts),
+            error(timeout_when_waiting_for_response, [Client, Req, Pred]);
+        {Stanza, #{recv_timestamp := RecvTimestamp}} ->
+            amoc_metrics:update_time(TimeMetric, RecvTimestamp - SendTimestamp),
+            Stanza
+    end.

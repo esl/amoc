@@ -82,9 +82,12 @@ send_message(Client, ToId, SleepTime) ->
 
 -spec send_and_recv_escalus_handlers() -> [{atom(), any()}].
 send_and_recv_escalus_handlers() ->
-    [
-      {received_stanza_handlers, [fun amoc_xmpp_handlers:measure_ttd/3]},
-      {sent_stanza_handlers, [fun amoc_xmpp_handlers:measure_sent_messages/2]}
+    [{received_stanza_handlers,
+      amoc_xmpp_handlers:stanza_handlers(
+        [{fun escalus_pred:is_message/1, fun amoc_xmpp_handlers:measure_ttd/3}])},
+     {sent_stanza_handlers,
+      amoc_xmpp_handlers:stanza_handlers(
+        [{fun escalus_pred:is_message/1, fun amoc_xmpp_handlers:measure_sent_messages/0}])}
     ].
 
 -spec socket_opts() -> [gen_tcp:option()].
@@ -92,4 +95,3 @@ socket_opts() ->
     [binary,
      {reuseaddr, false},
      {nodelay, true}].
-
