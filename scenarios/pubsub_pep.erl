@@ -214,25 +214,13 @@ schedule_publishing(Pid) ->
 %% User connection
 %%------------------------------------------------------------------------------------------------
 connect_amoc_user(Id) ->
-    Cfg = make_user_cfg(Id),
-    {ok, Client, _} = escalus_connection:start(Cfg),
+    ExtraProps = amoc_xmpp:pick_server([[{host, "127.0.0.1"}]]) ++
+    [{server, get_parameter(mim_host)},
+     {socket_opts, socket_opts()}],
+
+    {ok, Client, _} = amoc_xmpp:connect_or_exit(Id, ExtraProps),
     erlang:put(jid, Client#client.jid),
     Client.
-
-make_user_cfg(Id) ->
-    BinId = integer_to_binary(Id),
-    Username = <<"user_", BinId/binary>>,
-    Password = <<"password_", BinId/binary>>,
-    Resource = <<"res1">>,
-    ConnectionDetails = amoc_xmpp:pick_server([[{host, "127.0.0.1"}]]),
-    [{username, Username},
-     {server, get_parameter(mim_host)},
-     {resource, Resource},
-     {password, Password},
-     {carbons, false},
-     {stream_management, false},
-     {socket_opts, socket_opts()} |
-     ConnectionDetails].
 
 socket_opts() ->
     [binary,
