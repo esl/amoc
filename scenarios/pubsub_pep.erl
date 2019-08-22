@@ -42,10 +42,10 @@
 -spec init() -> {ok, amoc_scenario:state()} | {error, Reason :: term()}.
 init() ->
     init_metrics(),
-    case config:get_scenario_settings(?ALL_PARAMETERS) of
+    case amoc_scenario_config:get_scenario_settings(?ALL_PARAMETERS) of
         {ok, Settings} ->
-            config:store_scenario_settings(Settings),
-            config:dump_settings(),
+            amoc_scenario_config:store_scenario_settings(Settings),
+            amoc_scenario_config:dump_settings(),
 
             [PublicationRate, NodeCreationRate] = [proplists:get_value(Key, Settings) ||
                                                       Key <- [publication_rate, node_creation_rate]],
@@ -57,7 +57,7 @@ init() ->
 
 -spec start(amoc_scenario:user_id(), amoc_scenario:state()) -> any().
 start(Id, Settings) ->
-    config:store_scenario_settings(Settings),
+    amoc_scenario_config:store_scenario_settings(Settings),
     Client = connect_amoc_user(Id),
     case get_role(Id) of
         coordinator -> start_coordinator(Client, Settings);
@@ -90,8 +90,8 @@ start_coordinator(Client, Settings) ->
 
 coordinator_fn(Settings) ->
     lager:debug("coordinator process ~p", [self()]),
-    config:store_scenario_settings(Settings),
-    config:dump_settings(),
+    amoc_scenario_config:store_scenario_settings(Settings),
+    amoc_scenario_config:dump_settings(),
     coordinator_loop([]).
 
 coordinator_loop(AllPids) ->
@@ -418,9 +418,9 @@ random_suffix() ->
 %% Config helpers
 %%------------------------------------------------------------------------------------------------
 get_parameter(Name) ->
-    case config:get_parameter(Name) of
+    case amoc_scenario_config:get_parameter(Name) of
         {error,Err} ->
-            lager:error("config:get_parameter/1 failed ~p", [Err]),
+            lager:error("amoc_scenario_config:get_parameter/1 failed ~p", [Err]),
             exit(Err);
         {ok,Value} -> Value
     end.

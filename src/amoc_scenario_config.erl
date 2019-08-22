@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 30. Mar 2019 01:15
 %%%-------------------------------------------------------------------
--module(config).
+-module(amoc_scenario_config).
 -author("denys").
 
 %% API
