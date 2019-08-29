@@ -8,25 +8,30 @@
 
 -required_variable({'ROOM_SIZE', <<"Number of users in a room.">>}).
 -required_variable({'ROOM_CREATION_RATE', <<"Rate of room creations (per minute, def:600)">>}).
+-required_variable({'GDPR_REMOVAL_RATE', <<"Rate of user removals (per minute, def:1)">>}).
 -required_variable({'PUBLICATION_RATE', <<"Rate of publications (per minute, def:1500)">>}).
 -required_variable({'ACTIVATION_POLICY', <<"Publish after subscribtion of (def: all_rooms | n_rooms)"/utf8>>}).
 -required_variable({'MIM_HOST', <<"The virtual host served by the server (def: <<\"localhost\">>)"/utf8>>}).
 -required_variable({'MUC_HOST', <<"The virtual MUC host served by the server (def: <<\"muclight.localhost\">>)"/utf8>>}).
+-required_variable({'MIM_REST_ENDPOINT', <<"MongooseIM REST endpoint (def: \"http://localhost:8088\">)">>}).
 
 -define(ALL_PARAMETERS, [
     {room_size, 'ROOM_SIZE', 5, positive_integer},
     {room_creation_rate, 'ROOM_CREATION_RATE', 600, positive_integer},
+    {gdpr_removal_rate, 'GDPR_REMOVAL_RATE', 1, positive_integer},
     {publication_rate, 'PUBLICATION_RATE', 1500, positive_integer},
     {activation_policy, 'ACTIVATION_POLICY', n_rooms, [all_rooms, n_rooms]},
     {mim_host, 'MIM_HOST', <<"localhost">>, bitstring},
-    {muc_host, 'MUC_HOST', <<"muclight.localhost">>, bitstring}
+    {muc_host, 'MUC_HOST', <<"muclight.localhost">>, bitstring},
+    {mim_rest_endpoint, 'MIM_REST_ENDPOINT', "http://localhost:8088", none}
 ]).
 
--define(GROUP_NAME, <<"coordinator">>).
 -define(ROOM_CREATION_THROTTLING, room_creation).
 -define(PUBLICATION_THROTTLING, publication).
+-define(REMOVAL_THROTTLING, user_removal).
 
--define(COORDINATOR_TIMEOUT, 100000).
+%% this prevents user processes from restarting
+-define(STOP_USER, throw(stop)).
 
 -export([init/0, start/2]).
 
@@ -35,12 +40,16 @@ init() ->
     init_metrics(),
     case config:get_scenario_settings(?ALL_PARAMETERS) of
         {ok, Settings} ->
+            http_req:start(),
+
             config:store_scenario_settings(Settings), config:dump_settings(),
 
-            [PublicationRate, RoomCreationRate] = [proplists:get_value(Key, Settings) ||
-                Key <- [publication_rate, room_creation_rate]],
+            [PublicationRate, RoomCreationRate, GDPRRemovalRate] =
+                [proplists:get_value(Key, Settings) ||
+                    Key <- [publication_rate, room_creation_rate, gdpr_removal_rate]],
             amoc_throttle:start(?ROOM_CREATION_THROTTLING, RoomCreationRate),
             amoc_throttle:start(?PUBLICATION_THROTTLING, PublicationRate),
+            amoc_throttle:start(?REMOVAL_THROTTLING, GDPRRemovalRate),
 
             start_coordinator(Settings),
             {ok, Settings};
@@ -63,46 +72,22 @@ init_metrics() ->
 %% Coordinator
 %%------------------------------------------------------------------------------------------------
 start_coordinator(Settings) ->
-    pg2:create(?GROUP_NAME),
-    Coordinator = spawn(fun() -> coordinator_fn(Settings) end),
-    pg2:join(?GROUP_NAME, Coordinator).
+    Plan = get_plan(),
+    coordinator:start_link(Plan, Settings).
 
-coordinator_fn(Settings) ->
-    lager:debug("coordinator process ~p", [self()]),
-    config:store_scenario_settings(Settings),
-    config:dump_settings(),
-    coordinator_loop([]).
+get_plan() ->
+    [{get_room_size(), fun(PidsAndClients) ->
+        make_full_rooms(PidsAndClients),
+        activate_users(pids(PidsAndClients), n_rooms)
+                       end},
+     {all, fun(PidsAndClients) -> activate_users(pids(PidsAndClients), all_rooms) end}].
 
-coordinator_loop(AllPids) ->
-    N = get_room_size(),
-    case wait_for_n_clients([], N) of
-        {timeout, []} when AllPids =:= [] -> coordinator_loop([]);
-        {timeout, Pids} ->
-            activate_users(Pids, n_rooms),
-            activate_users(Pids ++ AllPids, all_rooms),
-            lager:error("Waited too long for the new user!"),
-            coordinator_loop([]);
-        {ok, Pids} ->
-            activate_users(Pids, n_rooms),
-            coordinator_loop(Pids ++ AllPids)
-    end.
+pids(PidsAndClients) ->
+    {Pids, _Clients} = lists:unzip(PidsAndClients),
+    Pids.
 
-wait_for_n_clients(PidsAndJids, 0) ->
-    make_full_rooms(PidsAndJids),
-    Pids = [Pid || {Pid, _} <- PidsAndJids],
-    {ok, Pids};
-wait_for_n_clients(PidsAndJids, N) ->
-    receive
-        {new_client, NewPid, NewJid} ->
-            lager:debug("Coordinator received ~p~n", [NewJid]),
-            wait_for_n_clients([{NewPid, NewJid} | PidsAndJids], N - 1)
-    after ?COORDINATOR_TIMEOUT ->
-        Pids = [Pid || {Pid, _} <- PidsAndJids],
-        make_full_rooms(PidsAndJids),
-        {timeout, Pids}
-    end.
-
-make_full_rooms(PidsAndJids) ->
+make_full_rooms(PidsAndClients) ->
+    PidsAndJids = [{Pid, Client#client.jid} || {Pid, Client} <- PidsAndClients],
     [begin
          MemberJids = [Jid || {_, Jid} <- PidsAndJids, Jid =/= OwnerJid],
          OwnerPid ! {add_users, MemberJids}
@@ -111,16 +96,11 @@ make_full_rooms(PidsAndJids) ->
 activate_users(Pids, ActivationPolicy) ->
     case get_parameter(activation_policy) of
         ActivationPolicy ->
-            [schedule_publishing(Pid) || Pid <- Pids];
+            [begin
+                 schedule_publishing(Pid),
+                 schedule_removal(Pid)
+             end || Pid<-Pids];
         _ -> ok
-    end.
-
-get_coordinator_pid() ->
-    case pg2:get_members(?GROUP_NAME) of
-        [Coordinator] -> Coordinator;
-        _ -> %% [] or {error, {no_such_group, ?GROUP_NAME}}
-            timer:sleep(100),
-            get_coordinator_pid()
     end.
 
 %%------------------------------------------------------------------------------------------------
@@ -131,14 +111,12 @@ start_user(Client) ->
     erlang:monitor(process, Client#client.rcv_pid),
     create_muc_light_room(Client),
     escalus_tcp:set_active(Client#client.rcv_pid, true),
-    send_jid_and_pid_to_coordinator(Client),
+    send_info_to_coordinator(Client),
     user_loop(Client, 0).
 
-send_jid_and_pid_to_coordinator(Client) ->
-    Coordinator = get_coordinator_pid(),
-    lager:debug("Process ~p sending pid and jid to coordinator ~p", [self(), Coordinator]),
-    Jid = escalus_client:short_jid(Client),
-    Coordinator ! {new_client, self(), Jid}.
+send_info_to_coordinator(Client) ->
+    lager:debug("Process ~p, sending info about myself to coordinator", [self()]),
+    coordinator:register_user(Client).
 
 user_loop(Client, Time) ->
     receive
@@ -164,12 +142,18 @@ user_loop(Client, Time) ->
 
         {add_users, MemberJids} ->
             add_users_to_room(Client, MemberJids),
-            user_loop(Client, Time)
+            user_loop(Client, Time);
+        remove_user ->
+            lager:debug("Removing myself ~p", [self()]),
+            remove_self(Client)
     end.
 
 
 schedule_publishing(Pid) ->
     amoc_throttle:send(?PUBLICATION_THROTTLING, Pid, publish_item).
+
+schedule_removal(Pid) ->
+    amoc_throttle:send(?REMOVAL_THROTTLING, Pid, remove_user).
 
 update_publication_interval(0, _Now) ->
     ok;
@@ -180,6 +164,15 @@ update_publication_interval(Time, Now) ->
 update_message_ttd(Time, Now) ->
     Interval = Now - Time,
     amoc_metrics:update_time(message_ttd, Interval).
+
+remove_self(Client) ->
+    UserName = escalus_client:username(Client),
+    UserServer = escalus_client:server(Client),
+    Path = list_to_binary(["/api/users/", UserServer, "/", UserName]),
+    Host = get_parameter(mim_rest_endpoint),
+    {ok, R} = http_req:request(Host, Path, <<"DELETE">>, []),
+    lager:debug("removing user ~p:~n~p", [UserName,R]),
+    ?STOP_USER.
 
 %%------------------------------------------------------------------------------------------------
 %% User connection
