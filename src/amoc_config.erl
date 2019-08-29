@@ -69,10 +69,10 @@ get_value_and_verify({Name, Env, DefaultValue, VerificationMethod}) ->
     ValueVerification = verify_value(Value, VerificationMethod),
     Verification = case {DefaultValueVerification, ValueVerification} of
                        {true, true} -> true;
-                       {true, false} ->
+                       {false, true} ->
                            lager:error("Invalid default value for ~p", [Name]),
                            {false, bad_default_value};
-                       {false, true} ->
+                       {true, false} ->
                            lager:error("Invalid value for ~p", [Name]),
                            {false, bad_value};
                        {false, false} ->

@@ -15,7 +15,8 @@ all() ->
      config_osenv_dynamic_test,
      parse_scenario_settings_returns_map_if_all_params_are_valid,
      parse_scenario_settings_uses_default_value_if_a_param_is_not_set,
-     parse_scenario_settings_shadows_default_value].
+     parse_scenario_settings_shadows_default_value,
+     parse_scenario_settings_returns_error_for_invalid_values ].
 
 config_osenv_test(_Config) ->
     given_osenv_set([{"AMOC_interarrival", "100"},
@@ -92,6 +93,20 @@ parse_scenario_settings_shadows_default_value(_) ->
     {ok, Settings} = amoc_config:parse_scenario_settings(SettingsWithChangedDefault),
     ?assertMatch({ok, OriginalValue}, amoc_config:get_scenario_parameter(Name, Settings)).
 
+parse_scenario_settings_returns_error_for_invalid_values(_) ->
+    given_amoc_started(),
+    IncorrectScenarioParams = incorrect_scenario_params(),
+    Defaults = correct_scenario_params(),
+
+    given_scenario_parameters_set(IncorrectScenarioParams),
+    Result = amoc_config:parse_scenario_settings([{a_name, 'A_VAR', <<"bitstring">>, positive_integer} | Defaults]),
+    ?assertMatch({error,
+                  {invalid_settings,
+                   [{a_name, <<"bitstring">>, bad_value_bad_default_value},
+                     {iq_timeout, 0, bad_value},
+                     {coordinator_delay, -1, bad_value},
+                     {activation_policy, some_nodes, bad_value},
+                     {mim_host, an_atom, bad_value}]}}, Result).
 
 
 correct_scenario_params() ->
@@ -101,6 +116,15 @@ correct_scenario_params() ->
      {activation_policy,  'ACTIVATION_POLICY',       all_nodes, [all_nodes, n_nodes]},
      {mim_host,           'MIM_HOST',          <<"localhost">>, bitstring}
     ].
+
+incorrect_scenario_params() ->
+    [
+     {iq_timeout,         'IQ_TIMEOUT',                  0, positive_integer},
+     {coordinator_delay,  'COORDINATOR_DELAY',               -1, nonnegative_integer},
+     {activation_policy,  'ACTIVATION_POLICY',       some_nodes, [all_nodes, n_nodes]},
+     {mim_host,           'MIM_HOST',          an_atom, bitstring}
+    ].
+
 
 given_scenario_parameters_set(ScenarioParams) ->
     Params = [{Name, Value} || {_, Name, Value, _} <- ScenarioParams],
