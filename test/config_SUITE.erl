@@ -79,7 +79,7 @@ parse_scenario_settings_uses_default_value_if_a_param_is_not_set(_) ->
     given_amoc_started(),
     ScenarioParams = correct_scenario_params(),
     given_scenario_parameters_set(ScenarioParams),
-    SettingsWithNotSetParam = [{not_set_param, 'NOT_SET_SCENARIO_PARAM',  1234, none} | ScenarioParams],
+    SettingsWithNotSetParam = [{not_set_param, 1234, none} | ScenarioParams],
     {ok, Settings} = amoc_config:parse_scenario_settings(SettingsWithNotSetParam),
     ?assertMatch({ok, 1234}, amoc_config:get_scenario_parameter(not_set_param, Settings)).
 
@@ -87,9 +87,9 @@ parse_scenario_settings_shadows_default_value(_) ->
     given_amoc_started(),
     ScenarioParams = correct_scenario_params(),
     given_scenario_parameters_set(ScenarioParams),
-    [{Name, Var, OriginalValue, _} | Rest] = ScenarioParams,
+    [{Name, OriginalValue, _} | Rest] = ScenarioParams,
     NewRandomValue = base64:encode(crypto:strong_rand_bytes(5)),
-    SettingsWithChangedDefault = [{Name, Var, NewRandomValue, none} | Rest],
+    SettingsWithChangedDefault = [{Name, NewRandomValue, none} | Rest],
     {ok, Settings} = amoc_config:parse_scenario_settings(SettingsWithChangedDefault),
     ?assertMatch({ok, OriginalValue}, amoc_config:get_scenario_parameter(Name, Settings)).
 
@@ -99,7 +99,7 @@ parse_scenario_settings_returns_error_for_invalid_values(_) ->
     Defaults = correct_scenario_params(),
 
     given_scenario_parameters_set(IncorrectScenarioParams),
-    Result = amoc_config:parse_scenario_settings([{a_name, 'A_VAR', <<"bitstring">>, positive_integer} | Defaults]),
+    Result = amoc_config:parse_scenario_settings([{a_name, <<"bitstring">>, positive_integer} | Defaults]),
     ?assertMatch({error,
                   {invalid_settings,
                    [{a_name, <<"bitstring">>, bad_value_bad_default_value},
@@ -111,21 +111,27 @@ parse_scenario_settings_returns_error_for_invalid_values(_) ->
 
 correct_scenario_params() ->
     [
-     {iq_timeout,         'IQ_TIMEOUT',                  10000, positive_integer},
-     {coordinator_delay,  'COORDINATOR_DELAY',               0, nonnegative_integer},
-     {activation_policy,  'ACTIVATION_POLICY',       all_nodes, [all_nodes, n_nodes]},
-     {mim_host,           'MIM_HOST',          <<"localhost">>, bitstring}
+     {iq_timeout,        10000, positive_integer},
+     {coordinator_delay, 0, nonnegative_integer},
+     {activation_policy, all_nodes, [all_nodes, n_nodes]},
+     {mim_host,          <<"localhost">>, bitstring}
     ].
 
 incorrect_scenario_params() ->
     [
-     {iq_timeout,         'IQ_TIMEOUT',                  0, positive_integer},
-     {coordinator_delay,  'COORDINATOR_DELAY',               -1, nonnegative_integer},
-     {activation_policy,  'ACTIVATION_POLICY',       some_nodes, [all_nodes, n_nodes]},
-     {mim_host,           'MIM_HOST',          an_atom, bitstring}
+     {iq_timeout,        0, positive_integer},
+     {coordinator_delay, -1, nonnegative_integer},
+     {activation_policy, some_nodes, [all_nodes, n_nodes]},
+     {mim_host,          an_atom, bitstring}
     ].
 
 
 given_scenario_parameters_set(ScenarioParams) ->
-    Params = [{Name, Value} || {_, Name, Value, _} <- ScenarioParams],
-    application:set_env([{amoc, Params}]).
+    [os:putenv(env_name(Name), format_value(Value)) || {Name, Value, _} <- ScenarioParams].
+
+env_name(Name) ->
+    "AMOC_" ++ string:uppercase(erlang:atom_to_list(Name)).
+
+format_value(Value) ->
+    io_lib:format("~tp", [Value]).
+

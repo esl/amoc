@@ -12,8 +12,7 @@
 
 -export_type([scenario_configuration/0, settings/0]).
 
--type name() :: atom().
--type env_var() :: atom().
+-type name() :: atom() | string().
 -type value() :: any().
 
 -type one_of() :: [any()].
@@ -21,7 +20,7 @@
 -type validation() :: func() | one_of() | bitstring | nonnegative_integer | positive_integer | none.
 -type reason() :: atom().
 
--type parameter_configuration() :: {name(), env_var(), DefValue :: value(), validation()}.
+-type parameter_configuration() :: {name(), DefValue :: value(), validation()}.
 -type scenario_configuration() :: [parameter_configuration()].
 
 -type settings() :: #{name() => value()}.
@@ -35,14 +34,31 @@ get(Name) ->
     get(Name, undefined).
 
 -spec get(name(), any()) -> any().
-get(Name, Default) ->
-    case os:getenv("AMOC_" ++ erlang:atom_to_list(Name)) of
+get(Name, Default) when is_atom(Name) ->
+    EnvName = "AMOC_" ++ erlang:atom_to_list(Name),
+    case get_from_env(EnvName) of
         false ->
             application:get_env(amoc, Name, Default);
         Value ->
-            parse_value(Value)
+            Value
+    end;
+get(Name, Default) when is_list(Name) ->
+    EnvName = "AMOC_" ++ Name,
+    case get_from_env(EnvName) of
+        false ->
+            Default;
+        Value ->
+            Value
     end.
-
+%%
+%% ------------------------------------------------------------------
+%% @doc
+%% This function reads scenarion parameters from env variables only
+%% without consulting application envs.
+%% The env name is a uppercase representation of the atom name passed in the list
+%% of parameters.
+%% For example: name iq_timeout is translated to AMOC_IQ_TIMEOUT env var name
+%% ------------------------------------------------------------------
 -spec parse_scenario_settings(scenario_configuration()) -> {ok, settings()} | {error, invalid_settings()}.
 parse_scenario_settings(Config) ->
     ParametersVerification = [get_value_and_verify(C) || C <- Config],
@@ -63,8 +79,9 @@ get_scenario_parameter(Name, Settings) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
-get_value_and_verify({Name, Env, DefaultValue, VerificationMethod}) ->
-    Value = amoc_config:get(Env, DefaultValue),
+get_value_and_verify({Name, DefaultValue, VerificationMethod}) ->
+    EnvName = string:uppercase(erlang:atom_to_list(Name)),
+    Value = amoc_config:get(EnvName, DefaultValue),
     DefaultValueVerification = verify_value(DefaultValue, VerificationMethod),
     ValueVerification = verify_value(Value, VerificationMethod),
     Verification = case {DefaultValueVerification, ValueVerification} of
@@ -101,6 +118,14 @@ is_positive_integer(I) -> is_integer(I) andalso I > 0.
 is_nonnegative_integer(I) -> is_integer(I) andalso I >= 0.
 
 is_one_of(Element, List) -> lists:any(fun(El) -> El =:= Element end, List).
+
+get_from_env(EnvName) ->
+    case os:getenv(EnvName) of
+        false ->
+            false;
+        Value ->
+            parse_value(Value)
+    end.
 
 -spec parse_value(string()) -> any().
 parse_value(String) ->
