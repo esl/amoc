@@ -147,7 +147,7 @@ After that the scenario will keep running.
 ## Configuration
 
 amoc is configured through OTP application environment variables that
-are loaded from the configuration file, operating system environment variables 
+are loaded from the configuration file, operating system environment variables
 (with prefix ``AMOC_``) and Erlang application environment variables
 (`priv/app.config`).
 
@@ -247,6 +247,12 @@ docker run -d \
            --name amoc_container \
            amoc_image:tag
 ```
+
+If there is a need to point amoc inside the container to some additional paths with code,
+it can be done by specifying variable `AMOC_EXTRA_CODE_PATHS` like in the examples below.
+
+* `-e AMOC_EXTRA_CODE_PATHS=/a_single_path`
+* `-e AMOC_EXTRA_CODE_PATHS="/first_path /second_path"`
 
 ### Useful commands with Amoc container:
 
