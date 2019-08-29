@@ -16,14 +16,14 @@
 -required_variable({'MIM_HOST',           <<"The virtual host served by the server (def: <<\"localhost\">>)"/utf8>>}).
 
 -define(ALL_PARAMETERS,[
-    {iq_timeout,         'IQ_TIMEOUT',                    10000, positive_integer},
-    {coordinator_delay,  'COORDINATOR_DELAY',                 0, nonnegative_integer},
-    {node_creation_rate, 'NODE_CREATION_RATE',              600, positive_integer},
-    {publication_size,   'PUBLICATION_SIZE',                300, nonnegative_integer},
-    {publication_rate,   'PUBLICATION_RATE',               1500, positive_integer},
-    {n_of_subscribers,   'N_OF_SUBSCRIBERS',                 50, nonnegative_integer},
-    {activation_policy,  'ACTIVATION_POLICY',         all_nodes, [all_nodes, n_nodes]},
-    {mim_host,           'MIM_HOST',            <<"localhost">>, bitstring}
+    {iq_timeout,                   10000, positive_integer},
+    {coordinator_delay,                0, nonnegative_integer},
+    {node_creation_rate,             600, positive_integer},
+    {publication_size,               300, nonnegative_integer},
+    {publication_rate,              1500, positive_integer},
+    {n_of_subscribers,                50, nonnegative_integer},
+    {activation_policy,        all_nodes, [all_nodes, n_nodes]},
+    {mim_host,           <<"localhost">>, bitstring}
 ]).
 
 -define(PEP_NODE_NS, <<"just_some_random_namespace">>).
