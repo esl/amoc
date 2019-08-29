@@ -42,13 +42,12 @@
 -spec init() -> {ok, amoc_scenario:state()} | {error, Reason :: term()}.
 init() ->
     init_metrics(),
-    case amoc_scenario_config:get_scenario_settings(?ALL_PARAMETERS) of
+    case amoc_config:parse_scenario_settings(?ALL_PARAMETERS) of
         {ok, Settings} ->
-            amoc_scenario_config:store_scenario_settings(Settings),
-            amoc_scenario_config:dump_settings(),
 
-            [PublicationRate, NodeCreationRate] = [proplists:get_value(Key, Settings) ||
-                                                      Key <- [publication_rate, node_creation_rate]],
+            {ok, PublicationRate} = amoc_config:get_scenario_parameter(publication_rate, Settings),
+            {ok, NodeCreationRate} = amoc_config:get_scenario_parameter(node_creation_rate, Settings),
+
             amoc_throttle:start(?NODE_CREATION_THROTTLING, NodeCreationRate),
             amoc_throttle:start(?PUBLICATION_THROTTLING, PublicationRate),
             {ok, Settings};
@@ -57,11 +56,10 @@ init() ->
 
 -spec start(amoc_scenario:user_id(), amoc_scenario:state()) -> any().
 start(Id, Settings) ->
-    amoc_scenario_config:store_scenario_settings(Settings),
-    Client = connect_amoc_user(Id),
+    Client = connect_amoc_user(Id, Settings),
     case get_role(Id) of
         coordinator -> start_coordinator(Client, Settings);
-        user -> start_user(Client)
+        user -> start_user(Client, Settings)
     end.
 
 init_metrics() ->
@@ -86,31 +84,29 @@ start_coordinator(Client, Settings) ->
     pg2:create(?GROUP_NAME),
     Coordinator = spawn(fun() -> coordinator_fn(Settings) end),
     pg2:join(?GROUP_NAME, Coordinator),
-    start_user(Client).
+    start_user(Client, Settings).
 
 coordinator_fn(Settings) ->
     lager:debug("coordinator process ~p", [self()]),
-    amoc_scenario_config:store_scenario_settings(Settings),
-    amoc_scenario_config:dump_settings(),
-    coordinator_loop([]).
+    coordinator_loop(Settings, []).
 
-coordinator_loop(AllPids) ->
-    N = get_no_of_node_subscribers(),
-    coordinator_delay(),
+coordinator_loop(Settings, AllPids) ->
+    N = get_no_of_node_subscribers(Settings),
+    coordinator_delay(Settings),
     case wait_for_n_clients([], [], N) of
-        {timeout, []} when AllPids =:= [] -> coordinator_loop([]);
+        {timeout, []} when AllPids =:= [] -> coordinator_loop(Settings, []);
         {timeout, Pids} ->
-            activate_users(Pids, n_nodes),
-            activate_users(Pids ++ AllPids, all_nodes),
+            activate_users(Settings, Pids, n_nodes),
+            activate_users(Settings, Pids ++ AllPids, all_nodes),
             lager:error("Waited too long for the new user!"),
-            coordinator_loop([]);
+            coordinator_loop(Settings, []);
         {ok, Pids} ->
-            activate_users(Pids, n_nodes),
-            coordinator_loop(Pids ++ AllPids)
+            activate_users(Settings, Pids, n_nodes),
+            coordinator_loop(Settings, Pids ++ AllPids)
     end.
 
-coordinator_delay() ->
-    timer:sleep(get_parameter(coordinator_delay)).
+coordinator_delay(Settings) ->
+    timer:sleep(get_parameter(coordinator_delay, Settings)).
 
 wait_for_n_clients(Pids, Clients, 0) ->
     make_all_clients_friends(Clients),
@@ -132,8 +128,8 @@ make_all_clients_friends(Clients) ->
             send_presence(C2, <<"subscribe">>, C1)
         end, Clients).
 
-activate_users(Pids, ActivationPolicy) ->
-    case get_parameter(activation_policy) of
+activate_users(Settings, Pids, ActivationPolicy) ->
+    case get_parameter(activation_policy, Settings) of
         ActivationPolicy ->
             [schedule_publishing(Pid)||Pid<-Pids];
         _ -> ok
@@ -150,46 +146,46 @@ get_coordinator_pid() ->
 %%------------------------------------------------------------------------------------------------
 %% User
 %%------------------------------------------------------------------------------------------------
-start_user(Client) ->
+start_user(Client, Settings) ->
     lager:debug("user process ~p", [self()]),
-    create_new_node(Client),
+    create_new_node(Client, Settings),
     erlang:monitor(process, Client#client.rcv_pid),
     escalus_tcp:set_active(Client#client.rcv_pid, true),
     send_presence_with_caps(Client),
-    user_loop(Client, #{}).
+    user_loop(Settings, Client, #{}).
 
-create_new_node(Client) ->
+create_new_node(Client, Settings) ->
     Coordinator = get_coordinator_pid(),
     amoc_throttle:send_and_wait(?NODE_CREATION_THROTTLING, create_node),
-    create_pubsub_node(Client),
+    create_pubsub_node(Client, Settings),
     Coordinator ! {new_client, self(), Client}.
 
-user_loop(Client, Requests) ->
-    IqTimeout = get_parameter(iq_timeout),
+user_loop(Settings, Client, Requests) ->
+    IqTimeout = get_parameter(iq_timeout, Settings),
     receive
         {stanza, _, #xmlel{name = <<"message">>} = Stanza, #{recv_timestamp := TimeStamp}} ->
             process_msg(Stanza, TimeStamp),
-            user_loop(Client, Requests);
+            user_loop(Settings, Client, Requests);
         {stanza, _, #xmlel{name = <<"iq">>} = Stanza, #{recv_timestamp := TimeStamp}} ->
-            NewRequests = process_iq(Client, Stanza, TimeStamp, Requests),
-            user_loop(Client, NewRequests);
+            NewRequests = process_iq(Client, Stanza, TimeStamp, Requests, Settings),
+            user_loop(Settings, Client, NewRequests);
         {stanza, _, #xmlel{name = <<"presence">>} = Stanza, _} ->
             process_presence(Client, Stanza),
-            user_loop(Client, Requests);
+            user_loop(Settings, Client, Requests);
         publish_item ->
-            {TS, Id} = publish_pubsub_item(Client),
+            {TS, Id} = publish_pubsub_item(Client, Settings),
             amoc_metrics:update_counter(publication_query, 1),
-            user_loop(Client, Requests#{Id=>{new, TS}});
+            user_loop(Settings, Client, Requests#{Id=>{new, TS}});
         {'DOWN', _, process, Pid, Info} when Pid =:= Client#client.rcv_pid ->
             lager:error("TCP connection process ~p down: ~p", [Pid, Info]);
         Msg ->
             lager:error("unexpected message ~p", [Msg])
     after IqTimeout ->
-        user_loop(Client, verify_request(Requests))
+        user_loop(Settings, Client, verify_request(Requests, Settings))
     end.
 
-verify_request(Requests) ->
-    IqTimeout = get_parameter(iq_timeout),
+verify_request(Requests, Settings) ->
+    IqTimeout = get_parameter(iq_timeout, Settings),
     Now = os:system_time(microsecond),
     VerifyFN =
         fun(Key, Value) ->
@@ -213,9 +209,9 @@ schedule_publishing(Pid) ->
 %%------------------------------------------------------------------------------------------------
 %% User connection
 %%------------------------------------------------------------------------------------------------
-connect_amoc_user(Id) ->
+connect_amoc_user(Id, Settings) ->
     ExtraProps = amoc_xmpp:pick_server([[{host, "127.0.0.1"}]]) ++
-    [{server, get_parameter(mim_host)},
+    [{server, get_parameter(mim_host, Settings)},
      {socket_opts, socket_opts()}],
 
     {ok, Client, _} = amoc_xmpp:connect_or_exit(Id, ExtraProps),
@@ -230,7 +226,7 @@ socket_opts() ->
 %%------------------------------------------------------------------------------------------------
 %% Node creation
 %%------------------------------------------------------------------------------------------------
-create_pubsub_node(Client) ->
+create_pubsub_node(Client, Settings) ->
     ReqId = iq_id(create, Client),
     Request = publish_pubsub_stanza(Client, ReqId, #xmlel{name = <<"nothing">>}),
     %Request = escalus_pubsub_stanza:create_node(Client, ReqId, ?NODE),
@@ -238,7 +234,7 @@ create_pubsub_node(Client) ->
 
     {CreateNodeTime, CreateNodeResult} = timer:tc(
         fun() ->
-            catch escalus:wait_for_stanza(Client, get_parameter(iq_timeout))
+            catch escalus:wait_for_stanza(Client, get_parameter(iq_timeout, Settings))
         end),
 
     case {escalus_pred:is_iq_result(Request, CreateNodeResult), CreateNodeResult} of
@@ -280,9 +276,9 @@ caps() ->
 %%------------------------------------------------------------------------------------------------
 %% Item publishing
 %%------------------------------------------------------------------------------------------------
-publish_pubsub_item(Client) ->
+publish_pubsub_item(Client, Settings) ->
     Id = iq_id(publish, Client),
-    PayloadSize = get_parameter(publication_size),
+    PayloadSize = get_parameter(publication_size, Settings),
     Content = item_content(PayloadSize),
     Request = publish_pubsub_stanza(Client, Id, Content),
     escalus:send(Client, Request),
@@ -332,7 +328,7 @@ process_presence(Client, Stanza) ->
             ok %%it's ok to just ignore other presence notifications
     end.
 
-process_iq(Client, #xmlel{name = <<"iq">>} = Stanza, TS, Requests) ->
+process_iq(Client, #xmlel{name = <<"iq">>} = Stanza, TS, Requests, Settings) ->
     Id = exml_query:attr(Stanza, <<"id">>),
     Type = exml_query:attr(Stanza, <<"type">>),
     NS = exml_query:path(Stanza, [{element, <<"query">>}, {attr, <<"xmlns">>}]),
@@ -344,14 +340,14 @@ process_iq(Client, #xmlel{name = <<"iq">>} = Stanza, TS, Requests) ->
         {_, undefined, <<"publish", _/binary>>, undefined} ->
             lager:warning("unknown publish iq ~p", [Stanza]);
         {_, undefined, <<"publish", _/binary>>, {Tag, ReqTS}} ->
-            handle_publish_resp(Stanza, {Tag, TS - ReqTS});
+            handle_publish_resp(Stanza, {Tag, TS - ReqTS}, Settings);
         _ ->
             lager:warning("unexpected iq ~p", [Stanza])
     end,
     maps:remove(Id, Requests).
 
-handle_publish_resp(PublishResult, {Tag, PublishTime}) ->
-    IqTimeout = get_parameter(iq_timeout),
+handle_publish_resp(PublishResult, {Tag, PublishTime}, Settings) ->
+    IqTimeout = get_parameter(iq_timeout, Settings),
     case escalus_pred:is_iq_result(PublishResult) of
         true ->
             lager:debug("publish time ~p", [PublishTime]),
@@ -405,17 +401,17 @@ random_suffix() ->
 %%------------------------------------------------------------------------------------------------
 %% Config helpers
 %%------------------------------------------------------------------------------------------------
-get_parameter(Name) ->
-    case amoc_scenario_config:get_parameter(Name) of
+get_parameter(Name, Settings) ->
+    case amoc_config:get_scenario_parameter(Name, Settings) of
         {error,Err} ->
-            lager:error("amoc_scenario_config:get_parameter/1 failed ~p", [Err]),
+            lager:error("amoc_config:get_scenario_parameter/2 failed ~p", [Err]),
             exit(Err);
         {ok,Value} -> Value
     end.
 
-get_no_of_node_subscribers() ->
+get_no_of_node_subscribers(Settings) ->
     %instead of constant No of subscriptions we can use min/max values.
-    get_parameter(n_of_subscribers).
+    get_parameter(n_of_subscribers, Settings).
 
 
 
