@@ -18,6 +18,7 @@ install: make compile
 script:
     - make test
     - rebar3 dialyzer
+    - rebar3 xref
 
 cache:
     directories:

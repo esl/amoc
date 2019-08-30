@@ -71,7 +71,7 @@ annotate(Tags, Format, Args) ->
             Json = jiffy:encode(#{what => What, tags => Tags}),
             Path = "/events/",
             Destination = "http://" ++ Host,
-            {ok, Client} = fusco:start_link({Destination, []}),
+            {ok, Client} = fusco:start_link(Destination, []),
             ok = fusco:connect(Client),
             Response = fusco:request(Client, Path, "POST", [], Json, 5000),
             {ok, {{200, _}, _, _}} = Response,
