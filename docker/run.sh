@@ -16,7 +16,7 @@ sed -i -e "s/AMOC_HOSTS/${AMOC_HOSTS}/" ${SYSCONFIG}
 
 if [[ -n "${AMOC_EXTRA_CODE_PATHS// /}" ]]; then
     #if the var is not empty and contains sth else then just spaces
-    echo "-pz ${aMOC_EXTRA_CODE_PATHS}" >> ${VMARGS}
+    echo "-pz ${AMOC_EXTRA_CODE_PATHS}" >> ${VMARGS}
 fi
 
 /sbin/my_init
