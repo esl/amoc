@@ -158,7 +158,7 @@ from_json(Req, State = #state{resource = Resource}) ->
 
 
 %% internal function
--spec get_users_and_batches_from_body(cowboy_req:req()) -> {ok, term(),
+-spec get_users_and_batches_from_body(cowboy_req:req()) -> {ok, term(), term(),
                                                             cowboy_req:req()} |
         {error, bad_request, cowboy_req:req()}.
 get_users_and_batches_from_body(Req) ->

@@ -13,7 +13,7 @@
 
 -record(state, {scenario :: amoc:scenario() | undefined,
                 scenario_state :: any(),
-                nodes ::  non_neg_integer(),
+                nodes ::  non_neg_integer() | undefined,
                 node_id :: node_id() | undefined}).
 
 
