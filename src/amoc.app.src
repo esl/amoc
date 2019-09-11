@@ -6,6 +6,7 @@
   {applications, [
                   kernel,
                   stdlib,
+                  sasl,
                   lager,
                   jiffy,
                   exometer,
@@ -14,7 +15,8 @@
                   trails,
                   cowboy,
                   cowboy_swagger,
-                  amqp_client
+                  amqp_client,
+                  runtime_tools
                  ]},
   {mod, { amoc_app, []}},
   {env, [{repeat_interval, 60000},
