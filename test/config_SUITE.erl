@@ -1,8 +1,5 @@
 -module(config_SUITE).
 
--behaviour(proper_statem).
-
--include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -compile(export_all).
@@ -13,10 +10,10 @@ all() ->
      config_none_test,
      config_osappenv_test,
      config_osenv_dynamic_test,
-     parse_scenario_settings_returns_map_if_all_params_are_valid,
-     parse_scenario_settings_uses_default_value_if_a_param_is_not_set,
-     parse_scenario_settings_shadows_default_value,
-     parse_scenario_settings_returns_error_for_invalid_values ].
+     parse_scenario_settings_uses_default_values,
+     parse_scenario_settings_shadows_default_values,
+     parse_scenario_settings_returns_error_for_invalid_values,
+     parse_scenario_settings_returns_preprocessed_value].
 
 config_osenv_test(_Config) ->
     given_osenv_set([{"AMOC_interarrival", "100"},
@@ -68,70 +65,90 @@ config_osenv_dynamic_test(_) ->
     %% then
     ?assertEqual(baz, amoc_config:get(foo)).
 
-parse_scenario_settings_returns_map_if_all_params_are_valid(_) ->
+parse_scenario_settings_uses_default_values(_) ->
     given_amoc_started(),
     ScenarioParams = correct_scenario_params(),
-    given_scenario_parameters_set(ScenarioParams),
+    given_scenario_parameters_not_set(ScenarioParams),
     Result = amoc_config:parse_scenario_settings(ScenarioParams),
-    ?assertMatch({ok, SettingsMap} when is_map(SettingsMap), Result).
+    assert_settings(Result, ScenarioParams).
 
-parse_scenario_settings_uses_default_value_if_a_param_is_not_set(_) ->
+parse_scenario_settings_shadows_default_values(_) ->
     given_amoc_started(),
     ScenarioParams = correct_scenario_params(),
     given_scenario_parameters_set(ScenarioParams),
-    SettingsWithNotSetParam = [{not_set_param, 1234, none} | ScenarioParams],
-    {ok, Settings} = amoc_config:parse_scenario_settings(SettingsWithNotSetParam),
-    ?assertMatch({ok, 1234}, amoc_config:get_scenario_parameter(not_set_param, Settings)).
-
-parse_scenario_settings_shadows_default_value(_) ->
-    given_amoc_started(),
-    ScenarioParams = correct_scenario_params(),
-    given_scenario_parameters_set(ScenarioParams),
-    [{Name, OriginalValue, _} | Rest] = ScenarioParams,
-    NewRandomValue = base64:encode(crypto:strong_rand_bytes(5)),
-    SettingsWithChangedDefault = [{Name, NewRandomValue, none} | Rest],
-    {ok, Settings} = amoc_config:parse_scenario_settings(SettingsWithChangedDefault),
-    ?assertMatch({ok, OriginalValue}, amoc_config:get_scenario_parameter(Name, Settings)).
+    AnotherScenarioParams = another_correct_scenario_params(),
+    Result = amoc_config:parse_scenario_settings(AnotherScenarioParams),
+    assert_settings(Result, ScenarioParams).
 
 parse_scenario_settings_returns_error_for_invalid_values(_) ->
     given_amoc_started(),
     IncorrectScenarioParams = incorrect_scenario_params(),
     Defaults = correct_scenario_params(),
 
-    given_scenario_parameters_set(IncorrectScenarioParams),
-    Result = amoc_config:parse_scenario_settings([{a_name, <<"bitstring">>, positive_integer} | Defaults]),
+    given_scenario_parameters_set([{a_name, 3, none} | IncorrectScenarioParams]),
+    Result = amoc_config:parse_scenario_settings([{a_name, <<"bitstring">>, positive_integer},
+                                                  {another_name, an_atom, bitstring} | Defaults]),
     ?assertMatch({error,
                   {invalid_settings,
-                   [{a_name, <<"bitstring">>, bad_value_bad_default_value},
-                     {iq_timeout, 0, bad_value},
-                     {coordinator_delay, -1, bad_value},
-                     {activation_policy, some_nodes, bad_value},
-                     {mim_host, an_atom, bad_value}]}}, Result).
+                   [{a_name, 3, bad_default_value},
+                    {another_name, an_atom, bad_value_bad_default_value},
+                    {pos_int, 0, bad_value},
+                    {nonneg_int, -1, bad_value},
+                    {atom, wrong_atom, bad_value},
+                    {some_bitstring, an_atom, bad_value},
+                    {another_bitstring, "string", bad_value}]}}, Result).
 
+parse_scenario_settings_returns_preprocessed_value(_) ->
+    given_amoc_started(),
+    ValidationFn = fun(_) -> {true, another_atom} end,
+    ScenarioParams = [{preprocessed_param, an_atom, ValidationFn}],
+    {ok, Settings} = amoc_config:parse_scenario_settings(ScenarioParams),
+    ?assertEqual({ok, another_atom}, amoc_config:get_scenario_parameter(preprocessed_param, Settings)).
+
+assert_settings(Result, ScenarioParams) ->
+    ?assertMatch({ok, SettingsMap} when is_map(SettingsMap), Result),
+    {ok, Settings} = Result,
+    ?assertEqual(map_size(Settings), length(ScenarioParams)),
+    [?assertEqual({ok, Value}, amoc_config:get_scenario_parameter(Name, Settings)) ||
+        {Name, Value, _} <- ScenarioParams].
 
 correct_scenario_params() ->
-    [
-     {iq_timeout,        10000, positive_integer},
-     {coordinator_delay, 0, nonnegative_integer},
-     {activation_policy, all_nodes, [all_nodes, n_nodes]},
-     {mim_host,          <<"localhost">>, bitstring}
-    ].
+    scenario_params(10000, 0, some_atom, <<"some_bitstring">>, <<"another_bitstring">>).
+
+another_correct_scenario_params() ->
+    scenario_params(20000, 3, another_atom, <<"yet_another_bitstring">>, <<"bitstring">>).
 
 incorrect_scenario_params() ->
+    scenario_params(0, -1, wrong_atom, an_atom, "string").
+
+scenario_params(PosInt, NonNegInt, Atom, BitString1, BitString2) ->
     [
-     {iq_timeout,        0, positive_integer},
-     {coordinator_delay, -1, nonnegative_integer},
-     {activation_policy, some_nodes, [all_nodes, n_nodes]},
-     {mim_host,          an_atom, bitstring}
+        {pos_int, PosInt, positive_integer},
+        {nonneg_int, NonNegInt, nonnegative_integer},
+        {atom, Atom, [some_atom, another_atom]},
+        {some_bitstring, BitString1, bitstring},
+        {another_bitstring, BitString2, fun erlang:is_bitstring/1}
     ].
 
+given_scenario_parameters_not_set(ScenarioParams) ->
+    [unset_env(Name) || {Name, _, _} <- ScenarioParams].
 
 given_scenario_parameters_set(ScenarioParams) ->
-    [os:putenv(env_name(Name), format_value(Value)) || {Name, Value, _} <- ScenarioParams].
+    [set_env(Name, Value) || {Name, Value, _} <- ScenarioParams].
+
+unset_env(Name) ->
+    EnvName = env_name(Name),
+    os:unsetenv(EnvName),
+    false = os:getenv(EnvName).
+
+set_env(Name, Value) ->
+    os:putenv(env_name(Name), format_value(Value)).
 
 env_name(Name) ->
     "AMOC_" ++ string:uppercase(erlang:atom_to_list(Name)).
 
 format_value(Value) ->
     io_lib:format("~tp", [Value]).
+
+
 
