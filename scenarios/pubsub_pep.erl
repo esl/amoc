@@ -34,8 +34,7 @@
 -define(NODE_CREATION_THROTTLING, node_creation).
 -define(PUBLICATION_THROTTLING, publication).
 
--define(COORDINATOR_ID, 1).
--define(COORDINATOR_TIMEOUT, 100000).
+-define(COORDINATOR_TIMEOUT, 100).
 
 -export([init/0, start/2]).
 
@@ -50,6 +49,7 @@ init() ->
 
             amoc_throttle:start(?NODE_CREATION_THROTTLING, NodeCreationRate),
             amoc_throttle:start(?PUBLICATION_THROTTLING, PublicationRate),
+            start_coordinator(Settings),
             {ok, Settings};
         Error -> Error
     end.
@@ -57,10 +57,7 @@ init() ->
 -spec start(amoc_scenario:user_id(), amoc_scenario:state()) -> any().
 start(Id, Settings) ->
     Client = connect_amoc_user(Id, Settings),
-    case get_role(Id) of
-        coordinator -> start_coordinator(Client, Settings);
-        user -> start_user(Client, Settings)
-    end.
+    start_user(Client, Settings).
 
 init_metrics() ->
     Counters = [message,
@@ -73,76 +70,40 @@ init_metrics() ->
     [amoc_metrics:init(counters, Metric) || Metric <- Counters],
     [amoc_metrics:init(times, Metric) || Metric <- Times].
 
-get_role(1) -> coordinator;
-get_role(_) -> user.
-
 
 %%------------------------------------------------------------------------------------------------
 %% Coordinator
 %%------------------------------------------------------------------------------------------------
-start_coordinator(Client, Settings) ->
-    pg2:create(?GROUP_NAME),
-    Coordinator = spawn(fun() -> coordinator_fn(Settings) end),
-    pg2:join(?GROUP_NAME, Coordinator),
-    start_user(Client, Settings).
+start_coordinator(Settings) ->
+    amoc_coordinator:start(?MODULE, get_coordination_plan(Settings), ?COORDINATOR_TIMEOUT).
 
-coordinator_fn(Settings) ->
-    lager:debug("coordinator process ~p", [self()]),
-    coordinator_loop(Settings, []).
-
-coordinator_loop(Settings, AllPids) ->
+get_coordination_plan(Settings) ->
     N = get_no_of_node_subscribers(Settings),
-    coordinator_delay(Settings),
-    case wait_for_n_clients([], [], N) of
-        {timeout, []} when AllPids =:= [] -> coordinator_loop(Settings, []);
-        {timeout, Pids} ->
-            activate_users(Settings, Pids, n_nodes),
-            activate_users(Settings, Pids ++ AllPids, all_nodes),
-            lager:error("Waited too long for the new user!"),
-            coordinator_loop(Settings, []);
-        {ok, Pids} ->
-            activate_users(Settings, Pids, n_nodes),
-            coordinator_loop(Settings, Pids ++ AllPids)
+
+    [{N, [fun make_clients_friends/3,
+          users_activation(Settings,n_nodes),
+          coordination_delay(Settings)]},
+     {all,users_activation(Settings,all_nodes)}].
+
+coordination_delay(Settings) ->
+    Delay = get_parameter(coordinator_delay, Settings),
+    fun(coordinate) -> timer:sleep(Delay);
+       (_) -> ok
     end.
 
-coordinator_delay(Settings) ->
-    timer:sleep(get_parameter(coordinator_delay, Settings)).
+make_clients_friends(_, _, undefined) -> ok;
+make_clients_friends(_, {_, C1}, {_, C2}) ->
+    send_presence(C1, <<"subscribe">>, C2),
+    send_presence(C2, <<"subscribe">>, C1).
 
-wait_for_n_clients(Pids, Clients, 0) ->
-    make_all_clients_friends(Clients),
-    {ok, Pids};
-wait_for_n_clients(Pids, Clients, N) ->
-    receive
-        {new_client, NewPid, NewClient} ->
-            wait_for_n_clients([NewPid | Pids],
-                               [NewClient | Clients], N - 1)
-    after ?COORDINATOR_TIMEOUT ->
-        make_all_clients_friends(Clients),
-        {timeout, Pids}
-    end.
-
-make_all_clients_friends(Clients) ->
-    escalus_utils:distinct_pairs(
-        fun(C1, C2) ->
-            send_presence(C1, <<"subscribe">>, C2),
-            send_presence(C2, <<"subscribe">>, C1)
-        end, Clients).
-
-activate_users(Settings, Pids, ActivationPolicy) ->
+users_activation(Settings, ActivationPolicy) ->
     case get_parameter(activation_policy, Settings) of
         ActivationPolicy ->
-            [schedule_publishing(Pid)||Pid<-Pids];
-        _ -> ok
+            fun(_, CoordinationData) ->
+                [schedule_publishing(Pid) || {Pid, _} <- CoordinationData]
+            end;
+        _ -> fun(_) -> ok end
     end.
-
-get_coordinator_pid() ->
-    case pg2:get_members(?GROUP_NAME) of
-        [Coordinator] -> Coordinator;
-        _ -> %% [] or {error, {no_such_group, ?GROUP_NAME}}
-            timer:sleep(100),
-            get_coordinator_pid()
-    end.
-
 %%------------------------------------------------------------------------------------------------
 %% User
 %%------------------------------------------------------------------------------------------------
@@ -155,10 +116,9 @@ start_user(Client, Settings) ->
     user_loop(Settings, Client, #{}).
 
 create_new_node(Client, Settings) ->
-    Coordinator = get_coordinator_pid(),
     amoc_throttle:send_and_wait(?NODE_CREATION_THROTTLING, create_node),
     create_pubsub_node(Client, Settings),
-    Coordinator ! {new_client, self(), Client}.
+    amoc_coordinator:add(?MODULE, Client).
 
 user_loop(Settings, Client, Requests) ->
     IqTimeout = get_parameter(iq_timeout, Settings),
