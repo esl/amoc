@@ -49,7 +49,7 @@ execute_plan_without_timeout(_Config) ->
     nothing_after_tags(History, [all1, all2]).
 
 reset_plan_without_timeout(_Config) ->
-    N = 5, Name = ?FUNCTION_NAME,
+    N1 = 5, N2 = 6, Name = ?FUNCTION_NAME,
 
     Plan = [All1 = {all, [mocked_action(all1, 2), mocked_action(all1, 1)]},
             Item1 = {2, [mocked_action(item1, 2), mocked_action(item1, 1)]},
@@ -58,24 +58,38 @@ reset_plan_without_timeout(_Config) ->
             Item3 = {3, mocked_action(item3, 1)}],
 
     ?assertEqual(ok, amoc_coordinator:start(Name, Plan, infinity)),
-    [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N)],
+    [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N1)],
 
     amoc_coordinator:reset(Name),
     meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', reset], 1000),
 
-    History = meck:history(?MOCK_MOD),
-    [?assertEqual(reset, check_item_calls(History, Item, Tag, N)) ||
+    History1 = meck:history(?MOCK_MOD),
+    [?assertEqual(reset, check_item_calls(History1, Item, Tag, N1)) ||
         {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
                         {All1, all1}, {All2}]],
 
-    nothing_after_tags(History, [all1, all2]),
+    nothing_after_tags(History1, [all1, all2]),
+
+    meck:reset(?MOCK_MOD),
+    [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N2)],
+
+    amoc_coordinator:reset(Name),
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', reset], 1000),
+
+    History2 = meck:history(?MOCK_MOD),
+    [?assertEqual(reset, check_item_calls(History2, Item, Tag, N2)) ||
+        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
+                        {All1, all1}, {All2}]],
+
+    nothing_after_tags(History2, [all1, all2]),
+
 
     amoc_coordinator:stop(Name),
     meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', stop], 1000).
 
 
 execute_plan_with_timeout(_Config) ->
-    N = 6, Name = ?FUNCTION_NAME,
+    N1 = 7, N2 = 8, Name = ?FUNCTION_NAME,
 
     Plan = [Item1 = {2, [mocked_action(item1, 2), mocked_action(item1, 1)]},
             All1 = {all, [mocked_action(all1, 2), mocked_action(all1, 1)]},
@@ -84,19 +98,32 @@ execute_plan_with_timeout(_Config) ->
             Item3 = {3, mocked_action(item3, 1)}],
 
     ?assertEqual(ok, amoc_coordinator:start(Name, Plan, 1)),
-    [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N)],
+    [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N1)],
 
     meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', timeout], 2000),
 
-    ?assertError(timeout, meck:wait(length(Plan)+1, ?MOCK_MOD, f_1, ['_', timeout], 2000)),
+    ?assertError(timeout, meck:wait(length(Plan) + 1, ?MOCK_MOD, f_1, ['_', timeout], 2000)),
 
-    History = meck:history(?MOCK_MOD),
-    ct:pal("meck history ~p", [History]),
-    [?assertEqual(timeout, check_item_calls(History, Item, Tag, N)) ||
+    History1 = meck:history(?MOCK_MOD),
+    [?assertEqual(timeout, check_item_calls(History1, Item, Tag, N1)) ||
         {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
                         {All1, all1}, {All2, all2}]],
 
-    nothing_after_tags(History, [all1, all2]),
+    nothing_after_tags(History1, [all1, all2]),
+
+    meck:reset(?MOCK_MOD),
+    [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N2)],
+
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', timeout], 2000),
+
+    ?assertError(timeout, meck:wait(length(Plan) + 1, ?MOCK_MOD, f_1, ['_', timeout], 2000)),
+
+    History2 = meck:history(?MOCK_MOD),
+    [?assertEqual(timeout, check_item_calls(History2, Item, Tag, N2)) ||
+        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
+                        {All1, all1}, {All2, all2}]],
+
+    nothing_after_tags(History2, [all1, all2]),
 
     amoc_coordinator:stop(Name),
     meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', stop], 1000).
