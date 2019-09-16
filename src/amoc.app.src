@@ -16,7 +16,8 @@
                   cowboy,
                   cowboy_swagger,
                   amqp_client,
-                  runtime_tools
+                  runtime_tools,
+                  mnesia
                  ]},
   {mod, { amoc_app, []}},
   {env, [{repeat_interval, 60000},
