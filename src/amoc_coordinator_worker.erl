@@ -10,16 +10,14 @@
 %% gen_server callbacks
 -export([init/1,
          handle_call/3,
-         handle_cast/2,
-         handle_info/2]).
+         handle_cast/2]).
 
 -type event() :: amoc_coordinator:coordination_event().
 -type action() :: amoc_coordinator:coordination_action().
 -type data() :: amoc_coordinator:coordination_data().
 
--record(state, {required_n = 1 :: pos_integer(),
+-record(state, {required_n = all :: pos_integer() | all,
                 n = 0 :: non_neg_integer(),
-                timeout = infinity :: amoc_coordinator:coordination_timeout(),
                 actions = [] :: [action()],
                 collect_data = true :: boolean(),
                 accumulator = [] :: [data()]}).
@@ -28,17 +26,17 @@
 %%% API
 %%%===================================================================
 
--spec(start(amoc_coordinator:coordination_item_with_timeout()) -> {ok, Pid :: pid()}).
+-spec(start(amoc_coordinator:normalized_coordination_item()) -> {ok, Pid :: pid()}).
 start(CoordinationItem) -> gen_server:start(?MODULE, CoordinationItem, []).
 
 -spec(reset(pid()) -> ok).
-reset(Pid) -> gen_server:cast(Pid, reset).
+reset(Pid) -> gen_server:call(Pid, {reset,reset}).
 
 -spec(timeout(pid()) -> ok).
-timeout(Pid) -> erlang:send(Pid, timeout).
+timeout(Pid) -> gen_server:call(Pid, {reset,timeout}).
 
 -spec(stop(pid()) -> ok).
-stop(Pid) -> gen_server:cast(Pid, stop).
+stop(Pid) -> gen_server:call(Pid, {reset,stop}).
 
 -spec(add(pid(), data()) -> ok).
 add(Pid, Data) -> gen_server:cast(Pid, {add, Data}).
@@ -47,38 +45,26 @@ add(Pid, Data) -> gen_server:cast(Pid, {add, Data}).
 %%% gen_server callbacks
 %%%===================================================================
 
--spec(init(amoc_coordinator:coordination_item_with_timeout()) -> {ok, #state{}}).
-init({NoOfUsers, Actions, Timeout}) ->
-    State = #state{required_n = NoOfUsers, actions = Actions, timeout = Timeout},
+-spec(init(amoc_coordinator:normalized_coordination_item()) -> {ok, #state{}}).
+init({NoOfUsers, Actions}) ->
+    State = #state{required_n = NoOfUsers, actions = Actions},
     {ok, State#state{collect_data = is_acc_required(Actions)}}.
 
 
--spec(handle_call(term(), term(), #state{}) -> {reply, {error, not_implemented}, #state{}, timeout()}).
-handle_call(_Request, _From, #state{timeout = Timeout} = State) ->
-    {reply, {error, not_implemented}, State, Timeout}.
+-spec(handle_call({reset, reset | timeout | stop}, term(), #state{}) ->
+    {reply, ok, #state{}} | {stop, normal, ok, #state{}}).
+handle_call({reset, Event}, _, State) ->
+    NewState = reset_state(Event, State),
+    case Event of
+        stop -> {stop, normal, ok, NewState};
+        _ ->
+            {reply, ok, NewState}
+    end.
 
--spec(handle_cast(reset | stop | {add, any()}, #state{}) ->
-    {stop, normal, #state{}} |
-    {noreply, #state{}, timeout()} |
-    {noreply, #state{}}).
-handle_cast(reset, State) ->
-    NewState = reset_state(reset, State),
-    {noreply, NewState};
-handle_cast({add, Data}, #state{timeout = Timeout} = State) ->
+-spec(handle_cast({add, data()}, #state{}) -> {noreply, #state{}}).
+handle_cast({add, Data}, State) ->
     NewState = add_data(Data, State),
-    {noreply, NewState, Timeout};
-handle_cast(stop, State) ->
-    NewState = reset_state(stop, State),
-    {stop, normal, NewState}.
-
--spec(handle_info(timeout | any(), #state{}) ->
-    {noreply, NewState :: #state{}, timeout()} |
-    {noreply, NewState :: #state{}}).
-handle_info(timeout, State) ->
-    NewState = reset_state(timeout, State),
-    {noreply, NewState};
-handle_info(_, #state{timeout = Timeout} = State) ->
-    {noreply, State, Timeout}.
+    {noreply, NewState}.
 
 
 %%%===================================================================

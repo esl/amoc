@@ -13,9 +13,10 @@
          handle_call/2,
          terminate/2]).
 
--define(DEFAULT_TIMEOUT, 30000). %% 30 seconds
+-define(DEFAULT_TIMEOUT, 30). %% 30 seconds
 
 -define(is_pos_int(Integer), (is_integer(Integer) andalso Integer > 0)).
+-define(is_n_of_users(N), (?is_pos_int(N) orelse N =:= all)).
 -define(is_timeout(Timeout), (?is_pos_int(Timeout) orelse Timeout =:= infinity)).
 
 -type state() :: {worker, pid()} | {timeout, pid()}.
@@ -26,8 +27,6 @@
 
 -type coordination_event() :: coordinate | timeout | stop | reset.
 
--type coordination_timeout() :: pos_integer() | infinity.
-
 -type coordination_action() ::
     fun((coordination_event(), [coordination_data()]) -> any()) |
     fun((coordination_event(), maybe_coordination_data(), maybe_coordination_data()) -> any()) |
@@ -35,19 +34,18 @@
 
 -type coordination_actions() :: [coordination_action()] | coordination_action().
 
--type coordination_item_with_timeout() :: {NoOfUsers :: pos_integer(),
-                                           coordination_actions(),
-                                           coordination_timeout()}.
+-type coordination_item() :: {NoOfUsers :: pos_integer() | all,
+                              coordination_actions()}.
 
--type coordination_item_without_timeout() :: {NoOfUsers :: pos_integer(),
-                                              coordination_actions()}.
-
--type coordination_item() :: coordination_item_without_timeout() |
-                             coordination_item_with_timeout().
+-type normalized_coordination_item() :: {NoOfUsers :: pos_integer() | all,
+                                         [coordination_action()]}.
 
 -type coordination_plan() :: [coordination_item()] | coordination_item().
 
--export_type([coordination_plan/0]).
+%% timeout in seconds
+-type coordination_timeout_in_sec() :: pos_integer() | infinity.
+
+-export_type([coordination_plan/0, normalized_coordination_item/0]).
 
 %%%===================================================================
 %%% Api
@@ -56,13 +54,25 @@
 start(Name, CoordinationPlan) ->
     start(Name, CoordinationPlan, ?DEFAULT_TIMEOUT).
 
--spec start(atom(), coordination_plan(), coordination_timeout()) -> ok | error.
-start(Name, CoordinationPlan, Timeout) ->
+-spec start(atom(), coordination_plan(), coordination_timeout_in_sec()) -> ok | error.
+start(Name, CoordinationPlan, Timeout) when ?is_timeout(Timeout) ->
+    Plan = normalize_coordination_plan(CoordinationPlan),
     case gen_event:start({local, Name}) of
         {ok, _} ->
-            Plan = normalize_coordination_plan(CoordinationPlan),
+            %% according to gen_event documentation:
+            %%
+            %%    When the event is received, the event manager calls
+            %%    handle_event(Event, State) for each installed event
+            %%    handler, in the same order as they were added.
+            %%
+            %% in reality the order is reversed, the last added handler
+            %% is executed at first. so to ensure that all the items in
+            %% the plan with NoOfUsers =:= all are executed in the very
+            %% end, we need to add them first.
+            AllItemsHandlers = lists:reverse([Item || {all, _} = Item <- Plan]),
+            [gen_event:add_handler(Name, ?MODULE, Item) || Item <- AllItemsHandlers],
+            [gen_event:add_handler(Name, ?MODULE, Item) || {N, _} = Item <- Plan, is_integer(N)],
             gen_event:add_handler(Name, ?MODULE, {timeout, Name, Timeout}),
-            [gen_event:add_handler(Name, ?MODULE, I) || I <- Plan],
             ok;
         {error, _} -> error
     end.
@@ -95,9 +105,10 @@ reset(Name) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(init({timeout, atom(), coordination_timeout()} | coordination_item_with_timeout()) -> {ok, state()}).
+-spec(init({timeout, atom(), coordination_timeout_in_sec()} | normalized_coordination_item()) ->
+    {ok, state()}).
 init({timeout, Name, Timeout}) ->
-    Pid = spawn(fun() -> timeout_fn(Name, Timeout, infinity) end),
+    Pid = spawn(fun() -> timeout_fn(Name, 1000 * Timeout, infinity) end),
     {ok, {timeout, Pid}};
 init(CoordinationItem) ->
     {ok, Pid} = amoc_coordinator_worker:start(CoordinationItem),
@@ -118,11 +129,11 @@ handle_event(Event, {timeout, Pid}) ->
     {ok, {timeout, Pid}};
 handle_event(Event, {worker, Pid}) ->
     case Event of
-        coordinator_timeout ->
+        coordinator_timeout -> %% synchronous notification
             amoc_coordinator_worker:timeout(Pid);
-        reset_coordinator ->
+        reset_coordinator -> %% synchronous notification
             amoc_coordinator_worker:reset(Pid);
-        {coordinate, Data} ->
+        {coordinate, Data} -> %% asnyc notification
             amoc_coordinator_worker:add(Pid, Data)
     end,
     {ok, {worker, Pid}}.
@@ -154,30 +165,32 @@ handle_call(_Request, State) ->
 terminate(_, {timeout, Pid}) ->
     erlang:send(Pid, terminate), ok;
 terminate(_, {worker, Pid}) ->
+    %% synchronous notification
     amoc_coordinator_worker:stop(Pid), ok.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
--spec normalize_coordination_plan(coordination_plan()) -> [coordination_item_with_timeout()].
+-spec normalize_coordination_plan(coordination_plan()) -> [normalized_coordination_item()].
 normalize_coordination_plan(CoordinationPlan) when is_tuple(CoordinationPlan) ->
     normalize_coordination_plan([CoordinationPlan]);
 normalize_coordination_plan(CoordinationPlan) ->
     [normalize_coordination_item(I) || I <- CoordinationPlan].
 
-normalize_coordination_item({NoOfUsers, Actions}) ->
-    normalize_coordination_item({NoOfUsers, Actions, infinity});
-normalize_coordination_item({NoOfUsers, Action, Timeout}) when is_function(Action) ->
-    normalize_coordination_item({NoOfUsers, [Action], Timeout});
-normalize_coordination_item({NoOfUsers, Actions, Timeout}) when ?is_pos_int(NoOfUsers),
-                                                                ?is_timeout(Timeout),
-                                                                is_list(Actions) ->
-    [assert_action(A) || A <- Actions],
-    {NoOfUsers, Actions, Timeout}.
+normalize_coordination_item({NoOfUsers, Action}) when is_function(Action) ->
+    normalize_coordination_item({NoOfUsers, [Action]});
+normalize_coordination_item({NoOfUsers, Actions}) when ?is_n_of_users(NoOfUsers),
+                                                       is_list(Actions) ->
+    [assert_action(NoOfUsers, A) || A <- Actions],
+    {NoOfUsers, Actions}.
 
-assert_action(Action) when is_function(Action, 1);
-                           is_function(Action, 2);
-                           is_function(Action, 3) ->
+assert_action(all, Action) when is_function(Action, 1);
+                                is_function(Action, 2) ->
+    ok;
+assert_action(N, Action) when is_integer(N),
+                              (is_function(Action, 1) orelse
+                               is_function(Action, 2) orelse
+                               is_function(Action, 3)) ->
     ok.
 
 timeout_fn(Name, CoordinationTimeout, Timeout) ->

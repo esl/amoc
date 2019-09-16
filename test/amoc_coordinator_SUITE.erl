@@ -10,8 +10,7 @@
 all() ->
     [execute_plan_without_timeout,
      reset_plan_without_timeout,
-     execute_plan_with_timeout,
-     execute_plan_with_individual_timeout].
+     execute_plan_with_timeout].
 
 init_per_suite(Config) ->
     meck:new(?MOCK_MOD, [non_strict, no_link]),
@@ -27,87 +26,80 @@ init_per_testcase(_, Config) ->
 end_per_suite(_Config) ->
     meck:unload().
 
-
-
 execute_plan_without_timeout(_Config) ->
     N = 4, Name = ?FUNCTION_NAME,
 
     Plan = [Item1 = {2, [mocked_action(item1, 2), mocked_action(item1, 1)]},
             Item2 = {4, [mocked_action(item2, 3), mocked_action(item2, 1)]},
-            Item3 = {3, mocked_action(item3, 1)}],
+            All1 = {all, [mocked_action(all1, 2), mocked_action(all1, 1)]},
+            Item3 = {3, mocked_action(item3, 1)},
+            All2 = {all, mocked_action(all2, 1)}],
 
-    amoc_coordinator:start(Name, Plan, infinity),
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan, infinity)),
     [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N)],
 
     amoc_coordinator:stop(Name),
-    meck:wait(3, ?MOCK_MOD, f_1, ['_', stop], 1000),
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', stop], 1000),
 
     History = meck:history(?MOCK_MOD),
     [?assertEqual(stop, check_item_calls(History, Item, Tag, N)) ||
-        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3}]].
+        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
+                        {All1, all1}, {All2}]],
+
+    nothing_after_tags(History, [all1, all2]).
 
 reset_plan_without_timeout(_Config) ->
     N = 5, Name = ?FUNCTION_NAME,
 
-    Plan = [Item1 = {2, [mocked_action(item1, 2), mocked_action(item1, 1)]},
+    Plan = [All1 = {all, [mocked_action(all1, 2), mocked_action(all1, 1)]},
+            Item1 = {2, [mocked_action(item1, 2), mocked_action(item1, 1)]},
             Item2 = {4, [mocked_action(item2, 3), mocked_action(item2, 1)]},
+            All2 = {all, mocked_action(all2, 1)},
             Item3 = {3, mocked_action(item3, 1)}],
 
-    amoc_coordinator:start(Name, Plan, infinity),
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan, infinity)),
     [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N)],
 
     amoc_coordinator:reset(Name),
-    meck:wait(3, ?MOCK_MOD, f_1, ['_', reset], 1000),
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', reset], 1000),
 
     History = meck:history(?MOCK_MOD),
     [?assertEqual(reset, check_item_calls(History, Item, Tag, N)) ||
-        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3}]],
+        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
+                        {All1, all1}, {All2}]],
+
+    nothing_after_tags(History, [all1, all2]),
 
     amoc_coordinator:stop(Name),
-    meck:wait(3, ?MOCK_MOD, f_1, ['_', stop], 1000).
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', stop], 1000).
 
 
 execute_plan_with_timeout(_Config) ->
     N = 6, Name = ?FUNCTION_NAME,
 
     Plan = [Item1 = {2, [mocked_action(item1, 2), mocked_action(item1, 1)]},
+            All1 = {all, [mocked_action(all1, 2), mocked_action(all1, 1)]},
             Item2 = {4, [mocked_action(item2, 3), mocked_action(item2, 1)]},
+            All2 = {all, mocked_action(all2, 1)},
             Item3 = {3, mocked_action(item3, 1)}],
 
-    amoc_coordinator:start(Name, Plan, 500),
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan, 1)),
     [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N)],
 
-    meck:wait(3, ?MOCK_MOD, f_1, ['_', timeout], 1000),
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', timeout], 2000),
 
-    ?assertError(timeout, meck:wait(4, ?MOCK_MOD, f_1, ['_', timeout], 1000)),
-
-    History = meck:history(?MOCK_MOD),
-    [?assertEqual(timeout, check_item_calls(History, Item, Tag, N)) ||
-        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3}]],
-
-    amoc_coordinator:stop(Name),
-    meck:wait(3, ?MOCK_MOD, f_1, ['_', stop], 1000).
-
-execute_plan_with_individual_timeout(_Config) ->
-    N = 7, Name = ?FUNCTION_NAME,
-
-    Plan = [{2, [mocked_action(item1, 2), mocked_action(item1, 1)]},
-            Item2 = {4, [mocked_action(item2, 3), mocked_action(item2, 1)], 500},
-            {3, mocked_action(item3, 1)}],
-
-    amoc_coordinator:start(Name, Plan, infinity),
-    [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N)],
-
-    meck:wait(1, ?MOCK_MOD, f_1, ['_', timeout], 1000),
-
-    ?assertError(timeout, meck:wait(2, ?MOCK_MOD, f_1, ['_', timeout], 1000)),
+    ?assertError(timeout, meck:wait(length(Plan)+1, ?MOCK_MOD, f_1, ['_', timeout], 2000)),
 
     History = meck:history(?MOCK_MOD),
+    ct:pal("meck history ~p", [History]),
     [?assertEqual(timeout, check_item_calls(History, Item, Tag, N)) ||
-        {Item, Tag} <- [{Item2, item2}]],
+        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
+                        {All1, all1}, {All2, all2}]],
+
+    nothing_after_tags(History, [all1, all2]),
 
     amoc_coordinator:stop(Name),
-    meck:wait(3, ?MOCK_MOD, f_1, ['_', stop], 1000).
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', stop], 1000).
 
 
 %% Helpers
@@ -130,8 +122,25 @@ mocked_action(Tag, 3) ->
            mock_mod:f_3(Tag, Event, undefined, undefined)
     end.
 
-check_item_calls(CallsHistory, {N, A, _}, Tag, NumberOfUsers) ->
-    check_item_calls(CallsHistory, {N, A}, Tag, NumberOfUsers);
+nothing_after_tags(History, Tags) ->
+    nothing_after_tags_(History, lists:reverse(Tags)).
+
+nothing_after_tags_(_, []) -> ok;
+nothing_after_tags_(History, [Tag | T]) ->
+    CallsWithTag = nothing_after_tag(History, Tag),
+    nothing_after_tags_(History -- CallsWithTag, T).
+
+nothing_after_tag(History, Tag) ->
+    CallsWithTag = lists:foldl(
+        fun({_, {_, _, [Tag1 | _]}, _} = Call, Acc) when Tag =:= Tag1 -> [Call | Acc];
+           (_, [_]) -> throw({calls_after_tag, Tag, History}); %% nonempty Acc, another tag
+           (_, []) -> []
+        end, [], History),
+    ?assertNotMatch([], CallsWithTag, {tag, Tag}),
+    CallsWithTag.
+
+check_item_calls(CallsHistory, {all, Actions}, Tag, NumberOfUsers) ->
+    check_item_calls(CallsHistory, {NumberOfUsers + 1, Actions}, Tag, NumberOfUsers);
 check_item_calls(CallsHistory, {N, Action}, Tag, NumberOfUsers) when is_function(Action) ->
     check_item_calls(CallsHistory, {N, [Action]}, Tag, NumberOfUsers);
 check_item_calls(CallsHistory, {N, Actions}, Tag, NumberOfUsers) ->
@@ -140,7 +149,7 @@ check_item_calls(CallsHistory, {N, Actions}, Tag, NumberOfUsers) ->
 check_filtered_calls(CallsHistory, {N, Actions}, NumberOfUsers, StartFrom) when N =< NumberOfUsers ->
     {coordinate, NewCallsHistory} = check_actions(CallsHistory, Actions, N, StartFrom),
     check_filtered_calls(NewCallsHistory, {N, Actions}, NumberOfUsers - N, StartFrom + N);
-check_filtered_calls(CallsHistory, {N, Actions}, NumberOfUsers, StartFrom) ->
+check_filtered_calls(CallsHistory, {_, Actions}, NumberOfUsers, StartFrom) ->
     {E, []} = check_actions(CallsHistory, Actions, NumberOfUsers, StartFrom),
     E.
 
