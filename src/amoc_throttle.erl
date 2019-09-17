@@ -20,9 +20,9 @@
 
 -define(DEFAULT_INTERVAL, 60000).%% one minute
 
--define(RATE(Name), [throttle, Name, rate]).
--define(EXEC_RATE(Name), [throttle, Name, exec_rate]).
--define(REQ_RATE(Name), [throttle, Name, req_rate]).
+-define(RATE(Name), {strict, [throttle, Name, rate]}).
+-define(EXEC_RATE(Name), {strict, [throttle, Name, exec_rate]}).
+-define(REQ_RATE(Name), {strict, [throttle, Name, req_rate]}).
 
 -type name() :: atom().
 
