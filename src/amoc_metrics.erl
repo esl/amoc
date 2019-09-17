@@ -5,7 +5,9 @@
 -export([update_time/2, update_counter/2, update_counter/1, update_gauge/2]).
 -export([messages_spiral_name/0, message_ttd_histogram_name/0]).
 
--type name() :: atom() | [atom()].
+-type simple_name() :: atom() | [atom()].
+
+-type name() :: simple_name() | {strict, simple_name()}.
 
 -type reporting_opts() :: #{reporter := atom(),
 interval := non_neg_integer(),
@@ -17,6 +19,7 @@ report => [atom()]}.
 init(Type, Name) ->
     init(Type, Name, default_reporting_opts()).
 
+-spec init(type(), name(), reporting_opts()) -> ok.
 init(Type, Name, Opts) ->
     ExName = make_name(Type, Name),
     ExType = exometer_metric_type(Type),
@@ -58,10 +61,15 @@ default_reporting_opts() ->
     #{reporter => exometer_report_graphite,
       interval => timer:seconds(10)}.
 
-make_name(Type, Name) when is_atom(Name) ->
-    [amoc, Type, Name];
-make_name(Type, Name) when is_list(Name) ->
-    [amoc, Type | Name].
+make_name(_, {strict, Name}) ->
+    add_name_prefix([amoc], Name);
+make_name(Type, Name) ->
+    add_name_prefix([amoc, Type], Name).
+
+add_name_prefix(Prefix, Name) when is_atom(Name) ->
+    Prefix ++ [Name];
+add_name_prefix(Prefix, Name) when is_list(Name) ->
+    Prefix ++ Name.
 
 metric_report_datapoints(gauge)     -> [value];
 metric_report_datapoints(spiral)    -> [count, one];
