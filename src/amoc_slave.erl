@@ -13,7 +13,8 @@
          start/2,
          monitor_master/1,
          ping/1,
-         node_name/1]).
+         node_name/1,
+         get_master_node/0]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -54,6 +55,13 @@ ping(Node) ->
 start(Host, Directory) ->
     gen_server:call(?SERVER, {start, Host, Directory}).
 
+-spec get_master_node() -> node().
+get_master_node() ->
+    case gen_server:call(?SERVER, get_master_node) of
+        undefined -> node();
+        MasterNode -> MasterNode
+    end.
+
 -spec monitor_master(node()) -> ok.
 monitor_master(Node) ->
     gen_server:call({?SERVER, Node}, {monitor_master, node()}).
@@ -75,6 +83,8 @@ init([]) ->
 handle_call({start, Host, Directory}, _From, State) ->
     State1 = handle_start(Host, Directory, State),
     {reply, ok, State1};
+handle_call(get_master_node, _From, #state{master = Master} = State) ->
+    {reply, Master, State};
 handle_call({monitor_master, Master}, _From, State) ->
     true = erlang:monitor_node(Master, true),
     {reply, ok, State#state{master = Master}};
