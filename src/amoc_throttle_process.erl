@@ -30,8 +30,8 @@
                 n :: integer(),
                 interval = 0 :: non_neg_integer(),  %%ms
                 delay_between_executions = 0 :: non_neg_integer(),  %%ms
-                schedule = [] :: [fun(()-> any())],
-                schedule_reversed = [] :: [fun(()-> any())]}).
+                schedule = [] :: [pid()],
+                schedule_reversed = [] :: [pid()]}).
 
 %%------------------------------------------------------------------------------
 %% Exported functions
@@ -47,7 +47,8 @@ stop(Pid) ->
 
 -spec run(pid(), fun(()-> any())) -> ok.
 run(Pid, Fun) ->
-    gen_server:cast(Pid, {run, Fun}).
+    RunnerPid = spawn(fun() -> async_runner(Fun) end),
+    gen_server:cast(Pid, {schedule, RunnerPid}).
 
 -spec update(pid(), non_neg_integer(), pos_integer()) -> ok.
 update(Pid, Interval, Rate) ->
@@ -91,8 +92,8 @@ handle_cast(pause_process, State) ->
     {noreply, State#state{pause = true}, {continue, maybe_run_fn}};
 handle_cast(resume_process, State) ->
     {noreply, State#state{pause = false}, {continue, maybe_run_fn}};
-handle_cast({run, Fn}, #state{schedule_reversed = SchRev} = State) ->
-    {noreply, State#state{schedule_reversed = [Fn | SchRev]}, {continue, maybe_run_fn}};
+handle_cast({schedule, RunnerPid}, #state{schedule_reversed = SchRev} = State) ->
+    {noreply, State#state{schedule_reversed = [RunnerPid | SchRev]}, {continue, maybe_run_fn}};
 handle_cast({update, Interval, Rate}, State) ->
     NewState = merge_state(initial_state(Interval, Rate), State),
     log_state("state update", NewState),
@@ -143,18 +144,27 @@ maybe_run_fn(#state{can_run_fn = true, pause = false, n = N} = State) when N > 0
 maybe_run_fn(State) ->
     State.
 
-run_fn(#state{schedule = [Fn | T], delay_between_executions = Delay, interval = Interval} = State) ->
-    Self = self(),
-    spawn(fun() -> run_and_wait(Fn, Interval), Self ! increase_n end),
+run_fn(#state{schedule = [RunnerPid | T], delay_between_executions = Delay, interval = Interval} = State) ->
+    RunnerPid ! {scheduled, self(), Interval},
     erlang:send_after(Delay, self(), delay_between_executions),
     State#state{schedule = T}.
 
-run_and_wait(Fn, Interval) ->
-    {TimeUs, _} = timer:tc(Fn),
-    Time = erlang:convert_time_unit(TimeUs, microsecond, millisecond),
-    case Interval - Time of
-        SleepTime when SleepTime > 0 -> timer:sleep(SleepTime);
-        _ -> ok
+async_runner(Fun) ->
+    receive
+        {scheduled, ThrottleProcessPid, Interval} ->
+            F = fun() -> try
+                             Fun()
+                         catch
+                             _:_ -> error
+                         end
+                end,
+            {TimeUs, _} = timer:tc(F),
+            Time = erlang:convert_time_unit(TimeUs, microsecond, millisecond),
+            case Interval - Time of
+                SleepTime when SleepTime > 0 -> timer:sleep(SleepTime);
+                _ -> ok
+            end,
+            ThrottleProcessPid ! increase_n
     end.
 
 timeout(State) ->
