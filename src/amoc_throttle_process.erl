@@ -75,7 +75,7 @@ init([Name, Interval, Rate]) ->
     {ok, InitialState#state{name = Name}, timeout(InitialState)}.
 
 -spec handle_info(term(), #state{}) -> {noreply, #state{}, {continue, maybe_run_fn}}.
-handle_info(increase_n, State) ->
+handle_info({'DOWN', _, process, _, _}, State) ->
     {noreply, inc_n(State), {continue, maybe_run_fn}};
 handle_info(delay_between_executions, State) ->
     {noreply, State#state{can_run_fn = true}, {continue, maybe_run_fn}};
@@ -147,28 +147,16 @@ maybe_run_fn(#state{can_run_fn = true, pause = false, n = N} = State) when N > 0
 maybe_run_fn(State) ->
     State.
 
-run_fn(#state{schedule = [RunnerPid | T], delay_between_executions = Delay, interval = Interval, name = Name} = State) ->
-    RunnerPid ! {scheduled, self(), Interval},
+run_fn(#state{schedule = [RunnerPid | T], delay_between_executions = Delay, name = Name} = State) ->
+    erlang:monitor(process, RunnerPid),
+    RunnerPid ! scheduled,
     amoc_throttle_controller:update_metric(Name, execution),
     erlang:send_after(Delay, self(), delay_between_executions),
     State#state{schedule = T}.
 
 async_runner(Fun) ->
     receive
-        {scheduled, ThrottleProcessPid, Interval} ->
-            F = fun() -> try
-                             Fun()
-                         catch
-                             _:_ -> error
-                         end
-                end,
-            {TimeUs, _} = timer:tc(F),
-            Time = erlang:convert_time_unit(TimeUs, microsecond, millisecond),
-            case Interval - Time of
-                SleepTime when SleepTime > 0 -> timer:sleep(SleepTime);
-                _ -> ok
-            end,
-            ThrottleProcessPid ! increase_n
+        scheduled -> Fun()
     end.
 
 timeout(State) ->
