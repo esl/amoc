@@ -56,34 +56,32 @@ run(Name, Fn) ->
     %% Diagram showing function execution flow in distributed env.
     %% generated using https://sequencediagram.org/ (remove "%%"):
     %%
-    %% 	  title Amoc distributed
-    %%    participantgroup  **Slave node**
-    %%        participant User
-    %%        participant Async runner
-    %%    end
-    %%    participantgroup **Master node**
-    %%        participant Throttle process
-    %%    end
-    %%    box left of User: inc req rate
+    %%        title Amoc distributed
+    %%        participantgroup  **Slave node**
+    %%            participant User
+    %%            participant Async runner
+    %%        end
+    %%        participantgroup **Master node**
+    %%            participant Throttle process
+    %%        end
+    %%        box left of User: inc req rate
     %%
-    %%    User -> *Async runner : Fun
+    %%        User -> *Async runner : Fun
     %%
-    %%    User -> Throttle process : {schedule, Async runner PID}
-    %%    box right of Throttle process : inc req rate
+    %%        User -> Throttle process : {schedule, Async runner PID}
+    %%        box right of Throttle process : inc req rate
     %%
     %%        ==throtlling delay==
     %%
-    %%    Throttle process -> Async runner:{scheduled, Throttle process PID, Interval}
+    %%        Throttle process -> Async runner: scheduled
     %%
-    %%    box left of Async runner : inc exec rate
-    %%    abox over Async runner : Fun()
-    %%    activate Async runner
-    %%    box right of Throttle process : inc exec rate
-    %%    deactivate Async runner
-    %%    Async runner -> Throttle process : increase n
-    %%    space 1
-    %%
-    %%    destroy Async runner
+    %%        box left of Async runner : inc exec rate
+    %%        abox over Async runner : Fun()
+    %%        activate Async runner
+    %%        box right of Throttle process : inc exec rate
+    %%        deactivate Async runner
+    %%        Async runner ->Throttle process:'DOWN'
+    %%        destroy Async runner
     %%
     %% for the local execution, req/exec rates are increased only by throttle process.
 
