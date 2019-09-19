@@ -86,7 +86,11 @@ handle_call({start, Host, Directory}, _From, State) ->
 handle_call(get_master_node, _From, #state{master = Master} = State) ->
     {reply, Master, State};
 handle_call({monitor_master, Master}, _From, State) ->
-    true = erlang:monitor_node(Master, true),
+    case node() of
+        Master -> ok;
+        _ ->
+            true = erlang:monitor_node(Master, true)
+    end,
     {reply, ok, State#state{master = Master}};
 handle_call(ping, _From, State) ->
     {reply, pong, State};
@@ -123,15 +127,19 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 -spec handle_start(string(), file:filename(), state()) -> state().
-handle_start(Host, Directory, #state{to_ack=Ack}=State) ->
-    create_status_file(<<"connecting">>),
-    _Port = start_slave_node(Host, Directory),
-    Node = node_name(Host),
-    Ack1 = [{Node, ?DEFAULT_RETRIES} | Ack],
-    State#state{to_ack = Ack1}.
+handle_start(Host, Directory, #state{to_ack = Ack} = State) ->
+    case {node_name(Host), node()} of
+        {Node, Node} -> State;
+        {Node, _} ->
+            create_status_file(<<"connecting">>),
+            maybe_start_slave_node(Host, Directory),
 
--spec start_slave_node(string(), file:filename()) -> port().
-start_slave_node(Host, Directory) ->
+            Ack1 = [{Node, ?DEFAULT_RETRIES} | Ack],
+            State#state{to_ack = Ack1}
+    end.
+
+-spec maybe_start_slave_node(string(), file:filename()) -> port().
+maybe_start_slave_node(Host, Directory) ->
     Cmd = "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "
           ++ Host ++ " " ++ Directory ++ "/bin/amoc start",
     erlang:open_port({spawn, Cmd}, [stream]).
