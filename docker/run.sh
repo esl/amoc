@@ -6,8 +6,8 @@ AMOC_GRAPHITE_HOST=${AMOC_GRAPHITE_HOST:-127.0.0.1}
 AMOC_GRAPHITE_PORT=${AMOC_GRAPHITE_PORT:-2003}
 AMOC_EXTRA_CODE_PATHS=${AMOC_EXTRA_CODE_PATHS:-""}
 
-SYSCONFIG="/home/amoc/amoc/releases/0.9.0/sys.config"
-VMARGS="/home/amoc/amoc/releases/0.9.0/vm.args"
+SYSCONFIG=${SYSCONFIG:-"/home/amoc/amoc/releases/0.9.0/sys.config"}
+VMARGS=${VMARGS:-"/home/amoc/amoc/releases/0.9.0/vm.args"}
 sed -e "s/AMOC_GRAPHITE_HOST/${AMOC_GRAPHITE_HOST}/" /sys.config.template > \
     ${SYSCONFIG}
 sed -i -e "s/AMOC_GRAPHITE_PORT/${AMOC_GRAPHITE_PORT}/" ${SYSCONFIG}
