@@ -25,12 +25,12 @@ init() ->
         fun() ->
             timer:sleep(200000),
             amoc_throttle:change_rate_gradually(?RATE_CHANGE_TEST,
-                                                1750, 21500, 60000, 200000, 5),
+                                                1750, 21500, 60000, 200000, 4),
             timer:sleep(950000),
             amoc_throttle:pause(?RATE_CHANGE_TEST),
             timer:sleep(100000),
             amoc_throttle:change_rate_gradually(?RATE_CHANGE_TEST,
-                                                20000, 1750, 60000, 200000, 3),
+                                                20000, 1750, 60000, 200000, 2),
             timer:sleep(100000),
             amoc_throttle:resume(?RATE_CHANGE_TEST)
         end),
@@ -53,15 +53,15 @@ rate_change_fn() ->
 
 parallel_execution_scenario() ->
     [parallel_execution_fn() || _ <- lists:seq(0, 10000)],
-    timer:sleep(200000),
+    timer:sleep(200000), %% 40 executions per minute
     amoc_throttle:pause(?PARALLEL_EXECUTION_TEST),
-    timer:sleep(150000),
+    timer:sleep(150000), %% 0 executions per minute
     amoc_throttle:resume(?PARALLEL_EXECUTION_TEST),
-    timer:sleep(100000),
+    timer:sleep(100000), %% 40 executions per minute
     amoc_throttle:change_rate(?PARALLEL_EXECUTION_TEST, 20, 60000),
-    timer:sleep(150000),
+    timer:sleep(150000), %% 20 executions per minute
     amoc_throttle:change_rate(?PARALLEL_EXECUTION_TEST, 30, 0),
-    timer:sleep(infinity).
+    timer:sleep(infinity). %% 60 executions per minute, and then 0
 
 parallel_execution_fn() ->
     %% just sleep 30 seconds
