@@ -19,7 +19,8 @@
          handle_call/3,
          handle_info/2,
          handle_cast/2,
-         handle_continue/2]).
+         handle_continue/2,
+         format_status/2]).
 
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
@@ -30,6 +31,7 @@
                 n :: integer(),
                 interval = 0 :: non_neg_integer(),  %%ms
                 delay_between_executions = 0 :: non_neg_integer(),  %%ms
+                tref :: timer:tref() | undefined,
                 schedule = [] :: [pid()],
                 schedule_reversed = [] :: [pid()]}).
 
@@ -72,7 +74,8 @@ get_state(Pid) ->
 -spec init(list()) -> {ok, #state{}, timeout()}.
 init([Name, Interval, Rate]) ->
     InitialState = initial_state(Interval, Rate),
-    {ok, InitialState#state{name = Name}, timeout(InitialState)}.
+    StateWithTimer = maybe_start_timer(InitialState),
+    {ok, StateWithTimer#state{name = Name}, timeout(InitialState)}.
 
 -spec handle_info(term(), #state{}) -> {noreply, #state{}, {continue, maybe_run_fn}}.
 handle_info({'DOWN', _, process, _, _}, State) ->
@@ -110,6 +113,12 @@ handle_call(_, _, State) ->
 handle_continue(maybe_run_fn, State) ->
     NewState = maybe_run_fn(State),
     {noreply, NewState, timeout(NewState)}.
+
+format_status(_Opt, [_PDict, State]) ->
+    ScheduleLen=length(State#state.schedule),
+    ScheduleRevLen=length(State#state.schedule_reversed),
+    State1=setelement(#state.schedule,State,ScheduleLen),
+    setelement(#state.schedule_reversed,State1,ScheduleRevLen).
 %%------------------------------------------------------------------------------
 %% internal functions
 %%------------------------------------------------------------------------------
@@ -132,8 +141,21 @@ initial_state(Interval, Rate) when Rate > 0 ->
 
 merge_state(#state{interval = I, delay_between_executions = D, n = N, max_n = MaxN},
             #state{n = OldN, max_n = OldMaxN} = OldState) ->
+    maybe_stop_timer(OldState),
     NewN = N - (OldMaxN - OldN),
-    OldState#state{interval = I, delay_between_executions = D, n = NewN, max_n = MaxN}.
+    NewState = OldState#state{interval = I, delay_between_executions = D, n = NewN, max_n = MaxN, tref = undefined},
+    maybe_start_timer(NewState).
+
+maybe_start_timer(#state{delay_between_executions = 0, tref = undefined} = State) ->
+    State#state{can_run_fn = true};
+maybe_start_timer(#state{delay_between_executions = D, tref = undefined} = State) ->
+    {ok, TRef} = timer:send_interval(D, delay_between_executions),
+    State#state{can_run_fn = false, tref = TRef}.
+
+maybe_stop_timer(#state{tref = undefined}) ->
+    ok;
+maybe_stop_timer(#state{tref = TRef}) ->
+    {ok, cancel} = timer:cancel(TRef).
 
 maybe_run_fn(#state{schedule = [], schedule_reversed = []} = State) ->
     State;
@@ -141,18 +163,20 @@ maybe_run_fn(#state{schedule = [], schedule_reversed = SchRev} = State) ->
     NewSchedule = lists:reverse(SchRev),
     NewState = State#state{schedule = NewSchedule, schedule_reversed = []},
     maybe_run_fn(NewState);
+maybe_run_fn(#state{interval = 0, pause = false, n = N} = State) when N > 0 ->
+    NewState = run_fn(State),
+    maybe_run_fn(NewState);
 maybe_run_fn(#state{can_run_fn = true, pause = false, n = N} = State) when N > 0 ->
     NewState = run_fn(State),
-    NewState#state{can_run_fn = false, n = N - 1};
+    NewState#state{can_run_fn = false};
 maybe_run_fn(State) ->
     State.
 
-run_fn(#state{schedule = [RunnerPid | T], delay_between_executions = Delay, name = Name} = State) ->
+run_fn(#state{schedule = [RunnerPid | T], name = Name, n = N} = State) ->
     erlang:monitor(process, RunnerPid),
     RunnerPid ! scheduled,
     amoc_throttle_controller:update_metric(Name, execution),
-    erlang:send_after(Delay, self(), delay_between_executions),
-    State#state{schedule = T}.
+    State#state{schedule = T, n = N - 1}.
 
 async_runner(Fun) ->
     receive
