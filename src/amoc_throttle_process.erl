@@ -130,12 +130,13 @@ initial_state(Interval, Rate) when Rate > 0 ->
         Rate < 5 -> lager:error("too low rate, please reduce NoOfProcesses");
         true -> ok
     end,
-    Delay = case {Interval, Interval div Rate} of
-                {0, 0} -> 0; %% limit only No of simultaneous executions
-                {_, I} when I < 10 ->
+    Delay = case {Interval, Interval div Rate, Interval rem Rate} of
+                {0, _, _} -> 0; %% limit only No of simultaneous executions
+                {_, I, _} when I < 10 ->
                     lager:error("too high rate, please increase NoOfProcesses"),
                     10;
-                {_, DelayBetweenExecutions} -> DelayBetweenExecutions
+                {_, DelayBetweenExecutions, 0} -> DelayBetweenExecutions;
+                {_, DelayBetweenExecutions, _} -> DelayBetweenExecutions + 1
             end,
     #state{interval = Interval, n = Rate, max_n = Rate, delay_between_executions = Delay}.
 
