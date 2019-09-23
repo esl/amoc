@@ -156,7 +156,14 @@ maybe_start_timer(#state{delay_between_executions = D, tref = undefined} = State
 maybe_stop_timer(#state{tref = undefined}) ->
     ok;
 maybe_stop_timer(#state{tref = TRef}) ->
-    {ok, cancel} = timer:cancel(TRef).
+    {ok, cancel} = timer:cancel(TRef),
+    consume_all_timer_ticks(delay_between_executions).
+
+consume_all_timer_ticks(Msg) ->
+    receive
+        Msg -> consume_all_timer_ticks(Msg)
+    after 0 -> ok
+    end.
 
 maybe_run_fn(#state{schedule = [], schedule_reversed = []} = State) ->
     State;
