@@ -209,8 +209,15 @@ change_rate_and_stop_plan(Name, State) ->
     HighRate = Plan#change_rate_plan.high_rate,
 
     {ok, HighRate} = do_change_rate(Name, HighRate, Interval),
-    timer:cancel(TRef),
+    {ok, cancel} = timer:cancel(TRef),
+    consume_all_timer_ticks({change_plan, Name}),
     State#{Name => Info#throttle_info{rate = HighRate, change_plan = undefined}}.
+
+consume_all_timer_ticks(Msg) ->
+    receive
+        Msg -> consume_all_timer_ticks(Msg)
+    after 0 -> ok
+    end.
 
 -spec continue_plan(name(), state()) -> state().
 continue_plan(Name, State) ->
