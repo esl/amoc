@@ -45,6 +45,7 @@
 -spec(start_link() ->
     {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
+    pg2:start(),
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 -spec(ensure_throttle_processes_started(name(), non_neg_integer(), non_neg_integer(), pos_integer()) ->
