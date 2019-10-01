@@ -16,8 +16,8 @@
 -type value() :: any().
 
 -type one_of() :: [any()].
--type func() :: fun((any()) -> boolean()).
--type validation() :: func() | one_of() | bitstring | nonnegative_integer | positive_integer | none.
+-type validation_fun() :: fun((any()) -> boolean() | {true, value()}).
+-type validation() :: validation_fun() | one_of() | atom().
 -type reason() :: atom().
 
 -type parameter_configuration() :: {name(), DefValue :: value(), validation()}.
@@ -82,8 +82,8 @@ get_scenario_parameter(Name, Settings) ->
 get_value_and_verify({Name, DefaultValue, VerificationMethod}) ->
     EnvName = string:uppercase(erlang:atom_to_list(Name)),
     Value = amoc_config:get(EnvName, DefaultValue),
-    DefaultValueVerification = verify_value(DefaultValue, VerificationMethod),
-    ValueVerification = verify_value(Value, VerificationMethod),
+    {DefaultValueVerification, _} = verify(DefaultValue, VerificationMethod),
+    {ValueVerification, NewValue} = verify(Value, VerificationMethod),
     Verification = case {DefaultValueVerification, ValueVerification} of
                        {true, true} -> true;
                        {false, true} ->
@@ -93,29 +93,44 @@ get_value_and_verify({Name, DefaultValue, VerificationMethod}) ->
                            lager:error("Invalid value for ~p", [Name]),
                            {false, bad_value};
                        {false, false} ->
-                           lager:error("Invalid default value & value for ~p", [Name]),
+                           lager:error("Invalid value & default value for ~p", [Name]),
                            {false, bad_value_bad_default_value}
                    end,
-    {Name, Value, Verification}.
+    {Name, NewValue, Verification}.
+
+verify(Value, VerificationMethod) ->
+    case verify_value(Value, VerificationMethod) of
+        {true, NewValue} -> {true, NewValue};
+        true -> {true, Value};
+        false -> {false, Value}
+    end.
 
 verify_value(_, none) -> true;
-verify_value(Value, positive_integer) ->
-    is_positive_integer(Value);
-verify_value(Value, nonnegative_integer) ->
-    is_nonnegative_integer(Value);
-verify_value(Value, bitstring) ->
-    is_bitstring(Value);
+verify_value(Value, Atom) when is_atom(Atom) ->
+    Fun = fun(Val) ->
+              erlang:apply(amoc_config_validation, Atom, [Val])
+          end,
+    call_verify_fun(Fun, Value);
 verify_value(Value, [_ | _] = NonemptyList) ->
     is_one_of(Value, NonemptyList);
 verify_value(Value, Fun) when is_function(Fun, 1) ->
-    Fun(Value);
+    call_verify_fun(Fun,Value);
 verify_value(_, VerificationMethod) ->
     lager:error("invalid verification method ~p", [VerificationMethod]),
     false.
 
-is_positive_integer(I) -> is_integer(I) andalso I > 0.
-
-is_nonnegative_integer(I) -> is_integer(I) andalso I >= 0.
+call_verify_fun(Fun, Value) ->
+    try Fun(Value) of
+        Bool when is_boolean(Bool) -> Bool;
+        {true, NewValue} -> {true, NewValue};
+        Ret ->
+            lager:error("invalid verification method ~p, return value : ~p", [Fun, Ret]),
+            false
+    catch
+        C:E:S ->
+            lager:error("invalid verification method ~p, exception: ~p ~p ~p", [Fun, C, E, S]),
+            false
+    end.
 
 is_one_of(Element, List) -> lists:any(fun(El) -> El =:= Element end, List).
 
