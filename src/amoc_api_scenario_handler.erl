@@ -117,16 +117,12 @@ content_types_accepted(Req, State) ->
 -spec resource_exists(cowboy_req:req(), state()) ->
     {boolean(), cowboy_req:req(), state()}.
 resource_exists(Req, State = #state{resource = Resource}) ->
-    {ok, Files} = file:list_dir("scenarios/"),
-    Pred = fun (File) -> File == Resource ++ ".erl" end,
-    case lists:filter(Pred, Files) of
-        [] ->
-            {false, Req, State};
-        [_File] ->
-            {true, Req, State}
+    case is_module_loaded(Resource) of
+        true ->
+            {true, Req, State};
+        false ->
+            {check_if_scenario_file_exists(Resource), Req, State}
     end.
-
-
 
 %% Request processing functions
 
@@ -190,3 +186,25 @@ maybe_add_batches(Scenario, Batches) when is_integer(Batches) ->
     amoc_controller:add_batches(Batches, Scenario);
 maybe_add_batches(_, _) ->
     skip.
+
+is_module_loaded(Resource) ->
+   try
+       Mod = erlang:list_to_existing_atom(Resource),
+       erlang:module_loaded(Mod)
+   catch
+       _:_ -> false
+   end.
+
+check_if_scenario_file_exists(Resource) ->
+    case file:list_dir("scenarios/") of
+        {ok, Files} ->
+                Pred = fun (File) -> File == Resource ++ ".erl" end,
+                case lists:filter(Pred, Files) of
+                    [] ->
+                        false;
+                    [_File] ->
+                        true
+                end;
+        {error, enoent} ->
+            false
+    end.
