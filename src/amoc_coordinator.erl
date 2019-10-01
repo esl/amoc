@@ -105,13 +105,13 @@ reset(Name) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(init({timeout, atom(), coordination_timeout_in_sec()} | normalized_coordination_item()) ->
-    {ok, state()}).
+-spec init({timeout, atom(), coordination_timeout_in_sec()} | normalized_coordination_item()) ->
+    {ok, state()}.
 init({timeout, Name, Timeout}) ->
     Pid = spawn(fun() -> timeout_fn(Name, 1000 * Timeout, infinity) end),
     {ok, {timeout, Pid}};
 init(CoordinationItem) ->
-    {ok, Pid} = amoc_coordinator_worker:start(CoordinationItem),
+    {ok, Pid} = amoc_coordinator_worker:start_link(CoordinationItem),
     {ok, {worker, Pid}}.
 
 %%--------------------------------------------------------------------
@@ -123,7 +123,7 @@ init(CoordinationItem) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_event(Event :: term(), state()) -> {ok, state()}).
+-spec handle_event(Event :: term(), state()) -> {ok, state()}.
 handle_event(Event, {timeout, Pid}) ->
     erlang:send(Pid, Event),
     {ok, {timeout, Pid}};
@@ -147,7 +147,7 @@ handle_event(Event, {worker, Pid}) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_call(Request :: term(), state()) -> {ok, {error, not_implemented}, state()}).
+-spec handle_call(Request :: term(), state()) -> {ok, {error, not_implemented}, state()}.
 handle_call(_Request, State) ->
     {ok, {error, not_implemented}, State}.
 
@@ -161,7 +161,7 @@ handle_call(_Request, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
--spec(terminate(any(), state()) -> ok).
+-spec terminate(any(), state()) -> ok.
 terminate(_, {timeout, Pid}) ->
     erlang:send(Pid, terminate), ok;
 terminate(_, {worker, Pid}) ->

@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/1, add/2,
+-export([start_link/1, add/2,
          stop/1, reset/1,
          timeout/1]).
 
@@ -26,33 +26,33 @@
 %%% API
 %%%===================================================================
 
--spec(start(amoc_coordinator:normalized_coordination_item()) -> {ok, Pid :: pid()}).
-start(CoordinationItem) -> gen_server:start(?MODULE, CoordinationItem, []).
+-spec start_link(amoc_coordinator:normalized_coordination_item()) -> {ok, Pid :: pid()}.
+start_link(CoordinationItem) -> gen_server:start_link(?MODULE, CoordinationItem, []).
 
--spec(reset(pid()) -> ok).
+-spec reset(pid()) -> ok.
 reset(Pid) -> gen_server:call(Pid, {reset,reset}).
 
--spec(timeout(pid()) -> ok).
+-spec timeout(pid()) -> ok.
 timeout(Pid) -> gen_server:call(Pid, {reset,timeout}).
 
--spec(stop(pid()) -> ok).
+-spec stop(pid()) -> ok.
 stop(Pid) -> gen_server:call(Pid, {reset,stop}).
 
--spec(add(pid(), data()) -> ok).
+-spec add(pid(), data()) -> ok.
 add(Pid, Data) -> gen_server:cast(Pid, {add, Data}).
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
--spec(init(amoc_coordinator:normalized_coordination_item()) -> {ok, #state{}}).
+-spec init(amoc_coordinator:normalized_coordination_item()) -> {ok, #state{}}.
 init({NoOfUsers, Actions}) ->
     State = #state{required_n = NoOfUsers, actions = Actions},
     {ok, State#state{collect_data = is_acc_required(Actions)}}.
 
 
--spec(handle_call({reset, reset | timeout | stop}, term(), #state{}) ->
-    {reply, ok, #state{}} | {stop, normal, ok, #state{}}).
+-spec handle_call({reset, reset | timeout | stop}, term(), #state{}) ->
+    {reply, ok, #state{}} | {stop, normal, ok, #state{}}.
 handle_call({reset, Event}, _, State) ->
     NewState = reset_state(Event, State),
     case Event of
@@ -61,7 +61,7 @@ handle_call({reset, Event}, _, State) ->
             {reply, ok, NewState}
     end.
 
--spec(handle_cast({add, data()}, #state{}) -> {noreply, #state{}}).
+-spec handle_cast({add, data()}, #state{}) -> {noreply, #state{}}.
 handle_cast({add, Data}, State) ->
     NewState = add_data(Data, State),
     {noreply, NewState}.
@@ -70,13 +70,13 @@ handle_cast({add, Data}, State) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
--spec(is_acc_required([action()]) -> boolean()).
+-spec is_acc_required([action()]) -> boolean().
 is_acc_required(Actions) ->
     lists:any(fun(F) when is_function(F, 1) -> false;
                  (_) -> true
               end, Actions).
 
--spec(add_data(data(), #state{}) -> #state{}).
+-spec add_data(data(), #state{}) -> #state{}.
 add_data(Data, #state{n = N, accumulator = Acc} = State) ->
     NewState = case State#state.collect_data of
                    false ->
@@ -86,18 +86,18 @@ add_data(Data, #state{n = N, accumulator = Acc} = State) ->
                end,
     maybe_reset_state(NewState).
 
--spec(maybe_reset_state(#state{}) -> #state{}).
+-spec maybe_reset_state(#state{}) -> #state{}.
 maybe_reset_state(#state{n = N, required_n = N} = State) ->
     reset_state(coordinate, State);
 maybe_reset_state(State) ->
     State.
 
--spec(reset_state(event(), #state{}) -> #state{}).
+-spec reset_state(event(), #state{}) -> #state{}.
 reset_state(Event, #state{actions = Actions, accumulator = Acc} = State) ->
     [execute_action(Action, Event, Acc) || Action <- Actions],
     State#state{accumulator = [], n = 0}.
 
--spec(execute_action(action(), event(), [data()]) -> any()).
+-spec execute_action(action(), event(), [data()]) -> any().
 execute_action(Action, Event, _) when is_function(Action, 1) ->
     safe_executions(Action, [Event]);
 execute_action(Action, Event, Acc) when is_function(Action, 2) ->
@@ -106,7 +106,7 @@ execute_action(Action, Event, Acc) when is_function(Action, 3) ->
     Fun = fun(A, B) -> safe_executions(Action, [Event, A, B]) end,
     distinct_pairs(Fun, Acc).
 
--spec(safe_executions(function(), [any()]) -> any()).
+-spec safe_executions(function(), [any()]) -> any().
 safe_executions(Fun, Args) ->
     try
         erlang:apply(Fun, Args)
@@ -114,7 +114,7 @@ safe_executions(Fun, Args) ->
         _:_ -> ok
     end.
 
--spec(distinct_pairs(fun((data(), data()) -> any()), [data()]) -> any()).
+-spec distinct_pairs(fun((data(), data()) -> any()), [data()]) -> any().
 distinct_pairs(Fun, []) ->
     Fun(undefined, undefined);
 distinct_pairs(Fun, [OneElement]) ->
@@ -124,4 +124,3 @@ distinct_pairs(Fun, [Element1, Element2]) ->
 distinct_pairs(Fun, [Element1 | Tail]) -> %% length(Tail) >= 2
     [Fun(Element1, Element2) || Element2 <- Tail],
     distinct_pairs(Fun, Tail).
-
