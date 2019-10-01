@@ -6,7 +6,7 @@
 -include_lib("escalus/include/escalus.hrl").
 
 -required_variable({'IQ_TIMEOUT',         <<"IQ timeout (milliseconds, def: 10000ms)"/utf8>>}).
--reqeired_variable({'COORDINATOR_DELAY',  <<"Delay after N subscriptions (milliseconds, def: 0ms)"/utf8>>}).
+-required_variable({'COORDINATOR_DELAY',  <<"Delay after N subscriptions (milliseconds, def: 0ms)"/utf8>>}).
 -required_variable({'NODE_CREATION_RATE', <<"Rate of node creations (per minute, def:600)">>}).
 -required_variable({'PUBLICATION_SIZE',   <<"Size of additional payload (bytes, def:300)">>}).
 -required_variable({'PUBLICATION_RATE',   <<"Rate of publications (per minute, def:1500)">>}).
@@ -79,13 +79,13 @@ get_coordination_plan(Settings) ->
     N = get_no_of_node_subscribers(Settings),
 
     [{N, [fun subscribe_users/2,
-          users_activation(Settings,n_nodes),
+          users_activation(Settings, n_nodes),
           coordination_delay(Settings)]},
-     {all,users_activation(Settings,all_nodes)}].
+     {all, users_activation(Settings, all_nodes)}].
 
 subscribe_users(_, CoordinationData) ->
     PidsAndNodes = [{Pid, Node} || {Pid, {_Client, Node}} <- CoordinationData],
-    [subscribe_msg(P, N) || {P, _}<-PidsAndNodes, {_, N} <- PidsAndNodes].
+    [subscribe_msg(P, N) || {P, _} <- PidsAndNodes, {_, N} <- PidsAndNodes].
 
 users_activation(Settings, ActivationPolicy) ->
     case get_parameter(activation_policy, Settings) of
@@ -150,14 +150,14 @@ verify_request(Requests, Settings) ->
     IqTimeout = get_parameter(iq_timeout, Settings),
     Now = os:system_time(microsecond),
     VerifyFN =
-        fun(Key, Value) ->
-            case Value of
-                {new, TS} when Now > TS + IqTimeout * 1000 ->
-                    update_timeout_metrics(Key),
-                    {timeout, TS};
-                _ -> Value
-            end
-        end,
+    fun(Key, Value) ->
+        case Value of
+            {new, TS} when Now > TS + IqTimeout * 1000 ->
+                update_timeout_metrics(Key),
+                {timeout, TS};
+            _ -> Value
+        end
+    end,
     maps:map(VerifyFN, Requests).
 
 update_timeout_metrics(<<"publish", _/binary>>) ->
@@ -175,8 +175,8 @@ schedule_publishing(Pid) ->
 %%------------------------------------------------------------------------------------------------
 connect_amoc_user(Id, Settings) ->
     ExtraProps = amoc_xmpp:pick_server([[{host, "127.0.0.1"}]]) ++
-    [{server, get_parameter(mim_host, Settings)},
-     {socket_opts, socket_opts()}],
+                 [{server, get_parameter(mim_host, Settings)},
+                  {socket_opts, socket_opts()}],
 
     {ok, Client, _} = amoc_xmpp:connect_or_exit(Id, ExtraProps),
     erlang:put(jid, Client#client.jid),
@@ -208,7 +208,7 @@ create_pubsub_node(Client, Settings) ->
             lager:debug("node creation ~p (~p)", [Node, self()]),
             amoc_metrics:update_counter(node_creation_success, 1),
             amoc_metrics:update_time(node_creation, CreateNodeTime);
-        {false,{'EXIT',{timeout_when_waiting_for_stanza,_}}}->
+        {false, {'EXIT', {timeout_when_waiting_for_stanza, _}}} ->
             amoc_metrics:update_counter(node_creation_timeout, 1),
             lager:error("Timeout creating node: ~p", [CreateNodeResult]),
             exit(node_creation_timeout);
@@ -249,9 +249,9 @@ publish_pubsub_item(Client, Node, Settings) ->
 item_content(PayloadSize) ->
     Payload = #xmlcdata{content = <<<<"A">> || _ <- lists:seq(1, PayloadSize)>>},
     #xmlel{
-        name     = <<"entry">>,
-        attrs    = [{<<"timestamp">>, integer_to_binary(os:system_time(microsecond))},
-                    {<<"jid">>, erlang:get(jid)}],
+        name = <<"entry">>,
+        attrs = [{<<"timestamp">>, integer_to_binary(os:system_time(microsecond))},
+                 {<<"jid">>, erlang:get(jid)}],
         children = [Payload]}.
 
 %%------------------------------------------------------------------------------------------------
@@ -343,16 +343,12 @@ random_suffix() ->
 
 get_parameter(Name, Settings) ->
     case amoc_config:get_scenario_parameter(Name, Settings) of
-        {error,Err} ->
+        {error, Err} ->
             lager:error("amoc_config:get_scenario_parameter/1 failed ~p", [Err]),
             exit(Err);
-        {ok,Value} -> Value
+        {ok, Value} -> Value
     end.
 
 get_no_of_node_subscribers(Settings) ->
     %instead of constant No of subscriptions we can use min/max values.
     get_parameter(n_of_subscribers, Settings).
-
-
-
-
