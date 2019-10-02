@@ -10,12 +10,10 @@
                   lager,
                   jiffy,
                   exometer,
-                  escalus,
                   ssl,
                   trails,
                   cowboy,
                   cowboy_swagger,
-                  amqp_client,
                   runtime_tools
                  ]},
   {mod, { amoc_app, []}},
