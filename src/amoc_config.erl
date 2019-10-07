@@ -37,7 +37,7 @@ get(Name) ->
 get(Name, Default) when is_atom(Name) ->
     EnvName = "AMOC_" ++ erlang:atom_to_list(Name),
     case get_from_env(EnvName) of
-        false ->
+        env_not_found ->
             application:get_env(amoc, Name, Default);
         Value ->
             Value
@@ -45,7 +45,7 @@ get(Name, Default) when is_atom(Name) ->
 get(Name, Default) when is_list(Name) ->
     EnvName = "AMOC_" ++ Name,
     case get_from_env(EnvName) of
-        false ->
+        env_not_found ->
             Default;
         Value ->
             Value
@@ -137,7 +137,7 @@ is_one_of(Element, List) -> lists:any(fun(El) -> El =:= Element end, List).
 get_from_env(EnvName) ->
     case os:getenv(EnvName) of
         false ->
-            false;
+            env_not_found;
         Value ->
             parse_value(Value)
     end.

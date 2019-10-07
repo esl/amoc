@@ -1,2 +1,3 @@
 #!/bin/bash
-exec /sbin/setuser amoc /home/amoc/amoc/bin/amoc console -noshell -noinput +Bd
+EXEC_PATH=${EXEC_PATH:-/home/amoc/amoc/bin/amoc}
+exec /sbin/setuser amoc $EXEC_PATH console -noshell -noinput +Bd
