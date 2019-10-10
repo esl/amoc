@@ -10,7 +10,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 -export([start_link/0,
-         start/2,
+         gather_node/2,
          monitor_master/1,
          ping/1,
          node_name/1,
@@ -51,9 +51,9 @@ ping(Node) ->
               pang
     end.
 
--spec start(string(), file:filename()) -> ok.
-start(Host, Directory) ->
-    gen_server:call(?SERVER, {start, Host, Directory}).
+-spec gather_node(string(), file:filename()) -> ok.
+gather_node(Host, Directory) ->
+    gen_server:call(?SERVER, {gather, Host, Directory}).
 
 -spec get_master_node() -> node().
 get_master_node() ->
@@ -80,8 +80,9 @@ init([]) ->
 
 -spec handle_call(command(), {pid(), any()}, state()) -> {reply, ok |
                                                           pong, state()}.
-handle_call({start, Host, Directory}, _From, State) ->
-    State1 = handle_start(Host, Directory, State),
+handle_call({gather, Host, Directory}, _From, State) ->
+    lager:info("{gather, ~p, ~p}, state: ~p", [Host, Directory, State]),
+    State1 = handle_gather(Host, Directory, State),
     {reply, ok, State1};
 handle_call(get_master_node, _From, #state{master = Master} = State) ->
     {reply, Master, State};
@@ -126,23 +127,16 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
--spec handle_start(string(), file:filename(), state()) -> state().
-handle_start(Host, Directory, #state{to_ack = Ack} = State) ->
+-spec handle_gather(string(), file:filename(), state()) -> state().
+handle_gather(Host, _Directory, #state{to_ack = Ack} = State) ->
     case {node_name(Host), node()} of
         {Node, Node} -> State;
         {Node, _} ->
             create_status_file(<<"connecting">>),
-            maybe_start_slave_node(Host, Directory),
-
             Ack1 = [{Node, ?DEFAULT_RETRIES} | Ack],
+            lager:info("Changing state to_ack element~nfrom: ~p~nto: ~p~n", [Ack, Ack1]),
             State#state{to_ack = Ack1}
     end.
-
--spec maybe_start_slave_node(string(), file:filename()) -> port().
-maybe_start_slave_node(Host, Directory) ->
-    Cmd = "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "
-          ++ Host ++ " " ++ Directory ++ "/bin/amoc start",
-    erlang:open_port({spawn, Cmd}, [stream]).
 
 -spec ping_slave_nodes(state()) -> state().
 ping_slave_nodes(#state{to_ack=Ack}=State) ->
