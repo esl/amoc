@@ -155,7 +155,6 @@ ping_slave_node({Node, 0}) ->
 ping_slave_node({Node, Retries}) ->
     case ping(Node) of
         pong ->
-            ok = monitor_master(Node),
             true = erlang:monitor_node(Node, true),
             lager:info("Node ~p successfully connected", [Node]),
             false;

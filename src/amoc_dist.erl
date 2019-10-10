@@ -103,7 +103,6 @@ ceil(Number) ->
 ping_node(Node) ->
     case amoc_slave:ping(Node) of
         pong ->
-              ok = amoc_slave:monitor_master(Node),
               pong;
         pang ->
               pang
