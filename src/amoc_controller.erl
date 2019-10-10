@@ -367,9 +367,9 @@ are_callbacks_exported(Scenario, Callbacks) ->
 schedule_scenario_checking(Scenario, Interval) ->
     schedule_periodic_action(Scenario, Interval, check).
 
--spec maybe_schedule_add_batch(term(), non_neg_integer()) -> reference().
+-spec maybe_schedule_add_batch(term(), non_neg_integer()) -> reference() | no_ref.
 maybe_schedule_add_batch({_, BatchCount, _, _}, _) when BatchCount == 0 ->
-    ok;
+    no_ref;
 maybe_schedule_add_batch(Data, Interval) ->
     schedule_periodic_action(Data, Interval, add_batch).
 

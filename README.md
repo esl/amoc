@@ -1,6 +1,7 @@
 # A Murder of Crows [![Build Status](https://travis-ci.org/esl/amoc.svg?branch=master)](https://travis-ci.org/esl/amoc)
 
-A Murder of Crows, aka amoc, is simple tool for running massively parallel XMPP tests. It can be used to load test [ESL's MongooseIM](https://github.com/esl/MongooseIM).
+A Murder of Crows, aka amoc, is a simple tool for running massively parallel XMPP tests. It can be
+used to load test [ESL's MongooseIM](https://github.com/esl/MongooseIM).
 
 It uses [escalus](https://github.com/esl/escalus), the Erlang XMPP client library.
 
@@ -33,14 +34,14 @@ start(Id) ->
     ok.
 ```
 
-The ``init/0`` function will be called only once per test run, at the very beginning.
+The `init/0` function will be called only once per test run, at the very beginning.
 It can be used for setting up necessary (global) state: metrics, database
 connections, etc.
 
-The ``start/1`` function describes the actual scenario and will be executed for
+The `start/1` function describes the actual scenario and will be executed for
 each user, in the context of that user's process.
 
-``Id`` is the given user's unique integer id.
+`Id` is the given user's unique integer id.
 After this function returns, it will be executed again following some delay (60
 seconds by default).
 
@@ -58,7 +59,7 @@ merged with amoc's `deps`.
 It's possible to terminate a scenario at any moment via two
 optional scenario callbacks `continue/0` and `terminate/1`. The former
 checks if the current scenario is still valid e.g. some metrics are
-below a certain treshold and must return `continue` or `{stop, Reason}`.
+below a certain threshold and must return `continue` or `{stop, Reason}`.
 The latter one implements the actual termination. It's called only
 if `continue/0` returned `{stop, Reason}`. The reason is passed to
 the terminate callback. When continue is returned nothing happens.

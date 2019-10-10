@@ -172,7 +172,7 @@ get_vars_from_body(Req) ->
     end.
 
 -spec compile_and_load_scenario(binary(), string()) ->
-    ok | {error, [string()], [string()]}.
+    ok | {error, [{file:filename(),[compile:err_info()]}], [string()]}.
 compile_and_load_scenario(BinModuleName, ScenarioPath) ->
     ok = ensure_ebin_directory(),
     case compile:file(ScenarioPath, [{parse_transform, lager_transform},
