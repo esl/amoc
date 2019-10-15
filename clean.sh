@@ -9,7 +9,7 @@ NETWORK=amoc-test-network
 PATH_TO_EXEC=/home/amoc/amoc/bin/amoc
 docker container rm -f amoc-1
 docker container rm -f amoc-2
-docker container rm -f mongooseim-1
+docker container rm -f graphite
 docker network rm ${NETWORK}
 
 
