@@ -60,13 +60,9 @@ start(Id, Settings) ->
     start_user(Client, Settings).
 
 init_metrics() ->
-    Counters = [message,
-                %% node counters
-                node_creation_failure, node_creation_success, node_creation_timeout,
-                %% publication counters
-                publication_query, publication_result, publication_error,
-                publication_success, publication_timeout],
-    Times = [node_creation, publication, message_ttd],
+    iq_metrics:start([node_creation, publication]),
+    Counters = [message],
+    Times = [message_ttd],
     [amoc_metrics:init(counters, Metric) || Metric <- Counters],
     [amoc_metrics:init(times, Metric) || Metric <- Times].
 
@@ -113,55 +109,34 @@ start_user(Client, Settings) ->
     erlang:monitor(process, Client#client.rcv_pid),
     escalus_tcp:set_active(Client#client.rcv_pid, true),
     send_presence_with_caps(Client),
-    user_loop(Settings, Client, #{}).
+    user_loop(Settings, Client).
 
 create_new_node(Client, Settings) ->
     amoc_throttle:send_and_wait(?NODE_CREATION_THROTTLING, create_node),
     create_pubsub_node(Client, Settings),
     amoc_coordinator:add(?MODULE, Client).
 
-user_loop(Settings, Client, Requests) ->
-    IqTimeout = get_parameter(iq_timeout, Settings),
+user_loop(Settings, Client) ->
     receive
         {stanza, _, #xmlel{name = <<"message">>} = Stanza, #{recv_timestamp := TimeStamp}} ->
             process_msg(Stanza, TimeStamp),
-            user_loop(Settings, Client, Requests);
-        {stanza, _, #xmlel{name = <<"iq">>} = Stanza, #{recv_timestamp := TimeStamp}} ->
-            NewRequests = process_iq(Client, Stanza, TimeStamp, Requests, Settings),
-            user_loop(Settings, Client, NewRequests);
+            user_loop(Settings, Client);
+        {stanza, _, #xmlel{name = <<"iq">>} = Stanza, _} ->
+            process_iq(Client, Stanza),
+            user_loop(Settings, Client);
         {stanza, _, #xmlel{name = <<"presence">>} = Stanza, _} ->
             process_presence(Client, Stanza),
-            user_loop(Settings, Client, Requests);
+            user_loop(Settings, Client);
         publish_item ->
-            {TS, Id} = publish_pubsub_item(Client, Settings),
-            amoc_metrics:update_counter(publication_query, 1),
-            user_loop(Settings, Client, Requests#{Id=>{new, TS}});
+            IqTimeout = get_parameter(iq_timeout, Settings),
+            Id = publish_pubsub_item(Client, Settings),
+            iq_metrics:request(publication, Id, IqTimeout),
+            user_loop(Settings, Client);
         {'DOWN', _, process, Pid, Info} when Pid =:= Client#client.rcv_pid ->
             lager:error("TCP connection process ~p down: ~p", [Pid, Info]);
         Msg ->
             lager:error("unexpected message ~p", [Msg])
-    after IqTimeout ->
-        user_loop(Settings, Client, verify_request(Requests, Settings))
     end.
-
-verify_request(Requests, Settings) ->
-    IqTimeout = get_parameter(iq_timeout, Settings),
-    Now = os:system_time(microsecond),
-    VerifyFN =
-    fun(Key, Value) ->
-        case Value of
-            {new, TS} when Now > TS + IqTimeout * 1000 ->
-                update_timeout_metrics(Key),
-                {timeout, TS};
-            _ -> Value
-        end
-    end,
-    maps:map(VerifyFN, Requests).
-
-update_timeout_metrics(<<"publish", _/binary>>) ->
-    amoc_metrics:update_counter(publication_timeout, 1);
-update_timeout_metrics(Id) ->
-    lager:error("unknown iq id ~p", Id).
 
 schedule_publishing(Pid) ->
     amoc_throttle:send(?PUBLICATION_THROTTLING, Pid, publish_item).
@@ -188,26 +163,23 @@ socket_opts() ->
 %%------------------------------------------------------------------------------------------------
 create_pubsub_node(Client, Settings) ->
     ReqId = iq_id(create, Client),
+    iq_metrics:request(node_creation, ReqId),
     Request = publish_pubsub_stanza(Client, ReqId, #xmlel{name = <<"nothing">>}),
     %Request = escalus_pubsub_stanza:create_node(Client, ReqId, ?NODE),
     escalus:send(Client, Request),
 
-    {CreateNodeTime, CreateNodeResult} = timer:tc(
-        fun() ->
-            catch escalus:wait_for_stanza(Client, get_parameter(iq_timeout, Settings))
-        end),
+    CreateNodeResult = (catch escalus:wait_for_stanza(Client, get_parameter(iq_timeout, Settings))),
 
     case {escalus_pred:is_iq_result(Request, CreateNodeResult), CreateNodeResult} of
         {true, _} ->
             lager:debug("node creation ~p (~p)", [?NODE, self()]),
-            amoc_metrics:update_counter(node_creation_success, 1),
-            amoc_metrics:update_time(node_creation, CreateNodeTime);
+            iq_metrics:response(ReqId, result);
         {false, {'EXIT', {timeout_when_waiting_for_stanza, _}}} ->
-            amoc_metrics:update_counter(node_creation_timeout, 1),
+            iq_metrics:timeout(ReqId, delete),
             lager:error("Timeout creating node: ~p", [CreateNodeResult]),
             exit(node_creation_timeout);
         {false, _} ->
-            amoc_metrics:update_counter(node_creation_failure, 1),
+            iq_metrics:response(ReqId, error),
             lager:error("Error creating node: ~p", [CreateNodeResult]),
             exit(node_creation_failed)
     end.
@@ -242,7 +214,7 @@ publish_pubsub_item(Client, Settings) ->
     Content = item_content(PayloadSize),
     Request = publish_pubsub_stanza(Client, Id, Content),
     escalus:send(Client, Request),
-    {os:system_time(microsecond), Id}.
+    Id.
 
 publish_pubsub_stanza(Client, Id, Content) ->
     ItemId = <<"current">>,
@@ -273,7 +245,7 @@ process_msg(#xmlel{name = <<"message">>} = Stanza, TS) ->
             TimeStampBin = exml_query:attr(Entry, <<"timestamp">>),
             TimeStamp = binary_to_integer(TimeStampBin),
             TTD = TS - TimeStamp,
-            lager:debug("time to delivery ~p", [TTD]),
+%%            lager:debug("time to delivery ~p", [TTD]),
             amoc_metrics:update_counter(message),
             amoc_metrics:update_time(message_ttd, TTD)
     end.
@@ -281,47 +253,34 @@ process_msg(#xmlel{name = <<"message">>} = Stanza, TS) ->
 process_presence(Client, Stanza) ->
     case exml_query:attr(Stanza, <<"type">>) of
         <<"subscribe">> ->
-            lager:debug("presence subscribe stanza ~p", [Stanza]),
             From = exml_query:attr(Stanza, <<"from">>),
             send_presence(Client, <<"subscribed">>, From);
         _ ->
             ok %%it's ok to just ignore other presence notifications
     end.
 
-process_iq(Client, #xmlel{name = <<"iq">>} = Stanza, TS, Requests, Settings) ->
+process_iq(Client, #xmlel{name = <<"iq">>} = Stanza) ->
     Id = exml_query:attr(Stanza, <<"id">>),
     Type = exml_query:attr(Stanza, <<"type">>),
     NS = exml_query:path(Stanza, [{element, <<"query">>}, {attr, <<"xmlns">>}]),
-    case {Type, NS, Id, maps:get(Id, Requests, undefined)} of
-        {<<"get">>, ?NS_DISCO_INFO, _, undefined} ->
+    case {Type, NS, Id} of
+        {<<"get">>, ?NS_DISCO_INFO, _} ->
             handle_disco_query(Client, Stanza);
-        {<<"set">>, ?NS_ROSTER, _, undefined} ->
+        {<<"set">>, ?NS_ROSTER, _} ->
             ok; %%it's ok to just ignore roster pushes
-        {_, undefined, <<"publish", _/binary>>, undefined} ->
-            lager:warning("unknown publish iq ~p", [Stanza]);
-        {_, undefined, <<"publish", _/binary>>, {Tag, ReqTS}} ->
-            handle_publish_resp(Stanza, {Tag, TS - ReqTS}, Settings);
+        {_, undefined, <<"publish", _/binary>>} ->
+            handle_publish_resp(Stanza,  Id);
         _ ->
             lager:warning("unexpected iq ~p", [Stanza])
-    end,
-    maps:remove(Id, Requests).
+    end.
 
-handle_publish_resp(PublishResult, {Tag, PublishTime}, Settings) ->
-    IqTimeout = get_parameter(iq_timeout, Settings),
+handle_publish_resp(PublishResult, Id) ->
     case escalus_pred:is_iq_result(PublishResult) of
         true ->
-            lager:debug("publish time ~p", [PublishTime]),
-            amoc_metrics:update_counter(publication_result, 1),
-            amoc_metrics:update_time(publication, PublishTime),
-            case Tag of
-                new when IqTimeout * 1000 > PublishTime ->
-                    amoc_metrics:update_counter(publication_success, 1);
-                new ->
-                    amoc_metrics:update_counter(publication_timeout, 1);
-                timeout -> ok %% do nothing, it's already reported as timeout
-            end;
+%%            lager:debug("publish time ~p", [PublishTime]),
+            iq_metrics:response(Id, result);
         _ ->
-            amoc_metrics:update_counter(publication_error, 1),
+            iq_metrics:response(Id, error),
             lager:error("Error publishing failed: ~p", [PublishResult]),
             exit(publication_failed)
     end.
