@@ -19,7 +19,8 @@
          get_scenario_status_returns_loaded_when_scenario_is_not_running/1,
          patch_scenario_returns_404_when_scenario_not_exists/1,
          patch_scenario_returns_400_when_malformed_request/1,
-         patch_scenario_returns_200_when_request_ok_and_module_exists/1
+         patch_scenario_returns_200_when_request_ok_and_module_exists/1,
+         patch_scenario_returns_200_when_request_with_user_batches_ok_and_module_exists/1
         ]).
 
 
@@ -32,15 +33,22 @@ all() ->
      get_scenario_status_returns_loaded_when_scenario_is_not_running,
      patch_scenario_returns_404_when_scenario_not_exists,
      patch_scenario_returns_400_when_malformed_request,
-     patch_scenario_returns_200_when_request_ok_and_module_exists
+     patch_scenario_returns_200_when_request_ok_and_module_exists,
+     patch_scenario_returns_200_when_request_with_user_batches_ok_and_module_exists
     ].
 
 init_per_testcase(
   patch_scenario_returns_200_when_request_ok_and_module_exists,
   Config) ->
-    ok = meck:new(amoc_dist, [unstick]),
-    Fun = fun(_,1,_) -> [ok] end,
-    ok = meck:expect(amoc_dist, do, Fun),
+    mock_amoc_dist_do(),
+    create_env(Config),
+    Config;
+
+init_per_testcase(
+  patch_scenario_returns_200_when_request_with_user_batches_ok_and_module_exists,
+  Config) ->
+    mock_amoc_dist_do(),
+    mock_amoc_controller_add_batches(),
     create_env(Config),
     Config;
 
@@ -52,6 +60,13 @@ end_per_testcase(
   patch_scenario_returns_200_when_request_ok_and_module_exists,
   _Config) ->
     ok = meck:unload(amoc_dist),
+    destroy_env();
+
+end_per_testcase(
+  patch_scenario_returns_200_when_request_with_user_batches_ok_and_module_exists,
+  _Config) ->
+    ok = meck:unload(amoc_dist),
+    ok = meck:unload(amoc_controller),
     destroy_env();
 
 end_per_testcase(_, _Config) ->
@@ -140,6 +155,17 @@ patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
     meck:wait(amoc_dist, do, ['sample_test1', 1, 10], 2000),
     ?assertEqual(200, CodeHttp).
 
+patch_scenario_returns_200_when_request_with_user_batches_ok_and_module_exists(_Config) ->
+    %% given
+    RequestBody = jiffy:encode({[{users, 10}, {batches, 10}]}),
+    %% when
+    {CodeHttp, _Body} = amoc_api_helper:patch(
+                          ?SAMPLE_GOOD_SCENARIO_PATH, RequestBody),
+    %% then
+    %% Maybe check Body, as answer format will be ready
+    meck:wait(amoc_dist, do, ['sample_test1', 1, 10], 2000),
+    meck:wait(amoc_controller, add_batches, [10, 'sample_test1'], 2000),
+    ?assertEqual(200, CodeHttp).
 
 %% Helpers
 
@@ -171,6 +197,20 @@ data(Config, Path) ->
 given_amoc_dist_mocked_with_test_status(Value) ->
     meck:new(amoc_dist, [passtrough]),
     meck:expect(amoc_dist, test_status, fun(_) -> Value end).
+
+-spec mock_amoc_dist_do() -> ok.
+mock_amoc_dist_do() ->
+    ok = meck:new(amoc_dist, [unstick]),
+    Fun = fun(_,1,_) -> [ok] end,
+    ok = meck:expect(amoc_dist, do, Fun).
+
+-spec mock_amoc_controller_add_batches() -> ok.
+mock_amoc_controller_add_batches() ->
+    ok = meck:new(amoc_controller, [unstick]),
+    Fun = fun(BatchCount, Scenario)
+                when is_integer(BatchCount) and is_atom(Scenario) -> ok
+          end,
+    ok = meck:expect(amoc_controller, add_batches, Fun).
 
 -spec cleanup_amoc_dist() -> ok.
 cleanup_amoc_dist() ->

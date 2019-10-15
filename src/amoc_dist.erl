@@ -13,6 +13,9 @@
          remove/2,
          remove/3,
          test_status/1]).
+
+-compile({no_auto_import,[ceil/1]}).
+
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
@@ -43,12 +46,14 @@ test_status(ScenarioName) ->
          amoc:do_opts()) -> [any()].
 do(Scenario, Start, End, Opts) ->
     Nodes = proplists:get_value(nodes, Opts, amoc_nodes()),
+    [amoc_slave:monitor_master(Node) || Node <- [node() | Nodes]],
 
     _InterArrival = proplists:get_value(interarrival, Opts, 75),
     _RepeatTimeout = proplists:get_value(repeat, Opts, 75),
     _Step = proplists:get_value(step, Opts, 1),
 
     amoc_event:notify({dist_do, Scenario, Start, End, Opts}),
+    amoc_controller:start_scenario_checking(Scenario),
     Count = length(Nodes),
     [ amoc_controller:do(Node, Scenario, Start, End, Count, Id, Opts) ||
       {Id, Node} <- lists:zip(lists:seq(1, Count), Nodes) ].

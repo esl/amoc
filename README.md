@@ -51,13 +51,48 @@ If additional dependencies are required by your scenario, a `rebar.config` file
 can be created inside the `scenario` dir and `deps` from that file will be
 merged with amoc's `deps`.
 
+### Advanced scenario features
+
+#### 1. Terminate a scenario at any time
+
+It's possible to terminate a scenario at any moment via two
+optional scenario callbacks `continue/0` and `terminate/1`. The former
+checks if the current scenario is still valid e.g. some metrics are
+below a certain treshold and must return `continue` or `{stop, Reason}`.
+The latter one implements the actual termination. It's called only
+if `continue/0` returned `{stop, Reason}`. The reason is passed to
+the terminate callback. When continue is returned nothing happens.
+Both callbacks are optional. Checking scenario state is scheduled
+only if both of them are implemented. By default, the checking interval
+equals 60s. It can be changed by setting `scenario_checking_interval`
+application environment variable.
+The checking logic happens in `amoc_controller` process only on a
+"master" Amoc node and only in the "distributed mode" (scenario has
+to be started via `amoc_dist:do/3/4`).
+
+#### 2. Add users in batches
+
+There is an `amoc_controller:add_batches/2` function that allows to add
+users in batches according to some strategy. The function takes the
+scenario module and the number of batches as parameters.
+The strategy of adding users should be returned by `next_user_batch/2`
+callback implemented in the scenario module. The callback is optional.
+The batch index and the number of users added in the previous batch are
+parmeters that are passed to the callback function. The strategy is a
+list of `{Node, NumOfUsers, Interarrival}`.
+Batches are added every batch interval specified by `add_batch_interval`
+application environment variable, which is 5 minutes by default.
+Adding batches can be sheduled via HTTP API by specifying batches key
+in a body request to `scenarios/$SCENARIO` endpoint.
+See [REST API docs](./REST_API_DOCS.md#start-scenario).
+
 ## Running a scenario
 
 ### Locally
 
 Everything you need to do is to create the release. To achieve that run:
 `make rel`. Now you are ready to test our scenario locally with one amoc node, to
-do this run `_rel/amoc/bin/amoc console`.
+do this run `_build/default/rel/amoc/bin/amoc console`.
 
 ```erlang
 amoc_local:do(my_scenario, 1, 10).
@@ -147,7 +182,7 @@ After that the scenario will keep running.
 ## Configuration
 
 amoc is configured through OTP application environment variables that
-are loaded from the configuration file, operating system environment variables 
+are loaded from the configuration file, operating system environment variables
 (with prefix ``AMOC_``) and Erlang application environment variables
 (`priv/app.config`).
 
@@ -207,6 +242,56 @@ There is available REST API for AMOC where we can:
 * check status of nodes in AMOC cluster
 
 API is described [here](REST_API_DOCS.md). You can also get an access to REST API by running AMOC and go to `(address:port)/api-docs`.
-### Docker
 
-TODO
+## Docker
+
+To build a Docker image with Amoc, run the following command from the root of
+the repository:
+```
+docker build -f Dockerfile -t amoc_image:tag .
+```
+It is important to start building at project root (it is indicated with dot `.`
+at the end of command). It will set build context at the project root. Dockerfile
+commands expects a context to be set like that:
+ - it copies **current** source code into container to compile it.
+ - It looks for files in `docker/` relative path.
+
+When image is ready it may be started just with
+```
+docker run -d --name amoc_container amoc_image:tag
+```
+
+However, you may want to use Amoc HTTP API for uploading and starting scenarios.
+In this case port 4000 should be published.
+```
+docker run -d -p 4000:4000 -name amoc_container amoc_image:tag
+```
+
+Amoc logs are connected with container standard output, so it is possible
+to get Amoc logs from running container with:
+```
+docker logs amoc_container
+```
+
+Amoc is able to report metrics to Graphite. It is possible to set up
+reporting endpoint by passing following envromental variables:
+```
+docker run -d \
+           -e AMOC_GRAPHITE_HOST=192.168.0.1 \
+           -e AMOC_GRAPHITE_PORT=2003 \
+           --name amoc_container \
+           amoc_image:tag
+```
+
+If there is a need to point amoc inside the container to some additional paths with code,
+it can be done by specifying variable `AMOC_EXTRA_CODE_PATHS` like in the examples below.
+
+* `-e AMOC_EXTRA_CODE_PATHS=/a_single_path`
+* `-e AMOC_EXTRA_CODE_PATHS="/first_path /second_path"`
+
+### Useful commands with Amoc container:
+
+Starting Amoc remote_console:
+```
+docker exec -it amoc_container /home/amoc/amoc/bin/amoc remote_console
+````

@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2015 Erlang Solutions Ltd.
+%% Copyright 2015-2019 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%
 %% In this scenarion users are sending message to its neighbours
@@ -14,8 +14,6 @@
 -include_lib("exml/include/exml.hrl").
 -include_lib("escalus/include/escalus.hrl").
 
--define(HOST, <<"localhost">>). %% The virtual host served by the server
--define(SERVER_IPS, {<<"192.168.99.100">>}). %% Tuple of servers, for example {<<"10.100.0.21">>, <<"10.100.0.22">>}
 -define(CHECKER_SESSIONS_INDICATOR, 10). %% How often a checker session should be generated
 -define(SLEEP_TIME_AFTER_SCENARIO, 0). %% wait 10s after scenario before disconnecting
 -define(NUMBER_OF_PREV_NEIGHBOURS, 4).
@@ -29,40 +27,15 @@
 -export([start/1]).
 -export([init/0]).
 
--define(MESSAGES_CT, [amoc, counters, messages_sent]).
--define(RECONNECTS_CT, [amoc, counters, reconnects]).
--define(MESSAGE_TTD_CT, [amoc, times, message_ttd]).
-
--type binjid() :: binary().
+-define(RECONNECTS_CT, reconnects).
 
 -spec init() -> ok.
 init() ->
-    lager:info("init some metrics"),
-    exometer:new(?MESSAGES_CT, spiral),
-    exometer_report:subscribe(exometer_report_graphite, ?MESSAGES_CT, [one, count], 10000),
-    exometer:new(?RECONNECTS_CT, spiral),
-    exometer_report:subscribe(exometer_report_graphite, ?RECONNECTS_CT, [one, count], 10000),
-    exometer:new(?MESSAGE_TTD_CT, histogram),
-    exometer_report:subscribe(exometer_report_graphite, ?MESSAGE_TTD_CT, [mean, min, max, median, 95, 99, 999], 10000),
+    lager:info("init metrics"),
+    amoc_metrics:init(counters, amoc_metrics:messages_spiral_name()),
+    amoc_metrics:init(times, amoc_metrics:message_ttd_histogram_name()),
+    amoc_metrics:init(counters, ?RECONNECTS_CT),
     ok.
-
--spec user_spec(binary(), binary(), binary()) -> escalus_users:user_spec().
-user_spec(ProfileId, Password, Res) ->
-    [ {username, ProfileId},
-      {server, ?HOST},
-      {host, pick_server(?SERVER_IPS)},
-      {password, Password},
-      {carbons, false},
-      {stream_management, false},
-      {resource, Res}
-    ].
-
--spec make_user(amoc_scenario:user_id(), binary()) -> escalus_users:user_spec().
-make_user(Id, R) ->
-    BinId = integer_to_binary(Id),
-    ProfileId = <<"user_", BinId/binary>>,
-    Password = <<"password_", BinId/binary>>,
-    user_spec(ProfileId, Password, R).
 
 -spec start(amoc_scenario:user_id()) -> any().
 start(MyId) ->
@@ -72,7 +45,7 @@ start(MyId) ->
               exit(shutdown);
           Exit:Reason ->
               lager:error("reconnection due to ~p ~p", [Exit, Reason]),
-              exometer:update(?RECONNECTS_CT, 1),
+              amoc_metrics:update_counter(?RECONNECTS_CT),
               timer:sleep(?SLEEP_TIME_BEFORE_RECONNECT),
               start(MyId)
     end.
@@ -80,21 +53,10 @@ start(MyId) ->
 -spec session(amoc_scenario:user_id()) -> any().
 session(MyId) ->
     ok = flush_mailbox(),
-    Cfg = make_user(MyId, <<"res1">>),
 
+    {ok, Client, _} = amoc_xmpp:connect_or_exit(MyId, send_and_recv_escalus_handlers()),
     IsChecker = MyId rem ?CHECKER_SESSIONS_INDICATOR == 0,
 
-    {ConnectionTime, ConnectionResult} = timer:tc(escalus_connection, start, [Cfg]),
-    Client = case ConnectionResult of
-        {ok, ConnectedClient, _, _} ->
-            exometer:update([amoc, counters, connections], 1),
-            exometer:update([amoc, times, connection], ConnectionTime),
-            ConnectedClient;
-        Error ->
-            exometer:update([amoc, counters, connection_failures], 1),
-            lager:error("Could not connect user=~p, reason=~p", [Cfg, Error]),
-            exit(connection_failed)
-    end,
 
     do(IsChecker, MyId, Client),
 
@@ -115,32 +77,7 @@ do(false, MyId, Client) ->
 do(_Other, _MyId, Client) ->
     lager:info("checker"),
     send_presence_available(Client),
-    process_flag(trap_exit, true),
-    receive_forever(Client).
-
--spec receive_forever(escalus:client()) -> no_return().
-receive_forever(#client{rcv_pid = Pid}=Client) ->
-    receive
-        {stanza, Client, Stanza} ->
-            Now = usec:from_now(os:timestamp()),
-            case Stanza of
-                #xmlel{name = <<"message">>, attrs=Attrs} ->
-                    case lists:keyfind(<<"timestamp">>, 1, Attrs) of
-                        {_, Sent} ->
-                            TTD = (Now - binary_to_integer(Sent)),
-                            exometer:update(?MESSAGE_TTD_CT, TTD);
-                        _ ->
-                            ok
-                    end;
-                _ ->
-                    ok
-            end;
-        {'EXIT', Pid, normal} ->
-            exit(connection_died);
-        {'EXIT', _, shutdown} ->
-            exit(shutdown)
-    end,
-    receive_forever(Client).
+    escalus_connection:wait_forever(Client).
 
 -spec send_presence_available(escalus:client()) -> ok.
 send_presence_available(Client) ->
@@ -152,7 +89,7 @@ send_presence_unavailable(Client) ->
     Pres = escalus_stanza:presence(<<"unavailable">>),
     escalus_connection:send(Client, Pres).
 
--spec send_messages_many_times(escalus:client(), timeout(), [binjid()]) -> ok.
+-spec send_messages_many_times(escalus:client(), timeout(), [amoc_scenario:user_id()]) -> ok.
 send_messages_many_times(Client, MessageInterval, NeighbourIds) ->
     S = fun(_) ->
                 send_messages_to_neighbors(Client, NeighbourIds, MessageInterval)
@@ -160,37 +97,17 @@ send_messages_many_times(Client, MessageInterval, NeighbourIds) ->
     lists:foreach(S, lists:seq(1, ?NUMBER_OF_SEND_MESSAGE_REPEATS)).
 
 
--spec send_messages_to_neighbors(escalus:client(), [binjid()], timeout()) -> list().
+-spec send_messages_to_neighbors(escalus:client(), [amoc_scenario:user_id()], timeout()) -> list().
 send_messages_to_neighbors(Client, TargetIds, SleepTime) ->
-    [send_message(Client, make_jid(TargetId), SleepTime)
+    [send_message(Client, TargetId, SleepTime)
      || TargetId <- TargetIds].
 
--spec send_message(escalus:client(), binjid(), timeout()) -> ok.
+-spec send_message(escalus:client(), amoc_scenario:user_id(), timeout()) -> ok.
 send_message(Client, ToId, SleepTime) ->
-    MsgIn = make_message(ToId),
-    TimeStamp = integer_to_binary(usec:from_now(os:timestamp())),
-    escalus_connection:send(Client, escalus_stanza:setattr(MsgIn, <<"timestamp">>, TimeStamp)),
-    exometer:update([amoc, counters, messages_sent], 1),
-    timer:sleep(SleepTime).
-
--spec make_message(binjid()) -> exml:element().
-make_message(ToId) ->
     Body = <<"hello sir, you are a gentelman and a scholar.">>,
-    Id = escalus_stanza:id(),
-    escalus_stanza:set_id(escalus_stanza:chat_to(ToId, Body), Id).
-
--spec make_jid(amoc_scenario:user_id()) -> binjid().
-make_jid(Id) ->
-    BinInt = integer_to_binary(Id),
-    ProfileId = <<"user_", BinInt/binary>>,
-    Host = ?HOST,
-    << ProfileId/binary, "@", Host/binary >>.
-
--spec pick_server({binary()}) -> binary().
-pick_server(Servers) ->
-    S = size(Servers),
-    N = erlang:phash2(self(), S) + 1,
-    element(N, Servers).
+    MsgIn = escalus_stanza:chat_to_with_id_and_timestamp(amoc_xmpp_users:make_jid(ToId), Body),
+    escalus_connection:send(Client, MsgIn),
+    timer:sleep(SleepTime).
 
 -spec flush_mailbox() -> ok.
 flush_mailbox() ->
@@ -200,3 +117,13 @@ flush_mailbox() ->
     after 0 ->
         ok
     end.
+
+-spec send_and_recv_escalus_handlers() -> [{atom(), any()}].
+send_and_recv_escalus_handlers() ->
+    [{received_stanza_handlers,
+      amoc_xmpp_handlers:stanza_handlers(
+        [{fun escalus_pred:is_message/1, fun amoc_xmpp_handlers:measure_ttd/3}])},
+     {sent_stanza_handlers,
+      amoc_xmpp_handlers:stanza_handlers(
+        [{fun escalus_pred:is_message/1, fun amoc_xmpp_handlers:measure_sent_messages/0}])}
+    ].

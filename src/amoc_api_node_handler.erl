@@ -4,16 +4,15 @@
 
 -export([trails/0]).
 
--export([init/3]).
+-export([init/2]).
 
--export([rest_init/2,
-         allowed_methods/2,
+-export([allowed_methods/2,
          content_types_provided/2,
          to_json/2]).
 
 -type state() :: [].
 
--spec trails() -> trails:trails().
+-spec trails() -> [trails:trail()].
 trails() ->
     ResponseBody =
     #{<<"200">> =>
@@ -40,16 +39,12 @@ trails() ->
     },
     [trails:trail("/nodes", ?MODULE, [], Metadata)].
 
--spec init(tuple(), cowboy_req:req(), state()) ->
-                  {upgrade, protocol, cowboy_rest}.
-init({tcp, http}, _Req, _Opts) ->
-    {upgrade, protocol, cowboy_rest}.
+-spec init(cowboy_req:req(), state()) ->
+                  {cowboy_rest, cowboy_req:req(), state()}.
+init(Req, Opts) ->
+    {cowboy_rest, Req, Opts}.
 
--spec rest_init(cowboy_req:req(), []) -> {ok, cowboy_req:req(), []}.
-rest_init(Req, _) ->
-    {ok, Req, []}.
-
--spec allowed_methods(cowboy_req:req(), state()) -> 
+-spec allowed_methods(cowboy_req:req(), state()) ->
                              {[binary()], cowboy_req:req(), state()}.
 allowed_methods(Req, State) ->
     {[<<"GET">>], Req, State}.

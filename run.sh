@@ -6,4 +6,4 @@ if [ "$#" -ne 3 ]; then
     exit 1
 fi
 
-./rebar compile && erl -config priv/app -env ERL_FULLSWEEP_AFTER 2 -pa ./deps/*/ebin ./ebin ./scenarios_ebin -s amoc do $1 $2 $3
+./rebar3 compile && erl -config priv/app -env ERL_FULLSWEEP_AFTER 2 -pa _build/default/lib/*/ebin ./scenarios_ebin -s amoc do $1 $2 $3

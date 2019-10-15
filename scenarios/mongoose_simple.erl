@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2015 Erlang Solutions Ltd.
+%% Copyright 2015-2019 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(mongoose_simple).
@@ -40,7 +40,7 @@ make_user_cfg(GeriId, R) ->
 start(MyId) ->
     Cfg = make_user_cfg(MyId, <<"res1">>),
 
-    {ok, Client, _, _} = escalus_connection:start(Cfg),
+    {ok, Client, _} = escalus_connection:start(Cfg),
 
     %%Allow presence stanza only
     AllowPresence = fun escalus_pred:is_presence/1,

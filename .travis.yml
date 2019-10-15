@@ -1,7 +1,9 @@
 sudo: false
 
 language: erlang
-otp_release: 18.0
+otp_release:
+    - 22.0
+    - 21.3
 
 branches:
     only:
@@ -13,8 +15,11 @@ addons:
             - libexpat1-dev
 
 install: make compile
-script: make test
+script:
+    - make test
+    - rebar3 dialyzer
+    - rebar3 xref
 
 cache:
     directories:
-        - dialyzer
+        - $HOME/.cache/rebar3

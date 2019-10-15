@@ -4,10 +4,9 @@
 
 -export([trails/0]).
 
--export([init/3]).
+-export([init/2]).
 
--export([rest_init/2,
-         allowed_methods/2,
+-export([allowed_methods/2,
          content_types_provided/2,
          content_types_accepted/2,
          to_json/2,
@@ -27,7 +26,7 @@ trails() ->
         required => [<<"scenario">>, <<"module_source">>],
         properties =>
         #{scenario => #{<<"type">> => <<"string">>,
-                        <<"description">> => 
+                        <<"description">> =>
                             <<"Name of scenario module without .erl suffix">>
                       },
           module_source => #{<<"type">> => <<"string">>,
@@ -85,33 +84,29 @@ trails() ->
     },
     [trails:trail("/scenarios", ?MODULE, [], Metadata)].
 
--spec init(tuple(), cowboy_req:req(), state()) ->
-    {upgrade, protocol, cowboy_rest}.
-init({tcp, http}, _Req, _Opts) ->
-    {upgrade, protocol, cowboy_rest}.
+-spec init(cowboy_req:req(), state()) ->
+    {cowboy_rest, cowboy_req:req(), state()}.
+init(Req, Opts) ->
+    {cowboy_rest, Req, Opts}.
 
--spec rest_init(cowboy_req:req(), [atom()]) -> {ok, cowboy_req:req(), state()}.
-rest_init(Req, _Opts) ->
-    {ok, Req, []}.
-
--spec allowed_methods(cowboy_req:req(), state()) -> 
+-spec allowed_methods(cowboy_req:req(), state()) ->
     {[binary()], cowboy_req:req(), state()}.
 allowed_methods(Req, State) ->
     {[<<"POST">>, <<"GET">>], Req, State}.
 
--spec content_types_provided(cowboy_req:req(), state()) -> 
+-spec content_types_provided(cowboy_req:req(), state()) ->
     {[tuple()], cowboy_req:req(), state()}.
 content_types_provided(Req, State) ->
     {[{<<"application/json">>, to_json}], Req, State}.
 
--spec content_types_accepted(cowboy_req:req(), state()) -> 
+-spec content_types_accepted(cowboy_req:req(), state()) ->
     {[tuple()], cowboy_req:req(), state()}.
 content_types_accepted(Req, State) ->
     {[{<<"application/json">>, from_json}], Req, State}.
 
 %% Request processing functions
 
--spec to_json(cowboy_req:req(), state()) -> 
+-spec to_json(cowboy_req:req(), state()) ->
     {iolist(), cowboy_req:req(), state()}.
 to_json(Req0, State) ->
     {ok, Filenames} = file:list_dir("scenarios"),
@@ -120,7 +115,7 @@ to_json(Req0, State) ->
           fun(X) -> string:right(X, 3) == "erl" end,
           Filenames),
 
-    Scenarios = 
+    Scenarios =
     [ erlang:list_to_binary(Y) ||  X <- Filenames2,
                                    Y <- string:tokens(X, "."),
                                    Y =/= "erl" ],
@@ -142,7 +137,7 @@ from_json(Req, State) ->
             Result = compile_and_load_scenario(
                        ModuleName,
                        ScenarioPath),
-            ResultBody = case Result of 
+            ResultBody = case Result of
                              ok -> Result;
                              {error, Errors, _Warnings} ->
                                  R = io_lib:format("~p", [Errors]),
@@ -159,10 +154,10 @@ from_json(Req, State) ->
 
 %% internal function
 -spec get_vars_from_body(cowboy_req:req()) ->
-    {ok, {binary(), binary()}, cowboy_req:req()} | 
+    {ok, {binary(), binary()}, cowboy_req:req()} |
     {error, wrong_json, cowboy_req:req()}.
 get_vars_from_body(Req) ->
-    {ok, Body, Req2} = cowboy_req:body(Req),
+    {ok, Body, Req2} = cowboy_req:read_body(Req),
     try
         {JSON} = jiffy:decode(Body),
         ModuleName = proplists:get_value(<<"scenario">>, JSON),
