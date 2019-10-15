@@ -86,6 +86,102 @@ Adding batches can be sheduled via HTTP API by specifying batches key
 in a body request to `scenarios/$SCENARIO` endpoint.
 See [REST API docs](./REST_API_DOCS.md#start-scenario).
 
+## Configuration
+
+Amoc is configured through OTP application environment variables that
+are loaded from the configuration file, operating system environment variables
+(with prefix ``AMOC_``) and Erlang application environment variables
+(`priv/app.config`).
+
+The following environmental variables must be set in order to successfully 
+run the scenario in distributed environment:
+
+- `AMOC_HOSTS` - the hostnames of all of the `amoc` machines,
+- `AMOC_xmpp_servers` - the hostnames and ports for the xmpp servers to be 
+  tested
+
+Amoc is able to report metrics to Graphite. It is possible to set up
+reporting endpoint by setting `AMOC_GRAPHITE_HOST` and `AMOC_GRAPHITE_PORT` enviornmental variables.
+
+If there is a need to point amoc to some additional paths with code,
+it can be done by specifying variable `AMOC_EXTRA_CODE_PATHS`.
+
+Internally, amoc is using the following settings:
+
+- ``interarrival`` - a delay in ms, for each node, between creating process
+  for two consecutive users. Defaults to 50 ms.
+- ``repeat_interval`` - a delay in ms each user process waits
+  before starting the same scenario again. Defaults to 1 minute.
+- ``repeat_num`` - number of scenario repetitions for each process.
+  Defaults to ``infinity``.
+
+You can also define your own entries that you might later use in your
+scenarios.
+
+The ``amoc_config`` is a module for getting configuration. Every time we ask
+for a config value, ``amoc_config`` looks into OS environment variables first
+(with ``AMOC_`` prefix; e.g. if we want to set ``interarrival`` by this mechanism
+we should set OS environment variable ``AMOC_interarrival``), and if it doesn't
+find it there, it tries to get it from the Erlang application environment variables.
+If it cannot find it there either and the default value was not supplied, an error
+it thrown. What's more, we can set variables  dynamically (by setting OS variable or
+``application:set_env(amoc, VARIABLE_NAME, VARIABLE_VALUE)`` in Erlang).
+
+``amoc_config`` provides the following function:
+
+- ``get(Name)`` and ``get(Name, Default)`` - return the value for the
+  given config entry according to the aforementioned rules.
+
+## Docker
+
+To build a Docker image with Amoc, run the following command from the root of
+the repository:
+```
+docker build -f Dockerfile -t amoc_image:tag .
+```
+It is important to start building at project root (it is indicated with dot `.`
+at the end of command). It will set build context at the project root. Dockerfile
+commands expects a context to be set like that:
+ - it copies **current** source code into container to compile it.
+ - It looks for files in `docker/` relative path.
+
+When image is ready you can start either a single instance of Amoc or configure a distributed environment,
+for which you should follow the steps described below.
+
+Before running Amoc containers, create a network and start a Graphite instance to collect and visualise some metrics.
+```
+docker network create amoc-test-network
+
+docker run --rm -d --name=graphite --network amoc-test-network \
+    -p 2003:2003 -p 8080:80 graphiteapp/graphite-statsd
+```
+Start two Amoc containers, export all of the necessary environmental variables so that the nodes can communicate with each other and send metrics to Graphite.
+In order to use Amoc HTTP API for uploading and starting scenarios port 4000 should be published.
+```
+docker run --rm -t -d --name amoc-1 -h amoc-1 --network ${NETWORK} \
+    -e AMOC_HOSTS="\"amoc-1\",\"amoc-2\"" \
+    -e AMOC_GRAPHITE_HOST=graphite \
+    -e AMOC_GRAPHITE_PORT=2003 \
+    -e AMOC_PREFIX=amoc1 \
+    --health-cmd="${PATH_TO_AMOC} status" \
+    -p 8081:4000 \
+    amoc-reworked:latest
+
+docker run --rm -t -d --name amoc-2 -h amoc-2 --network ${NETWORK} \
+    -e AMOC_HOSTS="\"amoc-1\",\"amoc-2\"" \
+    -e AMOC_GRAPHITE_HOST=graphite \
+    -e AMOC_GRAPHITE_PORT=2003 \
+    -e AMOC_PREFIX=amoc2 \
+    --health-cmd="${PATH_TO_AMOC} status" \
+    -p 8082:4000 \
+    amoc-reworked:latest
+```
+
+Connect to Amoc console and go to the *Running a scenario in a distributed environment* section.
+```
+docker exec -it amoc-1 /home/amoc/amoc/bin/amoc remote_console
+````
+
 ## Running a scenario
 
 ### Locally
@@ -121,17 +217,7 @@ are not working, however this may change in the future.
 Starting a scenario on multiple nodes is slightly more difficult.
 You need a number of machines that will be actually running the test
 (*slaves*) and one controller machine (*master*, which might be one of the test nodes).
-
-Moreover, you need a machine with both **Erlang** and **ansible** installed in
-order to do the following:
-
-1. Edit the ``hosts`` file and provide all required information - more information in the
-file itself.
-2. Run ``make prepare`` to configure the slave nodes, you don't need to do that each
-time you want to run a load test.
-3. Run `make deploy` in order to build and deploy the release across all nodes.
-Then go to the master's node and start amoc by executing ``~/amoc_master/bin/amoc console``, that
-will run the amoc shell, wait a couple of seconds till all slave nodes are started.
+Another aproach to do it is to use docker containers.
 
 Now instead of `amoc_local` use `amoc_dist` - this will tell amoc to distribute
 and start scenarios on all known nodes (except master).
@@ -179,57 +265,6 @@ Now you can run commands by attaching to the amoc's node with `bin/amoc attach`,
 typing a command and then pressing Ctrl+D to exit the shell.
 After that the scenario will keep running.
 
-## Configuration
-
-amoc is configured through OTP application environment variables that
-are loaded from the configuration file, operating system environment variables
-(with prefix ``AMOC_``) and Erlang application environment variables
-(`priv/app.config`).
-
-Internally, amoc is using the following settings:
-
-- ``interarrival`` - a delay in ms, for each node, between creating process
-  for two consecutive users. Defaults to 50 ms.
-- ``repeat_interval`` - a delay in ms each user process waits
-  before starting the same scenario again. Defaults to 1 minute.
-- ``repeat_num`` - number of scenario repetitions for each process.
-  Defaults to ``infinity``.
-
-You can also define your own entries that you might later use in your
-scenarios.
-
-The ``amoc_config`` is a module for getting configuration. Every time we ask
-for a config value, ``amoc_config`` looks into OS environment variables first
-(with ``AMOC_`` prefix; e.g. if we want to set ``interarrival`` by this mechanism
-we should set OS environment variable ``AMOC_interarrival``), and if it doesn't
-find it there, it tries to get it from the Erlang application environment variables.
-If it cannot find it there either and the default value was not supplied, an error
-it thrown. What's more, we can set variables  dynamically (by setting OS variable or
-``application:set_env(amoc, VARIABLE_NAME, VARIABLE_VALUE)`` in Erlang).
-
-``amoc_config`` provides the following function:
-
-- ``get(Name)`` and ``get(Name, Default)`` - return the value for the
-  given config entry according to the aforementioned rules.
-
-### Locally (without ansible)
-
-If you are not using ansible, just modify the ``priv/app.config`` file.
-It will later be added to your local release.
-
-### Distributed (with ansible)
-
-During the ansible deployment the following file is used as a template:
-``ansible/roles/amoc/templates/app.config.j2``.
-
-As long as you need to set only the amoc application variables (including
-your scenario-specific settings), you can do
-it in the ``ansible/group_vars/amoc`` file. You can also do it later in Erlang
-console (``application:set_env/3``) or set OS environment variable (with prefix
-``AMOC_``). Remember that OS environment variable will be taken if present even if you set it by ``application:set_env/3``.
-
-A separate file is required for this
-since dictionaries are not supported in the inventory file.
 
 ## REST API
 
@@ -242,56 +277,3 @@ There is available REST API for AMOC where we can:
 * check status of nodes in AMOC cluster
 
 API is described [here](REST_API_DOCS.md). You can also get an access to REST API by running AMOC and go to `(address:port)/api-docs`.
-
-## Docker
-
-To build a Docker image with Amoc, run the following command from the root of
-the repository:
-```
-docker build -f Dockerfile -t amoc_image:tag .
-```
-It is important to start building at project root (it is indicated with dot `.`
-at the end of command). It will set build context at the project root. Dockerfile
-commands expects a context to be set like that:
- - it copies **current** source code into container to compile it.
- - It looks for files in `docker/` relative path.
-
-When image is ready it may be started just with
-```
-docker run -d --name amoc_container amoc_image:tag
-```
-
-However, you may want to use Amoc HTTP API for uploading and starting scenarios.
-In this case port 4000 should be published.
-```
-docker run -d -p 4000:4000 -name amoc_container amoc_image:tag
-```
-
-Amoc logs are connected with container standard output, so it is possible
-to get Amoc logs from running container with:
-```
-docker logs amoc_container
-```
-
-Amoc is able to report metrics to Graphite. It is possible to set up
-reporting endpoint by passing following envromental variables:
-```
-docker run -d \
-           -e AMOC_GRAPHITE_HOST=192.168.0.1 \
-           -e AMOC_GRAPHITE_PORT=2003 \
-           --name amoc_container \
-           amoc_image:tag
-```
-
-If there is a need to point amoc inside the container to some additional paths with code,
-it can be done by specifying variable `AMOC_EXTRA_CODE_PATHS` like in the examples below.
-
-* `-e AMOC_EXTRA_CODE_PATHS=/a_single_path`
-* `-e AMOC_EXTRA_CODE_PATHS="/first_path /second_path"`
-
-### Useful commands with Amoc container:
-
-Starting Amoc remote_console:
-```
-docker exec -it amoc_container /home/amoc/amoc/bin/amoc remote_console
-````
