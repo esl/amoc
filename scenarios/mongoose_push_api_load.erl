@@ -11,11 +11,11 @@
 
 -define(SERVICES, [fcm, apns]).
 
--define(NOTIFICATIONS_ALL(S),          [amoc, counters,    notifications, S, all]).
--define(NOTIFICATIONS_SENT(S),         [amoc, counters,    notifications, S, sent]).
--define(NOTIFICATIONS_OK(S),           [amoc, counters,    notifications, S, ok]).
--define(NOTIFICATIONS_ERROR(S),        [amoc, counters,    notifications, S, error]).
--define(NOTIFICATIONS_PUSH_TIME(S),    [amoc, times,       notifications, S, push_time]).
+-define(NOTIFICATIONS_ALL(S),          [notifications, S, all]).
+-define(NOTIFICATIONS_SENT(S),         [notifications, S, sent]).
+-define(NOTIFICATIONS_OK(S),           [notifications, S, ok]).
+-define(NOTIFICATIONS_ERROR(S),        [notifications, S, error]).
+-define(NOTIFICATIONS_PUSH_TIME(S),    [notifications, S, push_time]).
 
 -define(SPIRAL_METRICS(S), [
     ?NOTIFICATIONS_ALL(S), ?NOTIFICATIONS_SENT(S), ?NOTIFICATIONS_OK(S), ?NOTIFICATIONS_ERROR(S)
@@ -29,14 +29,10 @@ init() ->
         fun(Service) ->
             lists:foreach(
                 fun(Metric) ->
-                    ok = exometer:new(Metric, spiral),
-                    ok = exometer_report:subscribe(exometer_report_graphite, Metric, [one, count], 10000)
+                        amoc_metrics:init(counters, Metric)
                 end, ?SPIRAL_METRICS(Service)),
 
-            ok = exometer:new(?NOTIFICATIONS_PUSH_TIME(Service), histogram),
-            ok = exometer_report:subscribe(exometer_report_graphite,
-                                           ?NOTIFICATIONS_PUSH_TIME(Service),
-                                           [mean, min, max, median, 95, 99, 999], 10000)
+            amoc_metrics:init(times, ?NOTIFICATIONS_PUSH_TIME(Service))
         end, ?SERVICES),
 
     ok.
@@ -54,16 +50,16 @@ start(MyId) ->
     URL = "https://" ++ ?HOST ++ ":" ++ integer_to_list(?PORT),
     lager:debug("Request to: ~p", [URL]),
 
-    exometer:update(?NOTIFICATIONS_ALL(Service), 1),
+    amoc_metrics:update_counter(?NOTIFICATIONS_ALL(Service), 1),
     case http_req:post_request(URL, Path, Headers, jiffy:encode(Notification)) of
         {ok, {{StatusCodeBin, StateMsg}, _RespHeaders, RespBody, _, TimeDiff}} ->
-            exometer:update(?NOTIFICATIONS_SENT(Service), 1),
-            exometer:update(?NOTIFICATIONS_PUSH_TIME(Service), TimeDiff),
+            amoc_metrics:update_counter(?NOTIFICATIONS_SENT(Service), 1),
+            amoc_metrics:update_time(?NOTIFICATIONS_PUSH_TIME(Service), TimeDiff),
             case binary_to_integer(StatusCodeBin) of
                 StatusCode when StatusCode >= 200, StatusCode < 300 ->
-                    exometer:update(?NOTIFICATIONS_OK(Service), 1);
+                    amoc_metrics:update_counter(?NOTIFICATIONS_OK(Service), 1);
                 _StatusCode ->
-                    exometer:update(?NOTIFICATIONS_ERROR(Service), 1)
+                    amoc_metrics:update_counter(?NOTIFICATIONS_ERROR(Service), 1)
             end,
 
             lager:debug("Request finished ~p: ~p ~p ~p ~p ms",
