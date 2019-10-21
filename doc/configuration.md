@@ -6,18 +6,18 @@ are loaded from the configuration file, operating system environment variables
 (`priv/app.config`).
 
 `AMOC_HOSTS` (the hostnames of all of the `amoc` machines) must be set in order to successfully
-run the scenario in distributed environment.
+run the scenario in a distributed environment.
 
 Amoc is able to report metrics to Graphite.
-It is possible to set up reporting endpoint by setting `AMOC_GRAPHITE_HOST`
-and `AMOC_GRAPHITE_PORT` enviornmental variables.
+It is possible to set up a reporting endpoint by setting `AMOC_GRAPHITE_HOST`
+and `AMOC_GRAPHITE_PORT` environment variables.
 
 If there is a need to point amoc to some additional paths with code,
 it can be done by specifying variable `AMOC_EXTRA_CODE_PATHS`.
 
 Internally, amoc is using the following settings:
 
-- ``interarrival`` - a delay in ms, for each node, between creating process
+- ``interarrival`` - a delay in ms, for each node, between creating processes
   for two consecutive users. Defaults to 50 ms.
 - ``repeat_interval`` - a delay in ms each user process waits
   before starting the same scenario again. Defaults to 1 minute.
@@ -33,8 +33,8 @@ Every time we ask for a config value, ``amoc_config`` looks into OS environment 
 we should set OS environment variable ``AMOC_interarrival``), and if it doesn't
 find it there, it tries to get it from the Erlang application environment variables.
 If it cannot find it there either and the default value was not supplied,
-an error it thrown.
-What's more, we can set variables  dynamically (by setting OS variable or
+an error is thrown.
+What's more, we can set variables dynamically (by setting the relevant OS variable or
 ``application:set_env(amoc, VARIABLE_NAME, VARIABLE_VALUE)`` in Erlang).
 
 ``amoc_config`` provides the following function:
