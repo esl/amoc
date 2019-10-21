@@ -5,9 +5,10 @@ the repository:
 ```
 docker build -f Dockerfile -t amoc_image:tag .
 ```
-It is important to start building at project root (it is indicated with dot `.`
-at the end of command). It will set build context at the project root. Dockerfile
-commands expects a context to be set like that:
+It is important to start building at project root
+(it is indicated with dot `.` at the end of command).
+It will set build context at the project root.
+Dockerfile commands expects a context to be set like that:
  - it copies **current** source code into container to compile it.
  - It looks for files in `docker/` relative path.
 
