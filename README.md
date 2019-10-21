@@ -8,8 +8,10 @@ Running a local instance of Amoc, you can test your scenarios during the develop
 
 ---------------------------------------------------------------------
 ### Table of Contents
-- [Developing a scenario](#running-on-localhost)
-- [Setting up locally](#local)
-	- [Testing your scenario](#local-run)
-- [Setting up distributed environment](#locally)
-	- [Running load test](#distributed)
+- [Developing a scenario](doc/scenario.md)
+- [Running locally](doc/local-run.md)
+- [Configuration](doc/configuration.md)
+- [Setting up distributed environment](doc/distributed.md)
+- [Running load test](doc/distributed-run.md)
+- [Advanced scenario features](doc/advanced-features.md)
+- [HTTP API](doc/http-api.md)
