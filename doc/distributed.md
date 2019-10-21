@@ -9,10 +9,10 @@ It is important to start building at project root
 (it is indicated with dot `.` at the end of command).
 It will set build context at the project root.
 Dockerfile commands expects a context to be set like that:
- - it copies **current** source code into container to compile it.
+ - it copies the **current** source code into the container to compile it.
  - It looks for files in `docker/` relative path.
 
-When image is ready you can start either a single instance of Amoc or configure a distributed environment,
+When the image is ready you can start either a single instance of Amoc or configure a distributed environment,
 for which you should follow the steps described below.
 
 Before running Amoc containers, create a network and start a Graphite instance to collect and visualise some metrics.
@@ -23,7 +23,7 @@ docker run --rm -d --name=graphite --network amoc-test-network \
     -p 2003:2003 -p 8080:80 graphiteapp/graphite-statsd
 ```
 Start two Amoc containers, export all of the necessary environmental variables so that the nodes can communicate with each other and send metrics to Graphite.
-In order to use Amoc HTTP API for uploading and starting scenarios port 4000 should be published.
+In order to use Amoc HTTP API for uploading and starting scenarios, port 4000 should be published.
 ```
 docker run --rm -t -d --name amoc-1 -h amoc-1 --network ${NETWORK} \
     -e AMOC_HOSTS="\"amoc-1\",\"amoc-2\"" \

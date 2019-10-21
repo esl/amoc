@@ -12,9 +12,9 @@ and start scenarios on all known nodes (except master).
 amoc_dist:do(my_scenario, 1, 100, Opts).
 ```
 
-Start `my_scenario` spawning 100 amoc users with IDs from range (1,100) inclusive.
+Start `my_scenario` spawning 100 amoc users with IDs from the range [1,100] inclusive.
 In this case sessions are going to be distributed across all nodes except master.
-At this moment users are distributed in round-robin fashion - user1 goes to slave1,
+At this moment users are distributed in a round-robin fashion &mdash; user1 goes to slave1,
 user2 goes to slave2, ...., user10 goes to slave10, user11 goes to slave1 etc
 (with the assumption that there are 10 slave nodes configured).
 We are planning to make the strategy configurable.

@@ -19,6 +19,6 @@ Remove 10 users.
 amoc_local:remove(10, [{force,true}]).
 ```
 
-NOTE: We advise using this mode for the scenario debugging purposes - everything you
+NOTE: We advise on using this mode for the scenario debugging purposes - everything you
 log using lager is going to be visible in the erlang shell.
 In this mode the annotations are not working, however this may change in the future.
