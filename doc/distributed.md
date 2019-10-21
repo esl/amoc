@@ -43,6 +43,6 @@ docker run --rm -t -d --name amoc-2 -h amoc-2 --network ${NETWORK} \
     amoc-reworked:latest
 ```
 
-Connect to Amoc console and go to the *Running a scenario in a distributed environment* section.
+Connect to Amoc console and go to the [next](doc/distributed-run.md) section.
 ```
 docker exec -it amoc-1 /home/amoc/amoc/bin/amoc remote_console
