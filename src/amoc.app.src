@@ -1,6 +1,6 @@
 { application, amoc, [
     {description, "A murder of crows"},
-    {vsn, "0.9.0"},
+    {vsn, "1.3.0"},
     {registered, []},
     {applications, [
         kernel,
