@@ -10,8 +10,11 @@ This module allows to synchronize the users, and act on groups of them.
 
 The coordinator reacts to new users showing up in a system, according to the `Coordination Plan`. 
 The `Coordination Plan` consists of `Coordination Items`, and each of them is defined as one of the following: `{NumberOfUsers, CoordinationActions}`.
-When the `Number Of Users` is set to `all`, then only `Coordination Actions` with the arities `/1, /2` are handled.
-When the `Number Of Users` is set to a positive integer, all `Coordination Actions` with arities `/1, /2` and `/3` are handled.
+ - When the `Number Of Users` is set to `all`, then only `Coordination Actions` with the arities `/1, /2` are handled. 
+ The `Coordination Items` with `all` are triggered by the `timeout` event. 
+ - When the `Number Of Users` is set to a positive integer, all `Coordination Actions` with arities `/1, /2` and `/3` are handled.
+
+The timeout timer is reset by calling function `add`.
 A new batch size is set in the `NumberOfUsers`. Each user in the batch calls the `add` function registering to the coordinator and triggering the `Coordination Plan`.
 If more then one of the `Coordination Items` matching the `NumberOfUsers` is triggered, each of them will be passed a respective number of users.
 For example if the `Coordination Plan` is `[{2, Act1}, {3, Act2}]` then on the 6th user calling `add`, `Act1` will be called with 2 users passed and `Act2` wil be called with 3 users passed.
