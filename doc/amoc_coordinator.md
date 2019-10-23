@@ -8,12 +8,20 @@
 
 This module allows to synchronize the users, and act on groups of them.
 
-The coordinator reacts to new users showing up in a system, according to `Coordination Plan`. `Coordination Plan` consists of `Coordination Items`, each of them is defined as one of the following: `{NumberOfUsers, CoordinationActions}`. When `Number Of Users` is set to `all`, then only `Coordination Actions` with the arities `/1, /2` are handled. When `Number Of Users` is set to a positive integer, then when then all `Coordination Actions` with the arities `/1, /2` and `/3` are handled. When new batch size `NumberOfUsers` of users calls `add` to the coordinator, then `Coordination Actions` following the `NumberOfUsers` in the `Coordination Plan` are triggered. When there is more then one `Coordination Items` matching the `NumberOfUsers` all are triggered, Each will be passed respective number of users, eg if the `Coordination Plan` is `[{2, Act1}, {3, Act2}]` then on 6th users calling `add`, `Act1` will be called with 2 users passed and `Act2` wil be called with 3 users passed.
+The coordinator reacts to new users showing up in a system, according to the `Coordination Plan`. 
+The `Coordination Plan` consists of `Coordination Items`, and each of them is defined as one of the following: `{NumberOfUsers, CoordinationActions}`.
+When the `Number Of Users` is set to `all`, then only `Coordination Actions` with the arities `/1, /2` are handled.
+When the `Number Of Users` is set to a positive integer, all `Coordination Actions` with arities `/1, /2` and `/3` are handled.
+A new batch size is set in the `NumberOfUsers`. Each user in the batch calls the `add` function registering to the coordinator and triggering the `Coordination Plan`.
+If more then one of the `Coordination Items` matching the `NumberOfUsers` is triggered, each of them will be passed a respective number of users.
+For example if the `Coordination Plan` is `[{2, Act1}, {3, Act2}]` then on the 6th user calling `add`, `Act1` will be called with 2 users passed and `Act2` wil be called with 3 users passed.
 
 `Coordination Actions` may be one of the following:
  - `fun(Event) -> any()` - this type of action does not care about particular users, but only about the number of them;
  - `fun(Event, ListOfUsersData) -> any()` - this type of action gets `ListOfUsersData` which is a list of tuples `{Pid, Data}` with `Pid`s passed by users calling `amoc_coordinator:add/2` or `amoc_coordinator:add/3`;
 - `fun(Event, User1, User2) -> any()` - this type of action gets `distinct pairs` from the batch of users `User1` and `User2` which are tuples `{Pid, Data}` with `Pid`s passed by users calling `amoc_coordinator:add/2` or `amoc_coordinator:add/3`;
+
+`Coordination Actions` are executed in reversed order in relation to thair declaration in the `Coordination Plan`.
 
 `distinct pairs` - in the context, these are pairs from collection where:
  - when `{A, B}` is in the `distinct pairs` then `{B, A}` is not;
@@ -25,10 +33,10 @@ The coordinator reacts to new users showing up in a system, according to `Coordi
 
 ## Exports
 
-### `start(CoordinatorName, CoordinationPlan) -> ok | error`
-### `start(CoordinatorName, CoordinationPlan, Timeout) -> ok | error`
+#### `start(CoordinatorName, CoordinationPlan) -> ok | error`
+#### `start(CoordinatorName, CoordinationPlan, Timeout) -> ok | error`
 
-#### Types
+##### Types
 ```erlang
 CoordinatorName :: atom()
 CoordinationPlan  :: [ CoordinationItem ]
@@ -47,10 +55,10 @@ Timeout :: pos_integer() | infinity
 
 This function starts a coordinator. Usually is called in `init/0` of a amoc scenario.
 
-### `add(CoordinatorName, Data) -> ok`
-### `add(CoordinatorName, Pid, Data) -> ok`
+#### `add(CoordinatorName, Data) -> ok`
+#### `add(CoordinatorName, Pid, Data) -> ok`
 
-### Types
+##### Types
 ```erlang
 CoordinatorName :: atom()
 UsersPid :: pid()
@@ -86,7 +94,7 @@ init() ->
                 io:fwrite("Three new users showed up\n", [])
             end},
         {all, fun(Event) ->
-                io:fwrite("All users have logged in Event = ~p\n", [Event])
+                io:fwrite("All users have called amoc_coordinator:add in Event = ~p\n", [Event])
             end}
         
     ],
@@ -154,6 +162,6 @@ Two new users showed up: Event = timeout; User1 = {<0.1139.0>,5}; User2 = undefi
 Two new users showed up: Event = timeout; ListOfUsers = [{<0.1139.0>,5}]
 {Msg = {hello,5}, Id = 5
 Two new users showed up: Event = timeout
-All users have logged in Event = timeout
+All users have called amoc_coordinator:add in Event = timeout
 ```
 
