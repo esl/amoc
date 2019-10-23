@@ -22,6 +22,12 @@
     {env, [{repeat_interval, 60000},
            {interarrival, 75},
            {exometer_predefined, [
+               {[erlang, system_info],
+                {function, erlang, system_info, ['$dp'], value, [port_count, process_count]},
+                []},
+               {[erlang, memory],
+                {function, erlang, memory, ['$dp'], value, [total, processes, processes_used, system, binary, ets]},
+                []},
                {[amoc, users],
                 {function, ets, info, [amoc_users], proplist, [size]},
                 []},
