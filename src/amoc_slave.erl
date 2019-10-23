@@ -10,7 +10,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 -export([start_link/0,
-         gather_node/2,
+         gather_node/1,
          monitor_master/1,
          ping/1,
          node_name/1,
@@ -51,9 +51,9 @@ ping(Node) ->
               pang
     end.
 
--spec gather_node(string(), file:filename()) -> ok.
-gather_node(Host, Directory) ->
-    gen_server:call(?SERVER, {gather, Host, Directory}).
+-spec gather_node(string()) -> ok.
+gather_node(Host) ->
+    gen_server:call(?SERVER, {gather, Host}).
 
 -spec get_master_node() -> node().
 get_master_node() ->
@@ -80,9 +80,9 @@ init([]) ->
 
 -spec handle_call(command(), {pid(), any()}, state()) -> {reply, ok |
                                                           pong, state()}.
-handle_call({gather, Host, Directory}, _From, State) ->
-    lager:info("{gather, ~p, ~p}, state: ~p", [Host, Directory, State]),
-    State1 = handle_gather(Host, Directory, State),
+handle_call({gather, Host}, _From, State) ->
+    lager:info("{gather, ~p}, state: ~p", [Host, State]),
+    State1 = handle_gather(Host, State),
     {reply, ok, State1};
 handle_call(get_master_node, _From, #state{master = Master} = State) ->
     {reply, Master, State};
@@ -127,8 +127,8 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
--spec handle_gather(string(), file:filename(), state()) -> state().
-handle_gather(Host, _Directory, #state{to_ack = Ack} = State) ->
+-spec handle_gather(string(), state()) -> state().
+handle_gather(Host, #state{to_ack = Ack} = State) ->
     case {node_name(Host), node()} of
         {Node, Node} -> State;
         {Node, _} ->

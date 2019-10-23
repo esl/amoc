@@ -12,7 +12,8 @@ sed -e "s/AMOC_GRAPHITE_HOST/${AMOC_GRAPHITE_HOST}/" /sys.config.template > \
     ${SYSCONFIG}
 sed -i -e "s/AMOC_GRAPHITE_PORT/${AMOC_GRAPHITE_PORT}/" ${SYSCONFIG}
 sed -i -e "s/AMOC_PREFIX/${AMOC_PREFIX}/" ${SYSCONFIG}
-sed -i -e "s/AMOC_HOSTS/${AMOC_HOSTS}/" ${SYSCONFIG}
+
+export AMOC_HOSTS="[${AMOC_HOSTS}]"
 
 if [[ -n "${AMOC_EXTRA_CODE_PATHS// /}" ]]; then
     #if the var is not empty and contains sth else then just spaces

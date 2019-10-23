@@ -1,34 +1,33 @@
-{application, amoc,
- [
-  {description, "A murder of crows"},
-  {vsn, "0.9.0"},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib,
-                  sasl,
-                  lager,
-                  jiffy,
-                  exometer,
-                  escalus,
-                  ssl,
-                  trails,
-                  cowboy,
-                  cowboy_swagger,
-                  amqp_client,
-                  runtime_tools,
-                  mnesia
-                 ]},
-  {mod, { amoc_app, []}},
-  {env, [{repeat_interval, 60000},
-         {interarrival, 30},
-         {exometer_predefined, [
-          {[amoc, users],
-           {function, ets, info, [amoc_users], proplist, [size]},
-           []},
-          {[amoc, times, connection], histogram, []},
-          {[amoc, counters, connections], spiral, []},
-          {[amoc, counters, connection_failures], spiral, []}
-         ]}
-  ]}
- ]}.
+{ application, amoc, [
+    {description, "A murder of crows"},
+    {vsn, "0.9.0"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        sasl,
+        lager,
+        jiffy,
+        exometer,
+        escalus,
+        ssl,
+        trails,
+        cowboy,
+        cowboy_swagger,
+        amqp_client,
+        runtime_tools,
+        mnesia
+    ]},
+    {mod, {amoc_app, []}},
+    {env, [{repeat_interval, 60000},
+           {interarrival, 75},
+           {exometer_predefined, [
+               {[amoc, users],
+                {function, ets, info, [amoc_users], proplist, [size]},
+                []},
+               {[amoc, times, connection], histogram, []},
+               {[amoc, counters, connections], spiral, []},
+               {[amoc, counters, connection_failures], spiral, []}
+           ]}
+    ]}
+]}.

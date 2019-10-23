@@ -1,8 +1,4 @@
-[
- {amoc, [{interarrival, 75},
-         {path, "/home/amoc/amoc"},
-         {hosts, [AMOC_HOSTS]}]},
- {exometer, [
+[{exometer, [
     {predefined, [
         {[erlang, system_info],
          {function, erlang, system_info, ['$dp'], value, [port_count, process_count]},
