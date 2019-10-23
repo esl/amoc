@@ -93,8 +93,8 @@ maybe_reset_state(State) ->
     State.
 
 -spec reset_state(event(), #state{}) -> #state{}.
-reset_state(Event, #state{actions = Actions, accumulator = Acc} = State) ->
-    [execute_action(Action, Event, Acc) || Action <- Actions],
+reset_state(Event, #state{actions = Actions, accumulator = Acc, n = N} = State) ->
+    [execute_action(Action, {Event, N}, Acc) || Action <- Actions],
     State#state{accumulator = [], n = 0}.
 
 -spec execute_action(action(), event(), [data()]) -> any().
