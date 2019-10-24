@@ -25,7 +25,9 @@
 
 -type maybe_coordination_data() :: coordination_data() | undefined.
 
--type coordination_event() :: coordinate | timeout | stop | reset.
+-type coordination_event_type() :: coordinate | timeout | stop | reset.
+
+-type coordination_event() :: {coordination_event_type(), non_neg_integer()}.
 
 -type coordination_action() ::
     fun((coordination_event(), [coordination_data()]) -> any()) |
