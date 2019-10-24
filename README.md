@@ -25,4 +25,5 @@ take a look at the [last](doc/http-api.md) chapter.
 - [Running load test](doc/distributed-run.md)
 - [Advanced scenario features](doc/advanced-features.md)
 - [HTTP API](doc/http-api.md)
-- [amoc_coordinator](doc/amoc_coordinator.md)
+- [Amoc throttle](doc/amoc_throttle.md)
+- [Amoc coordinator](doc/amoc_coordinator.md)
