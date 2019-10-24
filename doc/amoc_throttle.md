@@ -14,7 +14,12 @@ Because of that, it may happen that the actual `Rate` would be slightly below th
 
 Functions provided by Amoc throttle:
 ```
-start(Name :: name(), Rate :: pos_integer()[, Interval :: non_neg_integer(), NoOfProcesses :: pos_integer()) -> ok | {error, any()}.
+start(Name, Rate, Interval, NoOfProcesses) -> R when
+      Name :: name(),
+      Rate :: pos_integer(),
+      Interval :: non_neg_integer(),
+      NoOfProcesses :: pos_integer(),
+      R :: ok | {error, any()}.
 ```
 Starts the throttle mechanism for a given `Name` with a given `Rate`.
 The optional arguments are an `Interval` (default is one minute) and a ` NoOfProcesses` (default is 10).
@@ -57,12 +62,19 @@ change_rate(name(), pos_integer(), non_neg_integer()) -> ok | {error, any()}.
 Sets `Rate` and `Interval` for `Name` according to the given values.
 Can change whether Amoc throttle limits `Name` to parallel executions or to `Rate` per `Interval`, according to the given `Interval` value.
 ```
-change_rate_gradually(Name :: name(), From :: pos_integer(), To :: pos_integer(), RateInterval :: non_neg_integer(), StepInterval :: pos_integer(), NoOfSteps :: pos_integer()) -> ok | {error, any()}.
+change_rate_gradually(Name, From, To, RateInterval, StepInterval, NoOfSteps)) -> R when
+                      Name :: name(),
+                      From :: pos_integer(),
+                      To :: pos_integer(),
+                      RateInterval :: non_neg_integer(),
+                      StepInterval :: pos_integer(),
+                      NoOfSteps :: pos_integer(),
+                      R :: ok | {error, any()}.
 ```
 Allows to set a plan of gradual rate changes for a given `Name`.
 `Rate` will be changed from `From` to `To` in a series of consecutive steps.
 `From` does not need to be lower than `To`, rates can be changed downwards.
-The rate is calculated at each step in relation to the`RateInterval`, which can also be `0`.
+The rate is calculated at each step in relation to the `RateInterval`, which can also be `0`.
 Each step will take the `StepInterval` time in milliseconds.
 There will be `NoOfSteps` steps.
 Be aware that, at first, the rate will be changed to `From` per `RateInterval` and this is not considered a step.
