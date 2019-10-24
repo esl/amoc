@@ -11,8 +11,8 @@ It can return an `ok` or a tuple `{ok, State}` from which the `State` may be pas
 - `start/1` or `start/2` - describes the actual scenario and is executed for
 each user, in the context of that user's process.
 The first argument is the given user's unique integer id.
-The second, which is optional, is the state, as returned from `init/0` function.
-When `start` function returns, it is executed again after some delay (60 seconds by default).
+The second, which is optional, is the state, as returned from the `init/0` function.
+When the `start` function returns, it is executed again after some delay (60 seconds by default).
 
 A typical scenario file will look like this:
 
@@ -55,8 +55,9 @@ start(Id, Settings) ->
     %% send some messages again
     ok.
 ```
+
 ### Advanced features
-In addition to the required ones, `amoc_scenario` behaviour proposes optional callbacks:
+In addition to the required ones, the `amoc_scenario` behaviour proposes optional callbacks:
 
 - `continue/0` and `terminate/0`
 
@@ -78,15 +79,15 @@ In addition to the required ones, `amoc_scenario` behaviour proposes optional ca
 -   `next_user_batch/2`
     
     This callback enables adding users in batches.
-    It is supposed to return strategy for adding users,
+    It is supposed to return a strategy for adding users,
     which is a list of `{Node, NumOfUsers, Interarrival}`.
-    It is then used by `amoc_controller:add_batches/2` function,
+    It is then used by the `amoc_controller:add_batches/2` function,
     which takes the scenario module and the number of batches as parameters.
-    Parameters passed to the `next_user_batch` callback are 
+    The parameters passed to the `next_user_batch` callback are 
     the batch index and the number of users added in the previous batch.
-    Batches are added every batch interval specified by the `add_batch_interval`
+    Batches are added every batch interval as specified by the `add_batch_interval`
     application environment variable, which is 5 minutes by default.
-    Adding batches can be scheduled via HTTP API by specifying batches key
+    Adding batches can be scheduled via HTTP API by specifying the batch keys
     in a body request to the `scenarios/$SCENARIO` endpoint.
     See [REST API docs](./REST_API_DOCS.md#start-scenario).
 
