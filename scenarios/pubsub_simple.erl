@@ -98,7 +98,7 @@ users_activation(Settings, ActivationPolicy) ->
 
 coordination_delay(Settings) ->
     Delay = get_parameter(coordinator_delay, Settings),
-    fun(coordinate) -> timer:sleep(Delay);
+    fun({coordinate, _}) -> timer:sleep(Delay);
         (_) -> ok
     end.
 
