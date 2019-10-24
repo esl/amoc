@@ -13,34 +13,64 @@ Because of that, it may happen that the actual `Rate` would be slightly below th
 ## API
 
 Functions provided by Amoc throttle:
-
-- `start(Name, Rate)`, `start(Name, Rate, Interval)`, `start(Name, Rate, Interval, NoOfProcesses)` - functions starting the throttle mechanism for a given `Name` with a given `Rate`.
-They can also accept an `Interval` (default is one minute) and a ` NoOfProcesses` (default is 10).
+```
+start(Name :: name(), Rate :: pos_integer()[, Interval :: non_neg_integer(), NoOfProcesses :: pos_integer()) -> ok | {error, any()}.
+```
+Starts the throttle mechanism for a given `Name` with a given `Rate`.
+The optional arguments are an `Interval` (default is one minute) and a ` NoOfProcesses` (default is 10).
 `Name` is needed to identify the rate as a single test can have different rates for different tasks.
 `Interval` is given in milliseconds and can be changed to a different value for convenience or higher granularity.
 It also accepts a special value of `0` which limits the number of parallel executions associated with `Name` to `Rate`.
-- `send(Name, Msg)`, `send(Name, Pid, Msg)` - sends a given message `Msg` either to `self()` or a given `PID` when the rate for `Name` allows for that.
+
+```
+send(Name :: name()[, PID :: pid()], Msg :: any()) -> ok | {error, any()}.
+```
+Sends a given message `Msg` either to `self()` or a given (optional) `PID` when the rate for `Name` allows for that.
 May be used to schedule tasks.
-- `send_and_wait(Name, Msg)` - sends and receives the given message `Msg`.
+
+```
+send_and_wait(Name :: name(), Msg :: any()) -> ok | {error, any()}.
+```
+Sends and receives the given message `Msg`.
 Can be used to halt execution if we want a process to be idle when waiting for rate increase or other processes finishing their tasks.
-- `run(Name, Fn)` - executes a given function `Fn` when it does not exceed the rate for `Name`.
-`Fn` is executed in the context of a new process spawned on the same node on which the process executing `run/2` runs,
-so a call to `run/2` is non-blocking.
+```
+run(Name :: name(), Fn :: fun(()-> any())) -> ok | {error, any()}.
+```
+Executes a given function `Fn` when it does not exceed the rate for `Name`.
+`Fn` is executed in the context of a new process spawned on the same node on which the process executing `run/2` runs, so a call to `run/2` is non-blocking.
 This function is used internally by both `send` and `send_and_wait/2` functions,
 so all those actions will be limited to the same rate when called with the same `Name`.
-- `pause(Name)` - pauses executions for the given `Name` as if `Rate` was set to `0`.
+
+```
+pause(Name :: name()) -> ok | {error, any()}.
+```
+Pauses executions for the given `Name` as if `Rate` was set to `0`.
 Does not stop the scheduled rate changes.
-- `resume(Name)` - resumes the executions for the given `Name`, so the `Rate` and `Interval` are reset to their original values given before the pause.
-- `change_rate(Name, Rate, Interval)` - sets `Rate` and `Interval` for `Name` according to the given values.
+
+```
+resume(Name :: name()) -> ok | {error, any()}.
+```
+Resumes the executions for the given `Name`, so the `Rate` and `Interval` are reset to their original values given before the pause.
+```
+change_rate(name(), pos_integer(), non_neg_integer()) -> ok | {error, any()}.
+```
+Sets `Rate` and `Interval` for `Name` according to the given values.
 Can change whether Amoc throttle limits `Name` to parallel executions or to `Rate` per `Interval`, according to the given `Interval` value.
-- `change_rate_gradually(Name, From, To, RateInterval, StepInterval, NoOfSteps)` - allows to set a plan of gradual rate changes for a given `Name`.
+```
+change_rate_gradually(Name :: name(), From :: pos_integer(), To :: pos_integer(), RateInterval :: non_neg_integer(), StepInterval :: pos_integer(), NoOfSteps :: pos_integer()) -> ok | {error, any()}.
+```
+Allows to set a plan of gradual rate changes for a given `Name`.
 `Rate` will be changed from `From` to `To` in a series of consecutive steps.
 `From` does not need to be lower than `To`, rates can be changed downwards.
 The rate is calculated at each step in relation to the`RateInterval`, which can also be `0`.
 Each step will take the `StepInterval` time in milliseconds.
 There will be `NoOfSteps` steps.
 Be aware that, at first, the rate will be changed to `From` per `RateInterval` and this is not considered a step.
-- `stop(Name)` - stops the throttle mechanism for `Name`
+
+```
+stop(name()) -> ok | {error, any()}.
+```
+Stops the throttle mechanism for the given `Name`.
 
 ## Examples
 
@@ -134,7 +164,7 @@ Those exposed by the master node show the sum of all metrics from all nodes.
 This allows to quickly see the real rates across the whole system.
 
 #### Workflow
-When a user executes `amoc_throttle:run(Name, Fun)`, a request is reported to a metric that runs on the user's node.
+When a user executes `amoc_throttle:run/2`, a request is reported to a metric that runs on the user's node.
 Then a runner process is spawned on the same node.
 Its task will be to execute `Fun` asynchronously.
 A random throttle process which is assigned to the `Name` is asked for a permission for asynchronous runner to execute `Fun`.
