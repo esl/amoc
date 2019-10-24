@@ -6,7 +6,7 @@
 
 ## Description
 
-This module allows to synchronize the users, and act on groups of them.
+This module allows to synchronize the users and act on groups of them.
 
 The coordinator reacts to new users showing up in a system, according to the `Coordination Plan`. 
 The `Coordination Plan` consists of `Coordination Items`, and each of them is defined as one of the following: `{NumberOfUsers, CoordinationActions}`.
@@ -14,25 +14,26 @@ The `Coordination Plan` consists of `Coordination Items`, and each of them is de
  The `Coordination Items` with `all` are triggered by the `timeout` event. 
  - When the `Number Of Users` is set to a positive integer, all `Coordination Actions` with arities `/1, /2` and `/3` are handled.
 
-The timeout timer is reset by calling function `add`.
+The timeout timer is reset by calling the `add` function.
 A new batch size is set in the `NumberOfUsers`. Each user in the batch calls the `add` function registering to the coordinator and triggering the `Coordination Plan`.
 If more then one of the `Coordination Items` matching the `NumberOfUsers` is triggered, each of them will be passed a respective number of users.
-For example if the `Coordination Plan` is `[{2, Act1}, {3, Act2}]` then on the 6th user calling `add`, `Act1` will be called with 2 users passed and `Act2` wil be called with 3 users passed.
+For example if the `Coordination Plan` is `[{2, Act1}, {3, Act2}]` then on the 6th user calling `add`, `Act1` will be called with 2 users passed and `Act2` will be called with 3 users passed.
 
 `Coordination Actions` may be one of the following:
  - `fun(Event) -> any()` - this type of action does not care about particular users, but only about the number of them;
- - `fun(Event, ListOfUsersData) -> any()` - this type of action gets `ListOfUsersData` which is a list of tuples `{Pid, Data}` with `Pid`s passed by users calling `amoc_coordinator:add/2` or `amoc_coordinator:add/3`;
-- `fun(Event, User1, User2) -> any()` - this type of action gets `distinct pairs` from the batch of users `User1` and `User2` which are tuples `{Pid, Data}` with `Pid`s passed by users calling `amoc_coordinator:add/2` or `amoc_coordinator:add/3`;
+ - `fun(Event, ListOfUsersData) -> any()` - this type of action gets `ListOfUsersData` which is a list of `{Pid, Data}` tuples with `Pid`s passed by users calling `amoc_coordinator:add/2` or `amoc_coordinator:add/3`;
+- `fun(Event, User1, User2) -> any()` - this type of action gets `distinct pairs` from the batch of users `User1` and `User2` which are `{Pid, Data}` tuples with `Pid`s passed by users calling `amoc_coordinator:add/2` or `amoc_coordinator:add/3`;
 
-`Coordination Actions` are executed in reversed order in relation to thair declaration in the `Coordination Plan`.
+The order of `Coordination Actions` execution is not guaranteed.
+It’s guaranteed that all the `Coordination Actions` with `all` are executed after all numbered `Coordination Actions` are done.
 
-`distinct pairs` - in the context, these are pairs from collection where:
+`distinct pairs` - in the context,  these are pairs from a given collection of users, where:
  - when `{A, B}` is in the `distinct pairs` then `{B, A}` is not;
- - when `{A, A}` is not in the `distinct pairs`;
+ - `{A, A}` is not in the `distinct pairs`;
  - all pairs are distinct;
- - Eg. for `[a]` `distinct pairs` collection is `[{a, undefined}]`;
- - Eg. for `[a, b]` `distinct pairs` collection is `[{a, b}]`;
- - Eg. for `[a, b, c]` `distinct pairs` collection is `[{a, b}, {a, c}, {b, c}]`.
+ - Eg. for `[a]`, the `distinct pairs` collection is `[{a, undefined}]`;
+ - Eg. for `[a, b]`, the `distinct pairs` collection is `[{a, b}]`;
+ - Eg. for `[a, b, c]`, the `distinct pairs` collection is `[{a, b}, {a, c}, {b, c}]`.
 
 ## Exports
 
@@ -68,7 +69,7 @@ UsersPid :: pid()
 Data :: any()
 ```
 
-This function adds current process data. Usually is called in `start/2` of a amoc scenario.
+This function adds the current process data. It is usually called in `start/2` of a amoc scenario.
 
 ## Example
 
@@ -145,11 +146,11 @@ Two new users showed up: Event = coordinate
 {Msg = {hello,1}, Id = 1
 
 User = 3
-% We have 3 users added to amoc_coordinator so all of actions {3, _} are triggered:
+% We have 3 users added to amoc_coordinator so all of the {3, _} actions are triggered:
 Three new users showed up
 
 User = 4
-% We have 4 and 4 rem 2 == 0 therefore users added to amoc_coordinator so all of actions {2, _} are triggered:
+% We have 4 and 4 rem 2 == 0 therefore users added to amoc_coordinator so all of the {3, _} actions are triggered:
 Two new users showed up: Event = coordinate; User1 = {<0.1144.0>,4}; User2 = {<0.1143.0>,3}
 Two new users showed up: Event = coordinate; ListOfUsers = [{<0.1144.0>,4},{<0.1143.0>,3}]
 Two new users showed up: Event = coordinate
@@ -159,7 +160,7 @@ Two new users showed up: Event = coordinate
 User = 5
 
 % You need to wait for a while, and ...
-% Timeout has been reached. Which triggers all of the Coordination Actions with remaining number of users remaining.
+% Timeout has been reached, which triggers all of the Coordination Actions with the remaining number of users.
 Three new users showed up
 Two new users showed up: Event = timeout; User1 = {<0.1139.0>,5}; User2 = undefined
 Two new users showed up: Event = timeout; ListOfUsers = [{<0.1139.0>,5}]
