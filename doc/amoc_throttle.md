@@ -13,7 +13,7 @@ Because of that, it may happen that the actual `Rate` would be slightly below th
 ## API
 
 Functions provided by Amoc throttle:
-```
+```erlang
 start(Name, Rate, Interval, NoOfProcesses) -> R when
       Name :: name(),
       Rate :: pos_integer(),
@@ -27,18 +27,18 @@ The optional arguments are an `Interval` (default is one minute) and a ` NoOfPro
 `Interval` is given in milliseconds and can be changed to a different value for convenience or higher granularity.
 It also accepts a special value of `0` which limits the number of parallel executions associated with `Name` to `Rate`.
 
-```
+```erlang
 send(Name :: name()[, PID :: pid()], Msg :: any()) -> ok | {error, any()}.
 ```
 Sends a given message `Msg` either to `self()` or a given (optional) `PID` when the rate for `Name` allows for that.
 May be used to schedule tasks.
 
-```
+```erlang
 send_and_wait(Name :: name(), Msg :: any()) -> ok | {error, any()}.
 ```
 Sends and receives the given message `Msg`.
 Can be used to halt execution if we want a process to be idle when waiting for rate increase or other processes finishing their tasks.
-```
+```erlang
 run(Name :: name(), Fn :: fun(()-> any())) -> ok | {error, any()}.
 ```
 Executes a given function `Fn` when it does not exceed the rate for `Name`.
@@ -46,22 +46,22 @@ Executes a given function `Fn` when it does not exceed the rate for `Name`.
 This function is used internally by both `send` and `send_and_wait/2` functions,
 so all those actions will be limited to the same rate when called with the same `Name`.
 
-```
+```erlang
 pause(Name :: name()) -> ok | {error, any()}.
 ```
 Pauses executions for the given `Name` as if `Rate` was set to `0`.
 Does not stop the scheduled rate changes.
 
-```
+```erlang
 resume(Name :: name()) -> ok | {error, any()}.
 ```
 Resumes the executions for the given `Name`, so the `Rate` and `Interval` are reset to their original values given before the pause.
-```
+```erlang
 change_rate(name(), pos_integer(), non_neg_integer()) -> ok | {error, any()}.
 ```
 Sets `Rate` and `Interval` for `Name` according to the given values.
 Can change whether Amoc throttle limits `Name` to parallel executions or to `Rate` per `Interval`, according to the given `Interval` value.
-```
+```erlang
 change_rate_gradually(Name, From, To, RateInterval, StepInterval, NoOfSteps)) -> R when
                       Name :: name(),
                       From :: pos_integer(),
@@ -79,7 +79,7 @@ Each step will take the `StepInterval` time in milliseconds.
 There will be `NoOfSteps` steps.
 Be aware that, at first, the rate will be changed to `From` per `RateInterval` and this is not considered a step.
 
-```
+```erlang
 stop(name()) -> ok | {error, any()}.
 ```
 Stops the throttle mechanism for the given `Name`.
