@@ -89,14 +89,14 @@ maybe_add_reporter() ->
             case amoc_config:get(graphite_host) of
                 undefined -> ok;
                 Host ->
-                    Prefix =amoc_config:get(graphite_prefix,net_adm:localhost()),
-                    Port = amoc_config:get(graphite_port,2003),
+                    Prefix = amoc_config:get(graphite_prefix, net_adm:localhost()),
+                    Port = amoc_config:get(graphite_port, 2003),
                     Options = [{module, exometer_report_graphite},
                                {prefix, Prefix},
                                {host, Host},
                                {port, Port},
                                {api_key, ""}],
-                    exometer_report:add_reporter(Reporter,Options)
+                    exometer_report:add_reporter(Reporter, Options)
             end
     end.
 

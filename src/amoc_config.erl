@@ -4,7 +4,7 @@
 %%==============================================================================
 -module(amoc_config).
 
--export([get/1,get/2,
+-export([get/1, get/2,
          parse_scenario_settings/1,
          get_scenario_parameter/2]).
 
