@@ -1,9 +1,8 @@
 ## Configuration
 
 Amoc is configured through OTP application environment variables that
-are loaded from the configuration file, operating system environment variables
-(with prefix ``AMOC_``) and Erlang application environment variables
-(`priv/app.config`).
+are loaded from the configuration file (`amoc.app.src` or `priv/app.config`)
+and operating system environment variables (with prefix ``AMOC_``).
 
 `AMOC_HOSTS` (the hostnames of all of the `amoc` machines) must be set in order to successfully
 run the scenario in a distributed environment.
@@ -11,6 +10,8 @@ run the scenario in a distributed environment.
 Amoc is able to report metrics to Graphite.
 It is possible to set up a reporting endpoint by setting `AMOC_GRAPHITE_HOST`
 and `AMOC_GRAPHITE_PORT` environment variables.
+It is also possible to configure a different metrix reporter by setting
+the `AMOC_METRICS_REPORTER` variable.
 
 If there is a need to point amoc to some additional paths with code,
 it can be done by specifying variable `AMOC_EXTRA_CODE_PATHS`.
