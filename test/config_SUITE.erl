@@ -4,12 +4,29 @@
 
 -compile(export_all).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% these attributes are required for the testing purposes %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-required_variable({var1, "var1"}).
+-required_variable({var2, "var2", def2}).
+-required_variable([
+    {var3, "var3", def3, some_atom},
+    {var4, "var4", def4, [def4, another_atom]},
+    {var5, "var5", def5, test_verification_function},
+    {var6, "var6", def6, fun ?MODULE:test_verification_function/1}
+]).
+
+-export([test_verification_function/1]).
+test_verification_function(_) -> true.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 all() ->
     [config_osenv_test,
      config_appenv_test,
      config_none_test,
      config_osappenv_test,
      config_osenv_dynamic_test,
+     get_scenario_configuration,
      parse_scenario_settings_uses_default_values,
      parse_scenario_settings_shadows_default_values,
      parse_scenario_settings_returns_error_for_invalid_values,
@@ -64,6 +81,16 @@ config_osenv_dynamic_test(_) ->
     os:putenv("AMOC_foo", "baz"),
     %% then
     ?assertEqual(baz, amoc_config:get(foo)).
+
+get_scenario_configuration(_) ->
+    Result = amoc_config:get_scenario_configuration(?MODULE),
+    ExpectedResult = [{var1, undefined, none},
+                      {var2, def2, none},
+                      {var3, def3, some_atom},
+                      {var4, def4, [def4, another_atom]},
+                      {var5, def5, fun ?MODULE:test_verification_function/1},
+                      {var6, def6, fun ?MODULE:test_verification_function/1}],
+    ?assertEqual(lists:sort(ExpectedResult), lists:sort(Result)).
 
 parse_scenario_settings_uses_default_values(_) ->
     given_amoc_started(),

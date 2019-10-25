@@ -25,23 +25,25 @@ docker run --rm -d --name=graphite --network amoc-test-network \
 Start two Amoc containers, export all of the necessary environmental variables so that the nodes can communicate with each other and send metrics to Graphite.
 In order to use Amoc HTTP API for uploading and starting scenarios, port 4000 should be published.
 ```
-docker run --rm -t -d --name amoc-1 -h amoc-1 --network ${NETWORK} \
+docker run --rm -t -d --name amoc-1 -h amoc-1 \
+    --network amoc-test-network \
     -e AMOC_HOSTS="\"amoc-1\",\"amoc-2\"" \
     -e AMOC_GRAPHITE_HOST=graphite \
     -e AMOC_GRAPHITE_PORT=2003 \
     -e AMOC_PREFIX=amoc1 \
-    --health-cmd="${PATH_TO_AMOC} status" \
+    --health-cmd="/home/amoc/amoc/bin/amoc status" \
     -p 8081:4000 \
-    amoc-reworked:latest
+    amoc_image:tag
 
-docker run --rm -t -d --name amoc-2 -h amoc-2 --network ${NETWORK} \
+docker run --rm -t -d --name amoc-2 -h amoc-2 \
+    --network amoc-test-network \
     -e AMOC_HOSTS="\"amoc-1\",\"amoc-2\"" \
     -e AMOC_GRAPHITE_HOST=graphite \
     -e AMOC_GRAPHITE_PORT=2003 \
     -e AMOC_PREFIX=amoc2 \
-    --health-cmd="${PATH_TO_AMOC} status" \
+    --health-cmd="/home/amoc/amoc/bin/amoc status" \
     -p 8082:4000 \
-    amoc-reworked:latest
+    amoc_image:tag
 ```
 
 Connect to Amoc console and go to the [next](../doc/distributed-run.md) section.

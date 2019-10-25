@@ -18,6 +18,7 @@ start(_StartType, _StartArgs) ->
     Ret = amoc_sup:start_link(),
     amoc_dist:gather_nodes(),
     amoc_api:start_listener(),
+    amoc_metrics:start(),
     Ret.
 
 -spec stop(term()) -> ok.

@@ -22,8 +22,7 @@
 -spec gather_nodes() -> [ok].
 gather_nodes() ->
     Hosts = amoc_config:get(hosts, []),
-    Path = amoc_config:get(path, "/usr"),
-    gather_nodes(Hosts, Path).
+    gather_nodes(Hosts).
 
 -spec ping_nodes() -> [{atom(), pong|pang}].
 ping_nodes() ->
@@ -80,9 +79,9 @@ remove(Count, Opts, Nodes) ->
 %% ------------------------------------------------------------------
 %% Local functions
 %% ------------------------------------------------------------------
--spec gather_nodes([string()], file:filename()) -> [ok].
-gather_nodes(Hosts, Path) ->
-    [ amoc_slave:gather_node(Host, Path) || Host <- Hosts ].
+-spec gather_nodes([string()]) -> [ok].
+gather_nodes(Hosts) ->
+    [ amoc_slave:gather_node(Host) || Host <- Hosts ].
 
 -spec amoc_nodes() -> [node()].
 amoc_nodes() ->
