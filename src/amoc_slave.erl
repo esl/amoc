@@ -10,10 +10,11 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 -export([start_link/0,
-         start/2,
+         gather_node/1,
          monitor_master/1,
          ping/1,
-         node_name/1]).
+         node_name/1,
+         get_master_node/0]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -50,9 +51,16 @@ ping(Node) ->
               pang
     end.
 
--spec start(string(), file:filename()) -> ok.
-start(Host, Directory) ->
-    gen_server:call(?SERVER, {start, Host, Directory}).
+-spec gather_node(string()) -> ok.
+gather_node(Host) ->
+    gen_server:call(?SERVER, {gather, Host}).
+
+-spec get_master_node() -> node().
+get_master_node() ->
+    case gen_server:call(?SERVER, get_master_node) of
+        undefined -> node();
+        MasterNode -> MasterNode
+    end.
 
 -spec monitor_master(node()) -> ok.
 monitor_master(Node) ->
@@ -72,11 +80,18 @@ init([]) ->
 
 -spec handle_call(command(), {pid(), any()}, state()) -> {reply, ok |
                                                           pong, state()}.
-handle_call({start, Host, Directory}, _From, State) ->
-    State1 = handle_start(Host, Directory, State),
+handle_call({gather, Host}, _From, State) ->
+    lager:info("{gather, ~p}, state: ~p", [Host, State]),
+    State1 = handle_gather(Host, State),
     {reply, ok, State1};
+handle_call(get_master_node, _From, #state{master = Master} = State) ->
+    {reply, Master, State};
 handle_call({monitor_master, Master}, _From, State) ->
-    true = erlang:monitor_node(Master, true),
+    case node() of
+        Master -> ok;
+        _ ->
+            true = erlang:monitor_node(Master, true)
+    end,
     {reply, ok, State#state{master = Master}};
 handle_call(ping, _From, State) ->
     {reply, pong, State};
@@ -112,19 +127,16 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
--spec handle_start(string(), file:filename(), state()) -> state().
-handle_start(Host, Directory, #state{to_ack=Ack}=State) ->
-    create_status_file(<<"connecting">>),
-    _Port = start_slave_node(Host, Directory),
-    Node = node_name(Host),
-    Ack1 = [{Node, ?DEFAULT_RETRIES} | Ack],
-    State#state{to_ack = Ack1}.
-
--spec start_slave_node(string(), file:filename()) -> port().
-start_slave_node(Host, Directory) ->
-    Cmd = "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "
-          ++ Host ++ " " ++ Directory ++ "/bin/amoc start",
-    erlang:open_port({spawn, Cmd}, [stream]).
+-spec handle_gather(string(), state()) -> state().
+handle_gather(Host, #state{to_ack = Ack} = State) ->
+    case {node_name(Host), node()} of
+        {Node, Node} -> State;
+        {Node, _} ->
+            create_status_file(<<"connecting">>),
+            Ack1 = [{Node, ?DEFAULT_RETRIES} | Ack],
+            lager:info("Changing state to_ack element~nfrom: ~p~nto: ~p~n", [Ack, Ack1]),
+            State#state{to_ack = Ack1}
+    end.
 
 -spec ping_slave_nodes(state()) -> state().
 ping_slave_nodes(#state{to_ack=Ack}=State) ->
@@ -143,7 +155,6 @@ ping_slave_node({Node, 0}) ->
 ping_slave_node({Node, Retries}) ->
     case ping(Node) of
         pong ->
-            ok = monitor_master(Node),
             true = erlang:monitor_node(Node, true),
             lager:info("Node ~p successfully connected", [Node]),
             false;

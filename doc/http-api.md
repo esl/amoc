@@ -26,69 +26,74 @@ Requests and responses format
 #### Request
 `GET /scenarios`
 #### Response
-`
+```json
 {
     "scenarios": [ScenarioName]
 }
-`
+```
 ### Add new scenario
 
 #### Request
 `POST /scenarios` with:
-`
+```json
 {
     "scenario": ScenarioName, //string
     "module_source": ModuleSourceCode //string
 }
-`
+```
 #### Response
-`
+```json
 {
     "compile" : "ok" | "error"
 }
-`
+```
 ### Start scenario
 
 #### Request 
 `PATCH /scenarios/:id` (:id is a module name of scenario) with:
-`
+```json
 {
-    "users": NumberOfUsers //integer
+    "users": NumberOfUsers, //integer
+    "batches": NumOfBatches //integer
 }
-`
+```
+> `"batches"` key is optional, see [Add users in batches](./README.md#2-add-users-in-batches)
 #### Response
-`
+```json
 {
     "scenario": "started" | "wrong_json"
 }
-`
+```
 ### Scenario status
 
 #### Request
 `GET /scenarios/:id` (:id is a module name of scenario)
 #### Response
-`{
+```json
+{
     "scenario_status": "loaded" | "running" | "finished"
-}`
+}```
 Attention: when scenario with `:id` does not exists API returns 404.
 ### Ping nodes
 
 #### Request
 `GET /nodes`
 #### Response
-`{
+```json
+{
     "nodes": 
     {
         NodeName1: "up" | "down",
         NodeName2: "up" | "down",
         ...
     }
-}`
+}```
 ### Node status
 
 #### Request
 `GET /status`
 #### Response
-`{
+```json
+{
     "node_status": "up" | "down"
-}`
+}```
