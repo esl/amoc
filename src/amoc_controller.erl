@@ -25,6 +25,8 @@
 -type interarrival() :: non_neg_integer().
 -type user_batch_strategy() :: [{node(), user_count(), interarrival()}].
 
+-include_lib("kernel/include/logger.hrl").
+
 %% ------------------------------------------------------------------
 %% Types Exports
 %% ------------------------------------------------------------------
@@ -196,7 +198,7 @@ code_change(_OldVsn, State, _Extra) ->
 -spec handle_add(user_count(), state(), proplists:proplist()) ->
     ok | list({ok, pid()}).
 handle_add(_Count, #state{scenario=undefined}, _Opts) ->
-    lager:error("add users invoked, but no scenario defined");
+    ?LOG_ERROR("add users invoked, but no scenario defined");
 handle_add(Count, #state{scenario=Scenario,
                          scenario_state=State,
                          nodes = Nodes,
@@ -212,7 +214,7 @@ handle_add(Count, #state{scenario=Scenario,
 
 -spec handle_remove(user_count(), amoc:remove_opts(), state()) -> ok.
 handle_remove(_Count, _Opts, #state{scenario=undefined}) ->
-    lager:error("remove users invoked, but no scenario defined");
+    ?LOG_ERROR("remove users invoked, but no scenario defined");
 handle_remove(Count, Opts, _State) when
       is_integer(Count), Count > 0 ->
     ForceRemove = proplists:get_value(force, Opts, false),
@@ -247,12 +249,12 @@ handle_do(Scenario, UserIds, State) ->
                                          scenario_state = ScenarioState},
                     {reply, ok, State1};
                 {error, Reason} ->
-                    lager:error("scenario  ~p initialisation failed, reason: ~p",
+                    ?LOG_ERROR("scenario  ~p initialisation failed, reason: ~p",
                                 [Scenario, Reason]),
                     {reply, {error, Reason}, State}
             end;
         Error ->
-            lager:error("scenario module ~p cannot be found, reason: ~p",
+            ?LOG_ERROR("scenario module ~p cannot be found, reason: ~p",
                         [Scenario, Error]),
             {reply, {error, Error}, State}
     end.
@@ -264,10 +266,10 @@ handle_check(Scenario, Interval) ->
             schedule_scenario_checking(Scenario, Interval),
             continue;
         {ok, {stop, Reason}} ->
-            lager:info("scenario should be terminated, reason=~p", [Reason]),
+            ?LOG_INFO("scenario should be terminated, reason=~p", [Reason]),
             try_terminate_scenario(Scenario, Reason);
         {error, Error, Reason} ->
-            lager:error("continue/1 callback failed, scenario should be"
+            ?LOG_ERROR("continue/1 callback failed, scenario should be"
                        " terminated, error=~p, reason=~p", [Error, Reason]),
             try_terminate_scenario(Scenario, {Error, Reason})
     end.
@@ -284,7 +286,7 @@ handle_add_batch(Scenario, BatchCount, CurrentBatch, PrevUserCount, Interval) ->
             maybe_schedule_add_batch({Scenario, BatchCount - 1, CurrentBatch + 1,
                                       TotalUserCount}, Interval);
         {error, Error, Reason} ->
-            lager:error("next_user_batch/2 callback failed, scenario should be"
+            ?LOG_ERROR("next_user_batch/2 callback failed, scenario should be"
                         " terminated, error=~p, reason=~p", [Error, Reason]),
             try_terminate_scenario(Scenario, {Error, Reason})
     end.
@@ -299,7 +301,7 @@ start_scenario(Scenario, UserIds, State) ->
     Start = lists:min(UserIds),
     End = lists:max(UserIds),
     Length = erlang:length(UserIds),
-    lager:info("starting scenario begin_id=~p, end_id=~p, length=~p",
+    ?LOG_INFO("starting scenario begin_id=~p, end_id=~p, length=~p",
                [Start, End, Length]),
     start_users(Scenario, UserIds, interarrival(), State).
 
@@ -321,10 +323,10 @@ maybe_start_scenario_checking(Scenario) ->
     case are_callbacks_exported(Scenario, Callbacks) of
         true ->
             schedule_scenario_checking(Scenario, checking_interval()),
-            lager:info("checking has been started", []),
+            ?LOG_INFO("checking has been started", []),
             ok;
         false ->
-            lager:info("checking is not started as callbacks=~p are not"
+            ?LOG_INFO("checking is not started as callbacks=~p are not"
                        " exported", [Callbacks]),
             skip
     end.
@@ -339,7 +341,7 @@ maybe_add_batches(Scenario, BatchCount, CurrentBatch, PrevUserCount) ->
                                       PrevUserCount}, add_batch_interval()),
             ok;
         false ->
-            lager:info("add batches is not possible as callbacks=~p are not"
+            ?LOG_INFO("add batches is not possible as callbacks=~p are not"
                        " exported", [Callbacks]),
             skip
     end.
@@ -357,7 +359,7 @@ are_callbacks_exported(Scenario, Callbacks) ->
                               erlang:function_exported(Scenario, Func, Arity)
                       end, Callbacks);
         Error ->
-            lager:error("scenario module ~p cannot be found, reason: ~p",
+            ?LOG_ERROR("scenario module ~p cannot be found, reason: ~p",
                         [Scenario, Error]),
             false
     end.
@@ -383,7 +385,7 @@ try_terminate_scenario(Scenario, Reason) ->
         {ok, _} ->
             ok;
         {error, E, R} ->
-            lager:error("terminate/1 callback failed, scenario cannot be"
+            ?LOG_ERROR("terminate/1 callback failed, scenario cannot be"
                        " terminated, error=~p, reason=~p", [E, R]),
             application:stop(amoc)
     end.

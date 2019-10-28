@@ -22,6 +22,8 @@
          handle_continue/2,
          format_status/2]).
 
+-include_lib("kernel/include/logger.hrl").
+
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
 -record(state, {can_run_fn = true :: boolean(),
@@ -123,17 +125,17 @@ format_status(_Opt, [_PDict, State]) ->
 %% internal functions
 %%------------------------------------------------------------------------------
 initial_state(Interval, 0) ->
-    lager:error("invalid rate, must be higher than zero"),
+    ?LOG_ERROR("invalid rate, must be higher than zero"),
     initial_state(Interval, 1);
 initial_state(Interval, Rate) when Rate > 0 ->
     if
-        Rate < 5 -> lager:error("too low rate, please reduce NoOfProcesses");
+        Rate < 5 -> ?LOG_ERROR("too low rate, please reduce NoOfProcesses");
         true -> ok
     end,
     Delay = case {Interval, Interval div Rate, Interval rem Rate} of
                 {0, _, _} -> 0; %% limit only No of simultaneous executions
                 {_, I, _} when I < 10 ->
-                    lager:error("too high rate, please increase NoOfProcesses"),
+                    ?LOG_ERROR("too high rate, please increase NoOfProcesses"),
                     10;
                 {_, DelayBetweenExecutions, 0} -> DelayBetweenExecutions;
                 {_, DelayBetweenExecutions, _} -> DelayBetweenExecutions + 1
@@ -199,7 +201,7 @@ inc_n(#state{n = N, max_n = MaxN} = State) ->
     if
         MaxN < NewN ->
             PrintableState = printable_state(State),
-            lager:error("~nthrottle process ~p: invalid N (~p)~n", [self(), PrintableState]),
+            ?LOG_ERROR("~nthrottle process ~p: invalid N (~p)~n", [self(), PrintableState]),
             State#state{n = MaxN};
         true ->
             State#state{n = NewN}
@@ -207,7 +209,7 @@ inc_n(#state{n = N, max_n = MaxN} = State) ->
 
 log_state(Msg, State) ->
     PrintableState = printable_state(State),
-    lager:debug("~nthrottle process ~p: ~s (~p)~n", [self(), Msg, PrintableState]).
+    ?LOG_DEBUG("~nthrottle process ~p: ~s (~p)~n", [self(), Msg, PrintableState]).
 
 printable_state(#state{} = State) ->
     Fields = record_info(fields, state),
