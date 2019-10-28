@@ -28,6 +28,8 @@
 -type error() :: invalid_settings() | invalid_module.
 -type invalid_settings() :: {invalid_settings, [{name(), value(), reason()}]}.
 
+-include_lib("kernel/include/logger.hrl").
+
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
@@ -84,13 +86,13 @@ get_value_and_verify({Name, DefaultValue, VerificationMethod}) ->
     Verification = case {DefaultValueVerification, ValueVerification} of
                        {true, true} -> true;
                        {false, true} ->
-                           lager:error("Invalid default value for ~p", [Name]),
+                           ?LOG_ERROR("Invalid default value for ~p", [Name]),
                            {false, bad_default_value};
                        {true, false} ->
-                           lager:error("Invalid value for ~p", [Name]),
+                           ?LOG_ERROR("Invalid value for ~p", [Name]),
                            {false, bad_value};
                        {false, false} ->
-                           lager:error("Invalid value & default value for ~p", [Name]),
+                           ?LOG_ERROR("Invalid value & default value for ~p", [Name]),
                            {false, bad_value_bad_default_value}
                    end,
     {Name, NewValue, Verification}.
@@ -113,7 +115,7 @@ verify_value(Value, [_ | _] = NonemptyList) ->
 verify_value(Value, Fun) when is_function(Fun, 1) ->
     call_verify_fun(Fun,Value);
 verify_value(_, VerificationMethod) ->
-    lager:error("invalid verification method ~p", [VerificationMethod]),
+    ?LOG_ERROR("invalid verification method ~p", [VerificationMethod]),
     false.
 
 call_verify_fun(Fun, Value) ->
@@ -121,11 +123,11 @@ call_verify_fun(Fun, Value) ->
         Bool when is_boolean(Bool) -> Bool;
         {true, NewValue} -> {true, NewValue};
         Ret ->
-            lager:error("invalid verification method ~p, return value : ~p", [Fun, Ret]),
+            ?LOG_ERROR("invalid verification method ~p, return value : ~p", [Fun, Ret]),
             false
     catch
         C:E:S ->
-            lager:error("invalid verification method ~p, exception: ~p ~p ~p", [Fun, C, E, S]),
+            ?LOG_ERROR("invalid verification method ~p, exception: ~p ~p ~p", [Fun, C, E, S]),
             false
     end.
 

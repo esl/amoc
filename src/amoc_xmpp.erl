@@ -5,6 +5,8 @@
 -export([pick_server/1]).
 -export([send_request_and_get_response/5]).
 
+-include_lib("kernel/include/logger.hrl").
+
 %% @doc connects and authenticates a user with given id and additional properties
 %% If the passed proplist is empty, a default user spec a created by
 %% make_user function is passed.
@@ -30,7 +32,7 @@ connect_or_exit(Spec) ->
             Result;
         Error ->
             amoc_metrics:update_counter(connection_failures),
-            lager:error("Could not connect user=~p, reason=~p", [Spec, Error]),
+            ?LOG_ERROR("Could not connect user=~p, reason=~p", [Spec, Error]),
             exit(connection_failed)
     end.
 

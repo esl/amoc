@@ -13,6 +13,7 @@
          to_json/2,
          from_json/2]).
 
+-include_lib("kernel/include/logger.hrl").
 
 -record(state, {resource, users}).
 
@@ -176,7 +177,7 @@ get_result(Result) ->
         true -> started;
         false ->
                 Errors = lists:filter(fun(X) -> X =/= ok end, Result),
-                lager:error("Run scenario error: ~p", [Errors]),
+                ?LOG_ERROR("Run scenario error: ~p", [Errors]),
                 error
     end.
 
