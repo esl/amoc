@@ -21,19 +21,19 @@
 -required_variable({'MUC_HOST',               <<"The virtual MUC host served by the server (def: <<\"muclight.localhost\">>)"/utf8>>}).
 
 -define(ALL_PARAMETERS, [
-    {iq_timeout,             'IQ_TIMEOUT',                  10000, positive_integer},
-    {room_creation_rate,     'ROOM_CREATION_RATE',            600, positive_integer},
-    {node_creation_rate,     'NODE_CREATION_RATE',            600, positive_integer},
-    {room_publication_rate,  'ROOM_PUBLICATION_RATE',        1500, positive_integer},
-    {node_publication_rate,  'NODE_PUBLICATION_RATE',        1500, positive_integer},
-    {room_size,              'ROOM_SIZE',                      10, positive_integer},
-    {n_of_subscribers,       'N_OF_SUBSCRIBERS',               50, nonnegative_integer},
-    {room_activation_policy, 'ROOM_ACTIVATION_POLICY',  all_rooms, [all_rooms, n_rooms]},
-    {node_activation_policy, 'NODE_ACTIVATION_POLICY',  all_nodes, [all_nodes, n_nodes]},
-    {gdpr_removal_rate,      'GDPR_REMOVAL_RATE',               2, positive_integer},
-    {publication_size,       'PUBLICATION_SIZE',              300, nonnegative_integer},
-    {mim_host,               'MIM_HOST',          <<"localhost">>, bitstring},
-    {muc_host,               'MUC_HOST', <<"muclight.localhost">>, bitstring}
+    {iq_timeout,                  10000, positive_integer},
+    {room_creation_rate,            600, positive_integer},
+    {node_creation_rate,            600, positive_integer},
+    {room_publication_rate,        1500, positive_integer},
+    {node_publication_rate,        1500, positive_integer},
+    {room_size,                      10, positive_integer},
+    {n_of_subscribers,               50, nonnegative_integer},
+    {room_activation_policy,  all_rooms, [all_rooms, n_rooms]},
+    {node_activation_policy,  all_nodes, [all_nodes, n_nodes]},
+    {gdpr_removal_rate,               2, positive_integer},
+    {publication_size,              300, nonnegative_integer},
+    {mim_host,          <<"localhost">>, bitstring},
+    {muc_host, <<"muclight.localhost">>, bitstring}
 ]).
 
 -define(ROOM_CREATION_THROTTLING, room_creation).
@@ -52,24 +52,19 @@
 -define(NS_MUC_LIGHT_AFFILIATIONS, <<"urn:xmpp:muclight:0#affiliations">>).
 -define(NS_MUC_LIGHT_CREATION, <<"urn:xmpp:muclight:0#create">>).
 
--type client() :: #client{}.
--type plan() :: [{EveryNClients :: pos_integer() | all,
-    DoFun :: fun(([{Pid :: pid(), Client :: client()}]) -> any())}].
-
 -export([init/0, start/2]).
 
 -spec init() -> {ok, amoc_scenario:state()} | {error, Reason :: term()}.
 init() ->
     init_metrics(),
-    case config:get_scenario_settings(?ALL_PARAMETERS) of
+    case amoc_config:parse_scenario_settings(?ALL_PARAMETERS) of
         {ok, Settings} ->
             http_req:start(),
 
-            config:store_scenario_settings(Settings),
-            config:dump_settings(),
+            dump_settings(Settings),
 
             [RoomPublicationRate, NodePublicationRate, RoomCreationRate, NodeCreationRate, GDPRRemovalRate] =
-                [proplists:get_value(Key, Settings) ||
+                [get_parameter(Key, Settings) ||
                     Key <- [room_publication_rate, node_publication_rate,
                             room_creation_rate, node_creation_rate,
                             gdpr_removal_rate]],
@@ -86,7 +81,7 @@ init() ->
 
 -spec start(amoc_scenario:user_id(), amoc_scenario:state()) -> any().
 start(Id, Settings) ->
-    config:store_scenario_settings(Settings),
+    store_scenario_settings(Settings),
     Client = connect_amoc_user(Id),
     start_user(Client).
 
@@ -115,19 +110,45 @@ init_metrics() ->
 %% Coordinator
 %%------------------------------------------------------------------------------------------------
 start_coordinator(Settings) ->
-    Plan = get_plan(),
-    coordinator:start_link(Plan, Settings).
+    Plan = get_plan(Settings),
+    amoc_coordinator:start(?MODULE, Plan).
 
-node_activate_users(Pids, ActivationPolicy) ->
-    case get_parameter(node_activation_policy) of
+get_plan(Settings) ->
+    [{get_parameter(room_size, Settings),
+      fun(_, PidsAndClients) ->
+          make_full_rooms(PidsAndClients),
+          room_activate_users(Settings, pids(PidsAndClients), n_rooms)
+      end},
+     {get_parameter(n_of_subscribers, Settings),
+      fun(_, PidsAndClients) ->
+          make_all_clients_friends(clients(PidsAndClients)),
+          node_activate_users(Settings, pids(PidsAndClients), n_nodes)
+      end},
+     {all,
+      fun(_, PidsAndClients) ->
+          room_activate_users(Settings, pids(PidsAndClients), all_rooms),
+          node_activate_users(Settings, pids(PidsAndClients), all_nodes),
+          activate_removal(pids(PidsAndClients))
+      end}].
+
+clients(PidsAndClients) ->
+    {_Pids, Clients} = lists:unzip(PidsAndClients),
+    Clients.
+
+pids(PidsAndClients) ->
+    {Pids, _Clients} = lists:unzip(PidsAndClients),
+    Pids.
+
+node_activate_users(Settings, Pids, ActivationPolicy) ->
+    case get_parameter(node_activation_policy, Settings) of
         ActivationPolicy ->
             lager:debug("Node activate users running. Policy ~p. Pids: ~p", [ActivationPolicy, Pids]),
             [schedule_node_publishing(Pid) || Pid <- Pids];
         _ -> ok
     end.
 
-room_activate_users(Pids, ActivationPolicy) ->
-    case get_parameter(room_activation_policy) of
+room_activate_users(Settings, Pids, ActivationPolicy) ->
+    case get_parameter(room_activation_policy, Settings) of
         ActivationPolicy ->
             lager:debug("Room activate users running. Policy ~p. Pids: ~p", [ActivationPolicy, Pids]),
             [schedule_room_publishing(Pid) || Pid <- Pids];
@@ -525,7 +546,7 @@ handle_muc_light_room_iq_result(CreateRoomResult, {Tag, RoomCreationTime}) ->
 
 send_info_to_coordinator(Client) ->
     lager:debug("Process ~p, sending info about myself to coordinator", [self()]),
-    coordinator:register_user(Client).
+    amoc_coordinator:add(?MODULE, Client).
 
 handle_affiliation_change_iq(AffiliationChangeResult, {Tag, AffiliationChangeTime}) ->
     case {escalus_pred:is_iq_result(AffiliationChangeResult), AffiliationChangeResult} of
@@ -608,35 +629,30 @@ get_sender_bare_jid(Stanza) ->
 %%------------------------------------------------------------------------------------------------
 %% Config helpers
 %%------------------------------------------------------------------------------------------------
+dump_settings(Settings) ->
+    lager:info("scenario settings: ~p", [Settings]).
+
+store_scenario_settings(Settings) ->
+    erlang:put(scenario_settings, Settings).
+
 get_parameter(Name) ->
-    case config:get_parameter(Name) of
-        {error, Err} ->
-            lager:error("config_get_parameter/1 failed ~p", [Err]),
-            exit(Err);
-        {ok, Value} -> Value
+    case erlang:get(scenario_settings) of
+        undefined ->
+            lager:error("get_parameter/1 failed, no scenario settings"),
+            exit(no_settings);
+        Settings ->
+            case amoc_config:get_scenario_parameter(Name, Settings) of
+                {error, no_parameter} ->
+                    lager:error("get_parameter/1 failed, no such parameter"),
+                    exit(no_parameter);
+                {ok, Value} -> Value
+            end
     end.
 
-get_room_size() ->
-    get_parameter(room_size).
-
--spec(get_plan() -> Plan :: plan()).
-get_plan() ->
-    [{get_room_size(), fun(PidsAndClients) ->
-        make_full_rooms(PidsAndClients),
-        room_activate_users(pids(PidsAndClients), n_rooms) end},
-        {get_parameter(n_of_subscribers), fun(PidsAndClients) ->
-            make_all_clients_friends(clients(PidsAndClients)),
-            node_activate_users(pids(PidsAndClients), n_nodes) end},
-        {all, fun(PidsAndClients) ->
-            room_activate_users(pids(PidsAndClients), all_rooms),
-            node_activate_users(pids(PidsAndClients), all_nodes),
-            activate_removal(pids(PidsAndClients))
-              end}].
-
-clients(PidsAndClients) ->
-    {_Pids, Clients} = lists:unzip(PidsAndClients),
-    Clients.
-
-pids(PidsAndClients) ->
-    {Pids, _Clients} = lists:unzip(PidsAndClients),
-    Pids.
+get_parameter(Name, Settings) ->
+    case amoc_config:get_scenario_parameter(Name, Settings) of
+        {error, no_parameter} ->
+            lager:error("get_parameter/2 failed, no such parameter"),
+            exit(no_parameter);
+        {ok, Value} -> Value
+    end.
