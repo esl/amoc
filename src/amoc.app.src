@@ -1,33 +1,39 @@
-{application, amoc,
- [
-  {description, "A murder of crows"},
-  {vsn, "0.9.0"},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib,
-                  sasl,
-                  lager,
-                  jiffy,
-                  exometer_core,
-                  exometer_report_graphite,
-                  exometer_report_statsd,
-                  ssl,
-                  trails,
-                  cowboy,
-                  cowboy_swagger,
-                  runtime_tools
-                 ]},
-  {mod, { amoc_app, []}},
-  {env, [{repeat_interval, 60000},
-         {interarrival, 30},
-         {exometer_predefined, [
-          {[amoc, users],
-           {function, ets, info, [amoc_users], proplist, [size]},
-           []},
-          {[amoc, times, connection], histogram, []},
-          {[amoc, counters, connections], spiral, []},
-          {[amoc, counters, connection_failures], spiral, []}
-         ]}
-  ]}
- ]}.
+{ application, amoc, [
+    {description, "A murder of crows"},
+    {vsn, "1.3.0"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        sasl,
+        lager,
+        jiffy,
+        exometer_core,
+        exometer_report_graphite,
+        exometer_report_statsd,
+        ssl,
+        trails,
+        cowboy,
+        cowboy_swagger,
+        runtime_tools,
+        mnesia
+    ]},
+    {mod, {amoc_app, []}},
+    {env, [{repeat_interval, 60000},
+           {interarrival, 75},
+           {exometer_predefined, [
+               {[erlang, system_info],
+                {function, erlang, system_info, ['$dp'], value, [port_count, process_count]},
+                []},
+               {[erlang, memory],
+                {function, erlang, memory, ['$dp'], value, [total, processes, processes_used, system, binary, ets]},
+                []},
+               {[amoc, users],
+                {function, ets, info, [amoc_users], proplist, [size]},
+                []},
+               {[amoc, times, connection], histogram, []},
+               {[amoc, counters, connections], spiral, []},
+               {[amoc, counters, connection_failures], spiral, []}
+           ]}
+    ]}
+]}.

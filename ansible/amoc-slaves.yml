@@ -1,9 +1,0 @@
----
-- hosts: amoc-slave
-  remote_user: "{{user}}"
-  become: no
-  vars:
-    - amoc_slaves: []
-    - install_dir: "{{ slave_install_dir }}"
-  roles:
-    - amoc
