@@ -4,7 +4,7 @@
 %%==============================================================================
 -module(amoc_dist).
 
--export([start_nodes/0,
+-export([gather_nodes/0,
          ping_nodes/0,
          do/3,
          do/4,
@@ -19,11 +19,10 @@
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec start_nodes() -> [ok].
-start_nodes() ->
+-spec gather_nodes() -> [ok].
+gather_nodes() ->
     Hosts = amoc_config:get(hosts, []),
-    Path = amoc_config:get(path, "/usr"),
-    start_nodes(Hosts, Path).
+    gather_nodes(Hosts).
 
 -spec ping_nodes() -> [{atom(), pong|pang}].
 ping_nodes() ->
@@ -80,9 +79,9 @@ remove(Count, Opts, Nodes) ->
 %% ------------------------------------------------------------------
 %% Local functions
 %% ------------------------------------------------------------------
--spec start_nodes([string()], file:filename()) -> [ok].
-start_nodes(Hosts, Path) ->
-    [ amoc_slave:start(Host, Path) || Host <- Hosts ].
+-spec gather_nodes([string()]) -> [ok].
+gather_nodes(Hosts) ->
+    [ amoc_slave:gather_node(Host) || Host <- Hosts ].
 
 -spec amoc_nodes() -> [node()].
 amoc_nodes() ->
@@ -103,7 +102,6 @@ ceil(Number) ->
 ping_node(Node) ->
     case amoc_slave:ping(Node) of
         pong ->
-              ok = amoc_slave:monitor_master(Node),
               pong;
         pang ->
               pang

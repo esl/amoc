@@ -1,9 +1,0 @@
----
-- hosts: amoc-master
-  remote_user: "{{user}}"
-  become: no
-  vars:
-    - amoc_slaves: "{{ groups['amoc-slave'] }}"
-    - install_dir: "{{ master_install_dir }}"
-  roles:
-    - amoc

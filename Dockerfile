@@ -37,8 +37,6 @@ EXPOSE 4000
 
 RUN mkdir /etc/service/amoc
 ADD docker/amoc.sh /etc/service/amoc/run
-ADD docker/config/vm.args /home/amoc/amoc/releases/0.9.0/
-ADD docker/config/sys.config.template /
 ADD docker/run.sh /
 
 CMD ["/run.sh"]

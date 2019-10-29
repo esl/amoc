@@ -1,4 +1,4 @@
-.PHONY: all rel compile clean deploy prepare deps test ct eunit prop
+.PHONY: all rel compile clean deps test ct eunit prop
 
 REBAR = ./rebar3
 APPS_EBIN := $(wildcard _build/default/lib/*/ebin)
@@ -16,7 +16,7 @@ else
 PROP_OPTS = -suite $(PROP_FILES)
 endif
 
-all: rel deploy
+all: rel
 
 rel: compile
 	$(REBAR) tar
@@ -26,13 +26,6 @@ compile:
 
 clean:
 	$(REBAR) clean
-
-deploy: rel
-	ansible-playbook -i hosts ansible/amoc-master.yml
-	ansible-playbook -i hosts ansible/amoc-slaves.yml
-
-prepare:
-	ansible-playbook -i hosts ansible/amoc-prepare.yml $(ARGS)
 
 ct:
 	$(REBAR) ct --verbose $(SUITE_OPTS)
