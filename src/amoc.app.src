@@ -15,8 +15,7 @@
         trails,
         cowboy,
         cowboy_swagger,
-        runtime_tools,
-        mnesia
+        runtime_tools
     ]},
     {mod, {amoc_app, []}},
     {env, [{repeat_interval, 60000},
