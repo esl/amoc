@@ -51,7 +51,6 @@ do(Scenario, Start, End, Opts) ->
     _RepeatTimeout = proplists:get_value(repeat, Opts, 75),
     _Step = proplists:get_value(step, Opts, 1),
 
-    amoc_event:notify({dist_do, Scenario, Start, End, Opts}),
     amoc_controller:start_scenario_checking(Scenario),
     Count = length(Nodes),
     [ amoc_controller:do(Node, Scenario, Start, End, Count, Id, Opts) ||
@@ -63,7 +62,6 @@ add(Count) ->
 
 -spec add(non_neg_integer(), [node()]) -> [ok].
 add(Count, Nodes) ->
-    amoc_event:notify({dist_add, Count}),
     [ amoc_controller:add(Node, Count) || Node <- Nodes ].
 
 -spec remove(non_neg_integer(), amoc:remove_opts()) -> [ok].
@@ -72,7 +70,6 @@ remove(Count, Opts) ->
 
 -spec remove(non_neg_integer(), amoc:remove_opts(), [node()]) -> [ok].
 remove(Count, Opts, Nodes) ->
-    amoc_event:notify({dist_remove, Count, Opts}),
     CountPerNode = ceil(Count / length(Nodes)),
     [ amoc_controller:remove(Node, CountPerNode, Opts) || Node <- Nodes ].
 
