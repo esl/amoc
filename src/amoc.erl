@@ -4,8 +4,6 @@
 %%==============================================================================
 -module(amoc).
 
--export([do/1]).
-
 -export_type([
               scenario/0,
               do_opts/0,
@@ -20,20 +18,3 @@
 
 -type remove_opt() :: {force, boolean()}.
 -type remove_opts() :: [remove_opt()].
-
-%% ------------------------------------------------------------------
-%% Start scenario via shell script (run.sh)
-%% ------------------------------------------------------------------
--spec do([scenario() | integer(), ...]) -> ok | no_return().
-do([Scenario, Count]) ->
-    do([Scenario, '1', Count]);
-do([Scenario, Start, End]) ->
-    application:ensure_all_started(amoc),
-    S = list_to_integer(atom_to_list(Start)),
-    E = list_to_integer(atom_to_list(End)),
-    case amoc_local:do(Scenario, S, E) of
-        ok ->
-            ok;
-        {error, _} ->
-            exit(1)
-    end.
