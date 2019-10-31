@@ -14,8 +14,7 @@
         ssl,
         trails,
         cowboy,
-        cowboy_swagger,
-        runtime_tools
+        cowboy_swagger
     ]},
     {mod, {amoc_app, []}},
     {env, [{repeat_interval, 60000},
@@ -29,10 +28,7 @@
                 []},
                {[amoc, users],
                 {function, ets, info, [amoc_users], proplist, [size]},
-                []},
-               {[amoc, times, connection], histogram, []},
-               {[amoc, counters, connections], spiral, []},
-               {[amoc, counters, connection_failures], spiral, []}
+                []}
            ]}
     ]}
 ]}.

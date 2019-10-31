@@ -103,10 +103,7 @@ maybe_add_reporter() ->
 subsribe_default_metrics() ->
     maybe_subscribe([amoc, users], [size]),
     maybe_subscribe([erlang, system_info], [port_count, process_count]),
-    maybe_subscribe([erlang, memory], [total, processes, processes_used, system, binary, ets]),
-    maybe_subscribe([amoc, times, connection], metric_report_datapoints(histogram)),
-    maybe_subscribe([amoc, counters, connections], metric_report_datapoints(spiral)),
-    maybe_subscribe([amoc, counters, connection_failures], metric_report_datapoints(spiral)).
+    maybe_subscribe([erlang, memory], [total, processes, processes_used, system, binary, ets]).
 
 get_reporter() ->
     amoc_config:get(metrics_reporter, ?AMOC_DEFAULT_METRICS_REPORTER).
