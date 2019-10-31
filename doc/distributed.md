@@ -27,20 +27,20 @@ In order to use Amoc HTTP API for uploading and starting scenarios, port 4000 sh
 ```
 docker run --rm -t -d --name amoc-1 -h amoc-1 \
     --network amoc-test-network \
-    -e AMOC_HOSTS="\"amoc-1\",\"amoc-2\"" \
-    -e AMOC_GRAPHITE_HOST=graphite \
+    -e AMOC_NODES="['amoc@amoc-1','amoc@amoc-2']" \
+    -e AMOC_GRAPHITE_HOST='"graphite"' \
     -e AMOC_GRAPHITE_PORT=2003 \
-    -e AMOC_PREFIX=amoc1 \
+    -e AMOC_GRAPHITE_PREFIX='"amoc1"' \
     --health-cmd="/home/amoc/amoc/bin/amoc status" \
     -p 8081:4000 \
     amoc_image:tag
 
 docker run --rm -t -d --name amoc-2 -h amoc-2 \
     --network amoc-test-network \
-    -e AMOC_HOSTS="\"amoc-1\",\"amoc-2\"" \
-    -e AMOC_GRAPHITE_HOST=graphite \
+    -e AMOC_NODES="['amoc@amoc-1','amoc@amoc-2']" \
+    -e AMOC_GRAPHITE_HOST='"graphite"' \
     -e AMOC_GRAPHITE_PORT=2003 \
-    -e AMOC_PREFIX=amoc2 \
+    -e AMOC_GRAPHITE_PREFIX='"amoc2"' \
     --health-cmd="/home/amoc/amoc/bin/amoc status" \
     -p 8082:4000 \
     amoc_image:tag

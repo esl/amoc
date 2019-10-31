@@ -13,7 +13,6 @@
          gather_node/1,
          monitor_master/1,
          ping/1,
-         node_name/1,
          get_master_node/0]).
 
 %% ------------------------------------------------------------------
@@ -51,9 +50,9 @@ ping(Node) ->
               pang
     end.
 
--spec gather_node(string()) -> ok.
-gather_node(Host) ->
-    gen_server:call(?SERVER, {gather, Host}).
+-spec gather_node(node()) -> ok.
+gather_node(Node) ->
+    gen_server:call(?SERVER, {gather, Node}).
 
 -spec get_master_node() -> node().
 get_master_node() ->
@@ -66,10 +65,6 @@ get_master_node() ->
 monitor_master(Node) ->
     gen_server:call({?SERVER, Node}, {monitor_master, node()}).
 
--spec node_name(string()) -> node().
-node_name(Host) ->
-    list_to_atom("amoc@" ++ Host).
-
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -80,9 +75,9 @@ init([]) ->
 
 -spec handle_call(command(), {pid(), any()}, state()) -> {reply, ok |
                                                           pong, state()}.
-handle_call({gather, Host}, _From, State) ->
-    lager:info("{gather, ~p}, state: ~p", [Host, State]),
-    State1 = handle_gather(Host, State),
+handle_call({gather, Node}, _From, State) ->
+    lager:info("{gather, ~p}, state: ~p", [Node, State]),
+    State1 = handle_gather(Node, State),
     {reply, ok, State1};
 handle_call(get_master_node, _From, #state{master = Master} = State) ->
     {reply, Master, State};
@@ -127,9 +122,9 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
--spec handle_gather(string(), state()) -> state().
-handle_gather(Host, #state{to_ack = Ack} = State) ->
-    case {node_name(Host), node()} of
+-spec handle_gather(node(), state()) -> state().
+handle_gather(Node, #state{to_ack = Ack} = State) ->
+    case {Node, node()} of
         {Node, Node} -> State;
         {Node, _} ->
             create_status_file(<<"connecting">>),

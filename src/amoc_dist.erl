@@ -21,14 +21,13 @@
 %% ------------------------------------------------------------------
 -spec gather_nodes() -> [ok].
 gather_nodes() ->
-    Hosts = amoc_config:get(hosts, []),
-    gather_nodes(Hosts).
+    Nodes = amoc_config:get(nodes, []),
+    [amoc_slave:gather_node(Node) || Node <- Nodes].
 
 -spec ping_nodes() -> [{atom(), pong|pang}].
 ping_nodes() ->
-    Hosts = amoc_config:get(hosts, []),
-    [ {erlang:list_to_atom(Host), ping_node(amoc_slave:node_name(Host))} 
-        || Host <- Hosts ].
+    Nodes = amoc_config:get(nodes, []),
+    [{Node, amoc_slave:ping(Node)} || Node <- Nodes].
 
 -spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     [any()].
@@ -76,10 +75,6 @@ remove(Count, Opts, Nodes) ->
 %% ------------------------------------------------------------------
 %% Local functions
 %% ------------------------------------------------------------------
--spec gather_nodes([string()]) -> [ok].
-gather_nodes(Hosts) ->
-    [ amoc_slave:gather_node(Host) || Host <- Hosts ].
-
 -spec amoc_nodes() -> [node()].
 amoc_nodes() ->
     [ Node || Node <- erlang:nodes(), not is_remsh_node(Node) ].
@@ -95,14 +90,7 @@ is_remsh_node(Node) ->
 ceil(Number) ->
     erlang:round(Number+0.5).
 
--spec ping_node(node()) -> pong|pang.
-ping_node(Node) ->
-    case amoc_slave:ping(Node) of
-        pong ->
-              pong;
-        pang ->
-              pang
-    end.
+
 
 -spec pick_status([amoc_controller:scenario_status()], 
                   [amoc_controller:scenario_status()]) ->
