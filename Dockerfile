@@ -1,4 +1,4 @@
-FROM phusion/baseimage
+FROM phusion/baseimage as amoc-build
 MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
 RUN useradd -ms /bin/bash amoc
@@ -21,6 +21,7 @@ RUN apt-get update && \
 COPY . /amoc_build
 
 RUN cd amoc_build && \
+    git clean -ffxd && \
     make rel && \
     rm _build/default/rel/amoc/*tar.gz
 
@@ -29,7 +30,7 @@ MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
 RUN useradd -ms /bin/bash amoc
 
-COPY --from=0 /amoc_build/_build/default/rel/amoc/ /home/amoc/amoc/
+COPY --from=amoc-build /amoc_build/_build/default/rel/amoc/ /home/amoc/amoc/
 # It seems hub.docker.com does not support --chown param to COPY directive
 RUN chown -R amoc:amoc /home/amoc/amoc
 
