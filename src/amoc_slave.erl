@@ -26,6 +26,8 @@
          terminate/2,
          code_change/3]).
 
+-include_lib("kernel/include/logger.hrl").
+
 -record(state, {to_ack :: [{node(), no_retries()}],
                 master :: node()}).
 -define(DEFAULT_RETRIES, 10).
@@ -81,7 +83,7 @@ init([]) ->
 -spec handle_call(command(), {pid(), any()}, state()) -> {reply, ok |
                                                           pong, state()}.
 handle_call({gather, Host}, _From, State) ->
-    lager:info("{gather, ~p}, state: ~p", [Host, State]),
+    ?LOG_INFO("{gather, ~p}, state: ~p", [Host, State]),
     State1 = handle_gather(Host, State),
     {reply, ok, State1};
 handle_call(get_master_node, _From, #state{master = Master} = State) ->
@@ -107,11 +109,11 @@ handle_info(timeout, State) ->
     State1 = ping_slave_nodes(State),
     {noreply, State1};
 handle_info({nodedown, Master}, #state{master=Master}=State) ->
-    lager:error("Master node ~p is down. Halting.", [Master]),
+    ?LOG_ERROR("Master node ~p is down. Halting.", [Master]),
     erlang:halt(),
     {noreply, State};
 handle_info({nodedown, Node}, State) ->
-    lager:info("Node ~p is down", [Node]),
+    ?LOG_INFO("Node ~p is down", [Node]),
     {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -134,7 +136,7 @@ handle_gather(Host, #state{to_ack = Ack} = State) ->
         {Node, _} ->
             create_status_file(<<"connecting">>),
             Ack1 = [{Node, ?DEFAULT_RETRIES} | Ack],
-            lager:info("Changing state to_ack element~nfrom: ~p~nto: ~p~n", [Ack, Ack1]),
+            ?LOG_INFO("Changing state to_ack element~nfrom: ~p~nto: ~p~n", [Ack, Ack1]),
             State#state{to_ack = Ack1}
     end.
 
@@ -150,13 +152,13 @@ ping_slave_nodes(#state{to_ack=Ack}=State) ->
 -spec ping_slave_node({node(), no_retries()}) -> false |
                                                  {true, {node(), no_retries()}}.
 ping_slave_node({Node, 0}) ->
-    lager:error("Limit of retries exceeded for node ~p", [Node]),
+    ?LOG_INFO("Limit of retries exceeded for node ~p", [Node]),
     false;
 ping_slave_node({Node, Retries}) ->
     case ping(Node) of
         pong ->
             true = erlang:monitor_node(Node, true),
-            lager:info("Node ~p successfully connected", [Node]),
+            ?LOG_INFO("Node ~p successfully connected", [Node]),
             false;
         pang ->
             {true, {Node, Retries-1}}
