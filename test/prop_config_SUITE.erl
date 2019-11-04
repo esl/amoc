@@ -1,4 +1,4 @@
--module(prop_config).
+-module(prop_config_SUITE).
 
 -behaviour(proper_statem).
 
