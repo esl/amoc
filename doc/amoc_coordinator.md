@@ -127,7 +127,7 @@ To run it:
 $ make rel
 $ _build/default/rel/amoc/bin/amoc console
 
-1> amoc_local:do(example, 1, 5).
+1> amoc:do(example, 1, 5).
 ```
 
 Filtered, formated and explained output:
@@ -135,7 +135,7 @@ Filtered, formated and explained output:
 ```erlang
 User = 1  % First user is started
 
-ok  % result of calling amoc_local:do/3
+ok  % result of calling amoc:do/3
 
 User = 2 % First user is started
 
