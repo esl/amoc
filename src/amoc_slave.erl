@@ -10,10 +10,11 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 -export([start_link/0,
-         gather_node/1,
-         monitor_master/1,
+         connect_nodes/1,
          ping/1,
-         get_master_node/0]).
+         set_master_node/1,
+         get_master_node/0,
+         get_status/0]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -21,17 +22,18 @@
 -export([init/1,
          handle_call/3,
          handle_cast/2,
-         handle_info/2,
-         terminate/2,
-         code_change/3]).
+         handle_info/2]).
 
--record(state, {to_ack :: [{node(), no_retries()}],
+-record(state, {to_ack = [] :: [to_ack()], %% sorted by nodes
+                failed_to_connect = [] :: [node()],
+                connection_lost = [] :: [node()],
+                connected = [] :: [node()],
                 master :: node()}).
--define(DEFAULT_RETRIES, 10).
+
+-define(NUMBER_OF_RETRIES, 30).
 
 -type state() :: #state{}.
--type command() :: {start, string(), file:filename()} |
-                   {monitor_master, node()}.
+-type to_ack() :: {node(), no_retries()}.
 -type no_retries() :: non_neg_integer().
 
 %% ------------------------------------------------------------------
@@ -39,7 +41,12 @@
 %% ------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+    Nodes = amoc_config:get(nodes, []),
+    gen_server:start_link({local, ?SERVER}, ?MODULE, Nodes, []).
+
+-spec connect_nodes([node()]) -> ok.
+connect_nodes(Nodes) ->
+    connect_nodes(node(), Nodes).
 
 -spec ping(node()) -> pong | pang.
 ping(Node) ->
@@ -47,12 +54,8 @@ ping(Node) ->
         pong ->
             pong
     catch _:_ ->
-              pang
+        pang
     end.
-
--spec gather_node(node()) -> ok.
-gather_node(Node) ->
-    gen_server:call(?SERVER, {gather, Node}).
 
 -spec get_master_node() -> node().
 get_master_node() ->
@@ -61,107 +64,137 @@ get_master_node() ->
         MasterNode -> MasterNode
     end.
 
--spec monitor_master(node()) -> ok.
-monitor_master(Node) ->
-    gen_server:call({?SERVER, Node}, {monitor_master, node()}).
+-spec set_master_node(node()) -> ok.
+set_master_node(Node) ->
+    gen_server:call({?SERVER, Node}, {set_master_node, node()}).
+
+-spec get_status() -> #{}.
+get_status() ->
+    gen_server:call(?SERVER, get_status).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 -spec init([]) -> {ok, state()}.
-init([]) ->
-    schedule_timer(),
-    {ok, #state{to_ack = []}}.
+init(Nodes) ->
+    NewState = handle_connect_nodes(Nodes, #state{}),
+    schedule_timer(NewState),
+    {ok, NewState}.
 
--spec handle_call(command(), {pid(), any()}, state()) -> {reply, ok |
-                                                          pong, state()}.
-handle_call({gather, Node}, _From, State) ->
-    lager:info("{gather, ~p}, state: ~p", [Node, State]),
-    State1 = handle_gather(Node, State),
-    {reply, ok, State1};
-handle_call(get_master_node, _From, #state{master = Master} = State) ->
-    {reply, Master, State};
-handle_call({monitor_master, Master}, _From, State) ->
-    case node() of
-        Master -> ok;
-        _ ->
-            true = erlang:monitor_node(Master, true)
-    end,
-    {reply, ok, State#state{master = Master}};
+-spec handle_call(any(), any(), state()) -> {reply, any(), state()}.
+handle_call(get_master_node, _From, #state{master = Node} = State) ->
+    {reply, Node, State};
+handle_call({set_master_node, Node}, _From, #state{master = MasterNode} = State) ->
+    {NewState, RetValue} = case MasterNode of
+                               undefined ->
+                                   {State#state{master = Node}, ok};
+                               Node -> %% the same master as before
+                                   {State, ok};
+                               _NewMaster ->
+                                   {State, {error, master_is_already_set}}
+                           end,
+    {reply, RetValue, NewState};
 handle_call(ping, _From, State) ->
     {reply, pong, State};
+handle_call(get_status, _From, State) ->
+    {reply, state_to_map(State), State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 -spec handle_cast(any(), state()) -> {noreply, state()}.
+handle_cast({connect_nodes, Nodes}, State) ->
+    lager:info("{connect_nodes, ~p}, state: ~p", [Nodes, state_to_map(State)]),
+    NewState = handle_connect_nodes(Nodes, State),
+    schedule_timer(NewState),
+    {noreply, NewState};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
--spec handle_info(term(), state()) -> {noreply, state()}.
+-spec handle_info(any(), state()) -> {noreply, state()}.
 handle_info(timeout, State) ->
-    State1 = ping_slave_nodes(State),
-    {noreply, State1};
-handle_info({nodedown, Master}, #state{master=Master}=State) ->
-    lager:error("Master node ~p is down. Halting.", [Master]),
+    NewState = ping_nodes(State),
+    schedule_timer(NewState),
+    {noreply, NewState};
+handle_info({nodedown, Node}, #state{master = Node} = State) ->
+    lager:error("Master node ~p is down. Halting.", [Node]),
     erlang:halt(),
     {noreply, State};
 handle_info({nodedown, Node}, State) ->
-    lager:info("Node ~p is down", [Node]),
-    {noreply, State};
+    lager:error("node ~p is down.", [Node]),
+    {noreply, merge(connection_lost, [Node], State)};
 handle_info(_Info, State) ->
     {noreply, State}.
-
--spec terminate(term(), state()) -> ok.
-terminate(_Reason, _State) ->
-    ok.
-
--spec code_change(term(), state(), term()) -> {ok, state()}.
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
--spec handle_gather(node(), state()) -> state().
-handle_gather(Node, #state{to_ack = Ack} = State) ->
-    case {Node, node()} of
-        {Node, Node} -> State;
-        {Node, _} ->
-            create_status_file(<<"connecting">>),
-            Ack1 = [{Node, ?DEFAULT_RETRIES} | Ack],
-            lager:info("Changing state to_ack element~nfrom: ~p~nto: ~p~n", [Ack, Ack1]),
-            State#state{to_ack = Ack1}
+-spec connect_nodes(node(), [node()]) -> ok.
+connect_nodes(Node, Nodes) ->
+    gen_server:cast({?SERVER, Node}, {connect_nodes, Nodes}).
+
+-spec handle_connect_nodes([node()], state()) -> state().
+handle_connect_nodes(Nodes, #state{to_ack = Ack, connected = Connected} = State) ->
+    NodesToConnect = lists:usort(Nodes) -- [node() | Connected],
+    NewAck = [{Node, ?NUMBER_OF_RETRIES} || Node <- NodesToConnect],
+    State#state{to_ack = lists:ukeymerge(1, NewAck, Ack)}.
+
+-spec ping_nodes(state()) -> state().
+ping_nodes(#state{to_ack = Ack} = State) ->
+    {NewConnected, NewFailedToConnect, ReversedNewAck} =
+        lists:foldl(fun ping_node/2, {[], [], []}, Ack),
+    NewAck = lists:reverse(ReversedNewAck),
+    merge([{failed_to_connect, NewFailedToConnect}, {connected, NewConnected}],
+          State#state{to_ack = NewAck}).
+
+-spec ping_node(to_ack(), {[node()], [node()], [to_ack()]}) ->
+    {[node()], [node()], [to_ack()]}.
+ping_node({Node, Retries}, {Connected, FailedToConnect, Ack}) when is_integer(Retries),
+                                                                   Retries > 0 ->
+    case {ping(Node), Retries} of
+        {pong, _} ->
+            {[Node | Connected], FailedToConnect, Ack};
+        {pang, 1} -> %% that was the last try
+            {Connected, [Node | FailedToConnect], Ack};
+        {pang, _} ->
+            {Connected, FailedToConnect, [{Node, Retries - 1} | Ack]}
     end.
 
--spec ping_slave_nodes(state()) -> state().
-ping_slave_nodes(#state{to_ack=Ack}=State) ->
-    Ack1 = lists:filtermap(fun ping_slave_node/1, Ack),
-    case Ack1 of
-        []  -> create_status_file(<<"ready">>);
-        _   -> schedule_timer()
-    end,
-    State#state{to_ack=Ack1}.
-
--spec ping_slave_node({node(), no_retries()}) -> false |
-                                                 {true, {node(), no_retries()}}.
-ping_slave_node({Node, 0}) ->
-    lager:error("Limit of retries exceeded for node ~p", [Node]),
-    false;
-ping_slave_node({Node, Retries}) ->
-    case ping(Node) of
-        pong ->
-            true = erlang:monitor_node(Node, true),
-            lager:info("Node ~p successfully connected", [Node]),
-            false;
-        pang ->
-            {true, {Node, Retries-1}}
-    end.
-
--spec schedule_timer() -> reference().
-schedule_timer() ->
+-spec schedule_timer(state()) -> any().
+schedule_timer(#state{to_ack = []}) -> ok;
+schedule_timer(#state{to_ack = [_ | _]}) ->
     erlang:send_after(1000, self(), timeout).
 
--spec create_status_file(binary()) -> ok.
-create_status_file(Status) ->
-    Path = application:get_env(amoc, status_file, ".amoc.status"),
-    ok = file:write_file(Path, Status).
+
+-spec merge([{connected | failed_to_connect | connection_lost, [node()]}], state()) -> state().
+merge([], State) -> State;
+merge([{Type, Nodes} | Tail], State) ->
+    NewState = merge(Type, Nodes, State),
+    merge(Tail, NewState).
+
+
+-spec merge(connected | failed_to_connect | connection_lost, [node()], state()) -> state().
+merge(connected, Nodes, #state{failed_to_connect = FailedToConnect,
+                               connection_lost   = ConnectionLost,
+                               connected         = Connected} = State) ->
+    NewConnected = lists:usort(Nodes ++ Connected),
+    NewNodes = NewConnected -- Connected,
+    [begin
+         erlang:monitor_node(Node, true),
+         connect_nodes(Node, [node() | NewConnected])
+     end || Node <- NewNodes],
+    State#state{connected         = NewConnected,
+                failed_to_connect = FailedToConnect -- Nodes,
+                connection_lost   = ConnectionLost -- Nodes};
+merge(connection_lost, Nodes, #state{connection_lost = ConnectionLost,
+                                     connected = Connected} = State) ->
+    State#state{connection_lost = lists:usort(Nodes ++ ConnectionLost),
+                connected       = Connected -- Nodes};
+merge(failed_to_connect, Nodes, #state{failed_to_connect = FailedToConnect} = State) ->
+    State#state{failed_to_connect = lists:usort(Nodes ++ FailedToConnect)}.
+
+-spec state_to_map(#state{}) -> #{}.
+state_to_map(#state{} = State) ->
+    Fields = record_info(fields, state),
+    [state | Values] = tuple_to_list(State),
+    KVList = lists:zip(Fields, Values),
+    maps:from_list(KVList).

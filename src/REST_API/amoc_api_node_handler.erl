@@ -57,9 +57,11 @@ content_types_provided(Req, State) ->
 -spec to_json(cowboy_req:req(), state()) ->
                      {iolist(), cowboy_req:req(), state()}.
 to_json(Req, State) ->
-    Nodes = amoc_dist:ping_nodes(),
-    ResponseList = lists:map(
-                       fun({X, pong}) -> {X, up};
-                          ({X, pang}) -> {X, down}
-                        end, Nodes),
+    Status = amoc_slave:get_status(),
+    Connected = maps:get(connected, Status, []),
+    FailedToConnect = maps:get(failed_to_connect, Status, []),
+    ConnectionLost = maps:get(connection_lost, Status, []),
+    Up = [{Node, up} || Node <- Connected],
+    Down = [{Node, down} || Node <- lists:usort(FailedToConnect ++ ConnectionLost)],
+    ResponseList = Up ++ Down,
     {jiffy:encode({[{<<"nodes">>, {ResponseList}}]}), Req, State}.

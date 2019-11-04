@@ -1,4 +1,4 @@
-.PHONY: all rel compile clean deps test ct eunit prop
+.PHONY: all rel compile clean deps test ct prop
 
 REBAR = ./rebar3
 APPS_EBIN := $(wildcard _build/default/lib/*/ebin)
@@ -34,10 +34,7 @@ prop:
 	mkdir -p logs
 	ct_run -logdir logs -pa $(APPS_EBIN) $(PROP_OPTS)
 
-eunit:
-	$(REBAR) eunit $(SUITE_OPTS)
-
-test: compile eunit ct prop
+test: compile ct prop
 
 console:
 	erl -pa $(APPS_EBIN)
