@@ -14,11 +14,9 @@
   {git,"https://github.com/esl/exometer_report_statsd.git",
        {ref,"75f6f9ef2b3c0a677f9dba9a4b3d9d77c276a032"}},
   0},
- {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
  {<<"hut">>,{pkg,<<"hut">>,<<"1.2.1">>},1},
  {<<"jiffy">>,{pkg,<<"jiffy">>,<<"0.15.2">>},0},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"2.9.0">>},1},
- {<<"lager">>,{pkg,<<"lager">>,<<"3.6.8">>},0},
  {<<"parse_trans">>,{pkg,<<"parse_trans">>,<<"3.3.0">>},1},
  {<<"ranch">>,{pkg,<<"ranch">>,<<"1.4.0">>},1},
  {<<"trails">>,{pkg,<<"trails">>,<<"2.1.0">>},0}]}.
@@ -27,11 +25,9 @@
  {<<"cowboy">>, <<"268429481D6F41AD5564ADE4A2439C284B569083FCA0D19078AD4F56B4624724">>},
  {<<"cowboy_swagger">>, <<"53C36D4228E139F65DB4DB716C1A5BF9CE6DA9BF04C4C785EBB3A1A462CAD223">>},
  {<<"cowlib">>, <<"1AFA5B233CEE8F642C153EC6F1DC48DB0DD9A43E2114BC8B43E9D59636F6AE1F">>},
- {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
  {<<"hut">>, <<"08D46679523043424870723923971889E8A34D63B2F946A35B46CF921D1236E7">>},
  {<<"jiffy">>, <<"DE266C390111FD4EA28B9302F0BC3D7472468F3B8E0ACEABFBEFA26D08CD73B7">>},
  {<<"jsx">>, <<"D2F6E5F069C00266CAD52FB15D87C428579EA4D7D73A33669E12679E203329DD">>},
- {<<"lager">>, <<"897EFC7679BB82383448646C96768CDC4E747464DD18B999C7AACA485686B0DA">>},
  {<<"parse_trans">>, <<"09765507A3C7590A784615CFD421D101AEC25098D50B89D7AA1D66646BC571C1">>},
  {<<"ranch">>, <<"10272F95DA79340FA7E8774BA7930B901713D272905D0012B06CA6D994F8826B">>},
  {<<"trails">>, <<"D51D7F065F2B692654C611C663BFAC377D47EAFF9D38D0C17ECD031D1A59399A">>}]}

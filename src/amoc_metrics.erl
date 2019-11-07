@@ -4,6 +4,8 @@
 -export([update_time/2, update_counter/2, update_counter/1, update_gauge/2]).
 -export([messages_spiral_name/0, message_ttd_histogram_name/0]).
 
+-include_lib("kernel/include/logger.hrl").
+
 -type simple_name() :: atom() | [atom()].
 
 -type name() :: simple_name() | {strict, simple_name()}.
@@ -116,6 +118,6 @@ maybe_subscribe(ExName, Datapoints) ->
             exometer_report:unsubscribe(Reporter, ExName, Datapoints),
             ok = exometer_report:subscribe(Reporter, ExName, Datapoints, Interval);
         _ ->
-            lager:warning("Reporter=~p not_enbled", [Reporter])
+            ?LOG_WARNING("Reporter=~p not_enbled", [Reporter])
     end.
 

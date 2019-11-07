@@ -6,6 +6,8 @@
 -behaviour(gen_server).
 -define(SERVER, ?MODULE).
 
+-include_lib("kernel/include/logger.hrl").
+
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
@@ -103,7 +105,7 @@ handle_call(_Request, _From, State) ->
 
 -spec handle_cast(any(), state()) -> {noreply, state()}.
 handle_cast({connect_nodes, Nodes}, State) ->
-    lager:info("{connect_nodes, ~p}, state: ~p", [Nodes, state_to_map(State)]),
+    ?LOG_INFO("{connect_nodes, ~p}, state: ~p", [Nodes, state_to_map(State)]),
     NewState = handle_connect_nodes(Nodes, State),
     schedule_timer(NewState),
     {noreply, NewState};
@@ -116,11 +118,11 @@ handle_info(timeout, State) ->
     schedule_timer(NewState),
     {noreply, NewState};
 handle_info({nodedown, Node}, #state{master = Node} = State) ->
-    lager:error("Master node ~p is down. Halting.", [Node]),
+    ?LOG_ERROR("Master node ~p is down. Halting.", [Node]),
     erlang:halt(),
     {noreply, State};
 handle_info({nodedown, Node}, State) ->
-    lager:error("node ~p is down.", [Node]),
+    ?LOG_ERROR("node ~p is down.", [Node]),
     {noreply, merge(connection_lost, [Node], State)};
 handle_info(_Info, State) ->
     {noreply, State}.

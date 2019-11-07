@@ -6,7 +6,6 @@
         kernel,
         stdlib,
         sasl,
-        lager,
         jiffy,
         exometer_core,
         exometer_report_graphite,
