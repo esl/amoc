@@ -115,7 +115,7 @@ maybe_subscribe(ExName, Datapoints) ->
     Interval = ?AMOC_METRICS_REPORTING_INTERVAL,
     case lists:keyfind(Reporter, 1, exometer_report:list_reporters()) of
         {Reporter, _} ->
-            exometer_report:unsubscribe(Reporter, ExName, Datapoints),
+            exometer_report:unsubscribe(Reporter, ExName, Datapoints, []),
             ok = exometer_report:subscribe(Reporter, ExName, Datapoints, Interval);
         _ ->
             ?LOG_WARNING("Reporter=~p not_enbled", [Reporter])

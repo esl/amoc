@@ -171,15 +171,12 @@ get_vars_from_body(Req) ->
         {error, wrong_json, Req2}
     end.
 
--spec compile_and_load_scenario(binary(), string()) ->
-    ok | {error, [string()], [string()]}.
 compile_and_load_scenario(BinModuleName, ScenarioPath) ->
     ok = ensure_ebin_directory(),
     DefaultCompilationFlags = [return_errors, report_errors, verbose],
     ExtraCompilationFlags = amoc_config:get(extra_compilation_flags, []),
-    CompilationFlags = lists:keystore(outdir, 1,
-                                      ExtraCompilationFlags ++ DefaultCompilationFlags,
-                                      {outdir, "scenarios_ebin"}),
+    CompilationFlags = [{outdir, "scenarios_ebin"} |
+                        ExtraCompilationFlags ++ DefaultCompilationFlags],
     case compile:file(ScenarioPath, CompilationFlags) of
         {ok, _} ->
             Module = erlang:binary_to_atom(BinModuleName, utf8),
