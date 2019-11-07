@@ -33,8 +33,8 @@ all() ->
      parse_scenario_settings_returns_preprocessed_value].
 
 config_osenv_test(_Config) ->
-    given_osenv_set([{"AMOC_interarrival", "100"},
-                     {"AMOC_something", "[{a,b,c}, 9, 8, {7}]"}]),
+    given_osenv_set([{interarrival, 100},
+                     {something, [{a,b,c}, 9, 8, {7}]}]),
     given_amoc_started(),
     ?assertEqual(100, amoc_config:get(interarrival)),
     ?assertEqual(60000, amoc_config:get(repeat_interval)),
@@ -45,7 +45,7 @@ given_amoc_started() ->
     {ok, _} = application:ensure_all_started(amoc).
 
 given_osenv_set(Envs) ->
-    [ true = os:putenv(Name, Value) || {Name, Value} <- Envs ].
+    [true = set_env(Name, Value) || {Name, Value} <- Envs].
 
 config_appenv_test(_) ->
     %% given
@@ -65,7 +65,7 @@ config_osappenv_test(_) ->
     %% given
     given_amoc_started(),
     %% when
-    os:putenv("AMOC_foo", "bar"),
+    set_env(foo, bar),
     application:set_env(amoc, foo, baz),
     %% then
     ?assertEqual(bar, amoc_config:get(foo)).
@@ -74,11 +74,11 @@ config_osenv_dynamic_test(_) ->
     %% given
     given_amoc_started(),
     %% when
-    os:putenv("AMOC_foo", "bar"),
+    set_env(foo, bar),
     %% then
     ?assertEqual(bar, amoc_config:get(foo)),
     %% when
-    os:putenv("AMOC_foo", "baz"),
+    set_env(foo, baz),
     %% then
     ?assertEqual(baz, amoc_config:get(foo)).
 

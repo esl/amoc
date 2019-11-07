@@ -42,7 +42,7 @@ get(Name, Default) when is_atom(Name) ->
     DefValue = application:get_env(amoc, Name, Default),
     get(erlang:atom_to_list(Name), DefValue);
 get(Name, Default) when is_list(Name) ->
-    EnvName = "AMOC_" ++ Name,
+    EnvName = "AMOC_" ++ string:uppercase(Name),
     get_from_env(EnvName, Default).
 
 -spec parse_scenario_settings(scenario_configuration() | module()) ->
@@ -134,12 +134,7 @@ call_verify_fun(Fun, Value) ->
 is_one_of(Element, List) -> lists:any(fun(El) -> El =:= Element end, List).
 
 get_from_env(EnvName, Default) ->
-    Value = case os:getenv(EnvName) of
-                false ->
-                    os:getenv(string:uppercase(EnvName));
-                String ->
-                    String
-            end,
+    Value = os:getenv(EnvName),
     parse_value(Value, Default).
 
 -spec parse_value(string() | false, any()) -> any().
