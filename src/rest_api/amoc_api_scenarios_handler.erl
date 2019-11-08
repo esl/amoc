@@ -12,6 +12,8 @@
          to_json/2,
          from_json/2]).
 
+-export([install_scenario/2]).
+
 -type state() :: [].
 
 -spec trails() -> trails:trails().
@@ -128,21 +130,9 @@ to_json(Req0, State) ->
 from_json(Req, State) ->
     case get_vars_from_body(Req) of
         {ok, {ModuleName, ModuleSource}, Req2} ->
-            ScenarioPath = "scenarios/" ++ erlang:binary_to_list(ModuleName),
-            file:write_file(
-              ScenarioPath ++ ".erl",
-              ModuleSource,
-              [write]
-             ),
-            Result = compile_and_load_scenario(
-                       ModuleName,
-                       ScenarioPath),
-            ResultBody = case Result of
-                             ok -> Result;
-                             {error, Errors, _Warnings} ->
-                                 R = io_lib:format("~p", [Errors]),
-                                 erlang:list_to_bitstring(lists:flatten(R))
-                         end,
+            Nodes = amoc_nodes(),
+            ResultBody =  erlang:list_to_bitstring(
+                            process_multicall_results(Nodes, install_scenario_on_nodes(Nodes, ModuleName, ModuleSource))),
             Reply = jiffy:encode({[{compile, ResultBody}]}),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {true, Req3, State};
@@ -151,6 +141,13 @@ from_json(Req, State) ->
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {false, Req3, State}
     end.
+
+%% exported for rpc:multicall
+-spec install_scenario(binary(), binary()) -> ok | {error, [string()], [string()]}.
+install_scenario(ModuleName, ModuleSource) ->
+    ScenarioPath = "scenarios/" ++ erlang:binary_to_list(ModuleName),
+    write_scenario_to_file(ModuleSource, ScenarioPath),
+    compile_and_load_scenario(ModuleName, ScenarioPath).
 
 %% internal function
 -spec get_vars_from_body(cowboy_req:req()) ->
@@ -171,6 +168,61 @@ get_vars_from_body(Req) ->
         {error, wrong_json, Req2}
     end.
 
+install_scenario_on_nodes(Nodes, ModuleName, ModuleSource) ->
+    rpc:multicall(Nodes, ?MODULE, install_scenario, [ModuleName, ModuleSource]).
+
+process_multicall_results(Nodes, {Results, BadNodes}) ->
+    Errors = [{Node, Error} || {Node, {badrpc, Error}} <- lists:zip(Nodes -- BadNodes, Results)],
+    Msg = case {BadNodes, Errors} of
+        {[], []} ->
+                  case lists:all(fun(X) -> X == ok end, Results) of
+                      true ->
+                          [<<"ok">>];
+                      _ ->
+                          [result_to_string(Res) || Res <- Results]
+                  end;
+        {[], _} ->
+            process_reachable_nodes(Nodes, Errors);
+        {_, _} ->
+            [process_reachable_nodes(Nodes -- BadNodes, Errors)
+             | io_lib:format("Error, unreachable nodes: ~p~n", [BadNodes])]
+    end,
+    lists:flatten(Msg).
+
+result_to_string(Result) ->
+    case Result of
+        ok -> <<"ok">>;
+        {error, Errors, _Warnings} ->
+            R = io_lib:format("~p", [Errors]),
+            erlang:list_to_bitstring(lists:flatten(R))
+    end.
+
+process_reachable_nodes([], _) ->
+    [];
+process_reachable_nodes(Nodes, Errors) ->
+    ErrorNodes = [Node || {Node, _} <- Errors],
+    SuccessNodes = Nodes -- ErrorNodes,
+    SuccessMsg = case SuccessNodes of
+                     [] ->
+                         [];
+                     _ ->
+                         io_lib:format("Success on nodes: ~p~n", [SuccessNodes])
+                 end,
+    ErrorMsg = [node_error_message({Node, Error}) || {Node, Error} <- Errors],
+    [SuccessMsg | ErrorMsg].
+
+node_error_message({Node, Error}) ->
+    io_lib:format("Error on node ~s: ~p~n", [Node, Error]).
+
+write_scenario_to_file(ModuleSource, ScenarioPath) ->
+    file:write_file(
+      ScenarioPath ++ ".erl",
+      ModuleSource,
+      [write]
+     ).
+
+-spec compile_and_load_scenario(binary(), string()) ->
+    ok | {error, [string()], [string()]}.
 compile_and_load_scenario(BinModuleName, ScenarioPath) ->
     ok = ensure_ebin_directory(),
     DefaultCompilationFlags = [return_errors, report_errors, verbose],
@@ -196,4 +248,15 @@ ensure_ebin_directory() ->
         ok -> ok;
         {error, eexist} -> ok;
         {error, Reason} -> Reason
+    end.
+
+-spec amoc_nodes() -> [node()].
+amoc_nodes() ->
+    [node() | [ Node || Node <- erlang:nodes(), not is_remsh_node(Node) ]].
+
+-spec is_remsh_node(node()) -> boolean().
+is_remsh_node(Node) ->
+    case atom_to_list(Node) of
+        "remsh" ++ _ -> true;
+        _            -> false
     end.
