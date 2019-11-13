@@ -2,7 +2,6 @@
 
 -export([start/0, init/2]).
 -export([update_time/2, update_counter/2, update_counter/1, update_gauge/2]).
--export([messages_spiral_name/0, message_ttd_histogram_name/0]).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -47,15 +46,6 @@ update_counter(Name, Value) ->
 update_gauge(Name, Value) ->
     ExName = make_name(gauge, Name),
     exometer:update(ExName, Value).
-
--spec messages_spiral_name() -> name().
-messages_spiral_name() ->
-    messages_sent.
-
--spec message_ttd_histogram_name() -> name().
-message_ttd_histogram_name() ->
-    message_ttd.
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% internal functions
