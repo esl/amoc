@@ -15,10 +15,11 @@
 -define(AMOC_DEFAULT_METRICS_REPORTER, exometer_report_graphite).
 -define(AMOC_METRICS_REPORTING_INTERVAL, timer:seconds(10)).
 
--spec start() -> ok.
+-spec start() -> any().
 start() ->
     maybe_add_reporter(),
-    subsribe_default_metrics().
+    subsribe_default_metrics(),
+    maybe_init_preconfigured_metrics().
 
 -spec init(type(), name()) -> ok.
 init(Type, Name) ->
@@ -121,3 +122,6 @@ maybe_subscribe(ExName, Datapoints) ->
             ?LOG_WARNING("Reporter=~p not_enbled", [Reporter])
     end.
 
+maybe_init_preconfigured_metrics() ->
+    Preconfigured = amoc_config:get(metrics_preconfigured, []),
+    [init(Type, Name) || {Type, Name} <- Preconfigured].
