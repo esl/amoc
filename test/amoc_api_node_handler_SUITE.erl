@@ -40,7 +40,10 @@ returns_nodes_list_when_amoc_up(_Config) ->
     %% then
     ?assertEqual(200, CodeHttp),
     ?assertMatch(
-        {[{<<"nodes">>, {[{<<"test1">>, <<"up">>}, {<<"test2">>, <<"down">>}]}}]},
+        {[{<<"nodes">>,
+           {[{<<"test1">>, <<"up">>},
+             {<<"test2">>, <<"down">>},
+             {<<"test3">>, <<"down">>}]}}]},
         JSON),
     %% cleanup
     clean_nodes().
@@ -54,9 +57,12 @@ given_applications_started() ->
 
 -spec given_prepared_nodes() -> ok.
 given_prepared_nodes() ->
-    meck:new(amoc_dist, [unstick]),
-    meck:expect(amoc_dist, ping_nodes, fun() -> [{test1, pong}, {test2, pang}] end).
+    meck:new(amoc_slave, [unstick]),
+    ConnectionStatus = #{connected => [test1],
+                         failed_to_connect => [test2],
+                         connection_lost => [test3, test2]},
+    meck:expect(amoc_slave, get_status, fun() -> ConnectionStatus end).
 
 -spec clean_nodes() -> ok.
 clean_nodes() ->
-    meck:unload(amoc_dist).
+    meck:unload(amoc_slave).

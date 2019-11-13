@@ -2,7 +2,6 @@
 
 -export([start/0, init/2]).
 -export([update_time/2, update_counter/2, update_counter/1, update_gauge/2]).
--export([messages_spiral_name/0, message_ttd_histogram_name/0]).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -15,10 +14,11 @@
 -define(AMOC_DEFAULT_METRICS_REPORTER, exometer_report_graphite).
 -define(AMOC_METRICS_REPORTING_INTERVAL, timer:seconds(10)).
 
--spec start() -> ok.
+-spec start() -> any().
 start() ->
     maybe_add_reporter(),
-    subsribe_default_metrics().
+    subsribe_default_metrics(),
+    maybe_init_preconfigured_metrics().
 
 -spec init(type(), name()) -> ok.
 init(Type, Name) ->
@@ -46,15 +46,6 @@ update_counter(Name, Value) ->
 update_gauge(Name, Value) ->
     ExName = make_name(gauge, Name),
     exometer:update(ExName, Value).
-
--spec messages_spiral_name() -> name().
-messages_spiral_name() ->
-    messages_sent.
-
--spec message_ttd_histogram_name() -> name().
-message_ttd_histogram_name() ->
-    message_ttd.
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% internal functions
@@ -105,10 +96,7 @@ maybe_add_reporter() ->
 subsribe_default_metrics() ->
     maybe_subscribe([amoc, users], [size]),
     maybe_subscribe([erlang, system_info], [port_count, process_count]),
-    maybe_subscribe([erlang, memory], [total, processes, processes_used, system, binary, ets]),
-    maybe_subscribe([amoc, times, connection], metric_report_datapoints(histogram)),
-    maybe_subscribe([amoc, counters, connections], metric_report_datapoints(spiral)),
-    maybe_subscribe([amoc, counters, connection_failures], metric_report_datapoints(spiral)).
+    maybe_subscribe([erlang, memory], [total, processes, processes_used, system, binary, ets]).
 
 get_reporter() ->
     amoc_config:get(metrics_reporter, ?AMOC_DEFAULT_METRICS_REPORTER).
@@ -118,9 +106,12 @@ maybe_subscribe(ExName, Datapoints) ->
     Interval = ?AMOC_METRICS_REPORTING_INTERVAL,
     case lists:keyfind(Reporter, 1, exometer_report:list_reporters()) of
         {Reporter, _} ->
-            exometer_report:unsubscribe(Reporter, ExName, Datapoints),
+            exometer_report:unsubscribe(Reporter, ExName, Datapoints, []),
             ok = exometer_report:subscribe(Reporter, ExName, Datapoints, Interval);
         _ ->
             ?LOG_WARNING("Reporter=~p not_enbled", [Reporter])
     end.
 
+maybe_init_preconfigured_metrics() ->
+    Preconfigured = amoc_config:get(metrics_preconfigured, []),
+    [init(Type, Name) || {Type, Name} <- Preconfigured].

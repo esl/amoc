@@ -5,11 +5,11 @@
 -module(amoc_user).
 
 %% defaults
--define(REPEAT_INTERVAL, 60000). % time between sceanario restarts (60s)
+-define(REPEAT_INTERVAL, 60000). % time between user restarts (60s)
 -define(REPEAT_NUM, infinity). % number of scenario repetitions
 
 %% API
--export([start_link/3]).
+-export([start_link/3, stop/0]).
 -export([init/4]).
 
 -type state() :: term().
@@ -18,6 +18,8 @@
     {ok, pid()}.
 start_link(Scenario, Id, State) ->
     proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
+
+stop() -> throw(normal_user_stop).
 
 -spec init(pid(), amoc:scenario(), amoc_scenario:user_id(), state()) ->
     no_return().
@@ -32,10 +34,8 @@ init(Parent, Scenario, Id, State) ->
             end,
             normal
         catch
-            throw:stop ->
+            throw:normal_user_stop ->
                 normal;
-            %% {R, get_stack()} will result in a compact error message
-            %% {E, R, get_stack()} will result in a full stack report
             E:Reason:Stacktrace ->
                 {E, {abnormal_exit, Reason}, Stacktrace}
         after
@@ -56,8 +56,6 @@ perform_scenario(Scenario, Id, State) ->
 -spec flush_mailbox() -> ok.
 flush_mailbox() ->
     receive
-        stop ->
-            throw(stop);
         _ ->
             flush_mailbox()
     after 0 ->

@@ -430,7 +430,7 @@ last_users(Count, Current, Acc) ->
 -spec node_userids(amoc_scenario:user_id(), amoc_scenario:user_id(),
                    undefined | non_neg_integer(),
                    undefined | node_id()) ->[non_neg_integer()].
-%% amoc_local
+%% local execution
 node_userids(Start, End, undefined, undefined) ->
     lists:seq(Start, End);
 %% amoc_dist

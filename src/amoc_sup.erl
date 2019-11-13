@@ -35,7 +35,6 @@ init([]) ->
     amoc_users = start_users_ets(),
     {ok, {{one_for_one, 5, 10},
         [
-            ?CHILD(amoc_event, worker),
             ?CHILD(amoc_users_sup, supervisor),
             ?CHILD(amoc_controller, worker),
             ?CHILD(amoc_slave, worker),

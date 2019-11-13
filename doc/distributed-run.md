@@ -5,7 +5,7 @@ You need a number of machines that will be actually running the test
 (*slaves*) and one controller machine (*master*, which might be one of the test nodes).
 Another aproach to do it is to use docker containers.
 
-Now instead of `amoc_local` use `amoc_dist` - this will tell amoc to distribute
+Now instead of `amoc` use `amoc_dist` - this will tell amoc to distribute
 and start scenarios on all known nodes (except master).
 
 ```erlang

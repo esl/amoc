@@ -1,4 +1,4 @@
--module(prop_config).
+-module(prop_config_SUITE).
 
 -behaviour(proper_statem).
 
@@ -11,7 +11,7 @@ all() ->
     [config_prop_test].
 
 config_prop_test(_Config) ->
-     ?assertEqual(true, proper:quickcheck(config_prop(), [long_result, 100])).
+     ?assertEqual(true, proper:quickcheck(config_prop(), [long_result, 1000])).
 
 config_prop() ->
     ?FORALL(Cmds, proper_statem:commands(?MODULE),
@@ -45,7 +45,7 @@ precondition(_S, _) ->
 next_state(S=#{vars := Vars}, _Res, {call, ?MODULE, set_app_env_variable, 
                                         [Key, Value]}) ->
     ConvertedKey = lists:flatten(io_lib:format("~p", [Key])),
-    case os:getenv("AMOC_" ++ ConvertedKey) of
+    case os:getenv(env_name(ConvertedKey)) of
         false ->
             S#{vars := lists:keystore(Key, 1, Vars, {Key, Value})};
         _ ->
@@ -80,7 +80,7 @@ postcondition(_S, {call, _, _, _}, _Res) ->
 
 %% statem helpers
 set_env_variable(Name, Value) ->
-    EnvName = "AMOC_" ++ atom_to_list(Name),
+    EnvName = env_name(Name),
     true = os:putenv(EnvName, lists:flatten(io_lib:format("~p", [Value]))),
     ok.
 
@@ -91,6 +91,12 @@ safe_fetch(Name) ->
     catch amoc_config:fetch(Name).
 
 unset_all(#{envs := Envs}) ->
-    [ true = os:unsetenv("AMOC_" ++ atom_to_list(Env)) || Env <- Envs ],
+    [ true = os:unsetenv(env_name(Env)) || Env <- Envs ],
     [ ok = application:unset_env(amoc, Name)
       || {Name, _} <- application:get_all_env(amoc) ].
+
+
+env_name(Atom) when is_atom(Atom) ->
+    "AMOC_" ++ string:uppercase(atom_to_list(Atom));
+env_name(String) when is_list(String) ->
+    "AMOC_" ++ string:uppercase(String).

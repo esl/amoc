@@ -4,7 +4,9 @@
 %%==============================================================================
 -module(amoc).
 
--export([do/1]).
+-export([do/3,
+         add/1,
+         remove/2]).
 
 -export_type([
               scenario/0,
@@ -22,18 +24,18 @@
 -type remove_opts() :: [remove_opt()].
 
 %% ------------------------------------------------------------------
-%% Start scenario via shell script (run.sh)
+%% API for local scenario execution, use amoc_dist module to run
+%% scenarios in a distributed environment
 %% ------------------------------------------------------------------
--spec do([scenario() | integer(), ...]) -> ok | no_return().
-do([Scenario, Count]) ->
-    do([Scenario, '1', Count]);
-do([Scenario, Start, End]) ->
-    application:ensure_all_started(amoc),
-    S = list_to_integer(atom_to_list(Start)),
-    E = list_to_integer(atom_to_list(End)),
-    case amoc_local:do(Scenario, S, E) of
-        ok ->
-            ok;
-        {error, _} ->
-            exit(1)
-    end.
+-spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) ->
+    ok | {error, term()}.
+do(Scenario, Start, End) ->
+    amoc_controller:do(Scenario, Start, End).
+
+-spec add(non_neg_integer()) -> ok.
+add(Count) ->
+    amoc_controller:add(Count).
+
+-spec remove(non_neg_integer(), amoc:remove_opts()) -> ok.
+remove(Count, Opts) ->
+    amoc_controller:remove(Count, Opts).
