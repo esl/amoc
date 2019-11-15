@@ -9,18 +9,21 @@ NETWORK=amoc-test-network
 PATH_TO_EXEC=/home/amoc/amoc/bin/amoc
 docker network create ${NETWORK}
 
+AMOC_HOSTS="['amoc@amoc-1','amoc@amoc-2']"
+
+
 docker run --rm -t -d --name amoc-1 -h amoc-1 \
     --network ${NETWORK} \
-    -e AMOC_HOSTS="\"amoc-1\",\"amoc-2\"" \
-    -e AMOC_PREFIX=amoc1 \
+    -e AMOC_NODES=${AMOC_HOSTS} \
+    -e AMOC_PREFIX='"amoc1"' \
     --health-cmd="/home/amoc/amoc/bin/amoc status" \
     -p 8081:4000 \
     amoc:latest
 
 docker run --rm -t -d --name amoc-2 -h amoc-2 \
     --network ${NETWORK} \
-    -e AMOC_HOSTS="\"amoc-1\",\"amoc-2\"" \
-    -e AMOC_PREFIX=amoc2 \
+    -e AMOC_NODES=${AMOC_HOSTS} \
+    -e AMOC_PREFIX='"amoc2"' \
     --health-cmd="/home/amoc/amoc/bin/amoc status" \
     -p 8082:4000 \
     amoc:latest
