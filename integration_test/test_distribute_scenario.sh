@@ -5,6 +5,8 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+cd `dirname "$0"`/../
+
 # The purpose of this test is to check if scenario installed on
 # one node of Amoc cluster will be distributed to all nodes
 
@@ -44,7 +46,7 @@ list_scenarios_by_port ${PORT2}
 # -R means "raw input"
 # -s means "include linebreaks"
 # . means "output the root of the JSON document"
-SCEN_SOURCE=`cat ../test/amoc_api_scenarios_handler_SUITE_data/sample_test.erl | jq -aRs .`
+SCEN_SOURCE=`cat test/amoc_api_scenarios_handler_SUITE_data/sample_test.erl | jq -aRs .`
 
 echo "Installing scenario: 'sample_test.erl' on node amoc-1 (port ${PORT1})"
 
