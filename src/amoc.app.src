@@ -5,6 +5,7 @@
     {applications, [
         kernel,
         stdlib,
+        compiler,
         sasl,
         jiffy,
         exometer_core,

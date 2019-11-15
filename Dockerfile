@@ -1,6 +1,8 @@
 FROM phusion/baseimage as amoc-build
 MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
+ARG otp_vsn=21.3.8.7-1
+
 RUN useradd -ms /bin/bash amoc
 
 RUN apt-get update && \
@@ -16,7 +18,7 @@ RUN apt-get update && \
     wget https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
     dpkg -i erlang-solutions_1.0_all.deb && \
     apt-get update && \
-    apt-get install -y esl-erlang=1:21.2.2-1
+    apt-get install -y esl-erlang=1:${otp_vsn}
 
 COPY . /amoc_build
 
