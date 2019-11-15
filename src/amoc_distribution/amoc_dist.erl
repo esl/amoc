@@ -10,6 +10,7 @@
          add/2,
          remove/2,
          remove/3,
+         amoc_nodes/0,
          test_status/1]).
 
 -compile({no_auto_import, [ceil/1]}).
@@ -57,14 +58,14 @@ remove(Count, Opts, Nodes) ->
     CountPerNode = ceil(Count / length(Nodes)),
     [amoc_controller:remove(Node, CountPerNode, Opts) || Node <- Nodes].
 
-%% ------------------------------------------------------------------
-%% Local functions
-%% ------------------------------------------------------------------
 -spec amoc_nodes() -> [node()].
 amoc_nodes() ->
     Status = amoc_slave:get_status(),
     maps:get(connected, Status, []).
 
+%% ------------------------------------------------------------------
+%% Local functions
+%% ------------------------------------------------------------------
 -spec ceil(float()) -> integer().
 ceil(Number) ->
     erlang:round(Number + 0.5).

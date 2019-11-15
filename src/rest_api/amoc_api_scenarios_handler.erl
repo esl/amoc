@@ -130,7 +130,7 @@ to_json(Req0, State) ->
 from_json(Req, State) ->
     case get_vars_from_body(Req) of
         {ok, {ModuleName, ModuleSource}, Req2} ->
-            Nodes = amoc_nodes(),
+            Nodes = [node() | amoc_dist:amoc_nodes()],
             ResultBody =  erlang:list_to_bitstring(
                             process_multicall_results(Nodes, install_scenario_on_nodes(Nodes, ModuleName, ModuleSource))),
             Reply = jiffy:encode({[{compile, ResultBody}]}),
@@ -250,13 +250,3 @@ ensure_ebin_directory() ->
         {error, Reason} -> Reason
     end.
 
--spec amoc_nodes() -> [node()].
-amoc_nodes() ->
-    [node() | [ Node || Node <- erlang:nodes(), not is_remsh_node(Node) ]].
-
--spec is_remsh_node(node()) -> boolean().
-is_remsh_node(Node) ->
-    case atom_to_list(Node) of
-        "remsh" ++ _ -> true;
-        _            -> false
-    end.
