@@ -19,6 +19,9 @@ script:
     - make test
     - rebar3 dialyzer
     - rebar3 xref
+    - OTP_VSN=${TRAVIS_OTP_RELEASE}-1 ./integration_test/build_docker_image.sh
+    - ./integration_test/test_docker_image.sh
+    - ./integration_test/test_distribute_scenario.sh
 
 cache:
     directories:
