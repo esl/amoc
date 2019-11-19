@@ -52,6 +52,8 @@
          test_status/1,
          start_scenario_checking/1,
          add_batches/2]).
+
+-export([init_scenario/2]). %% for testing purposes only
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
@@ -225,24 +227,24 @@ handle_remove(Count, Opts, _State) when
                       amoc_scenario:user_id(), state()) ->
     {reply, ok | {error, term()}, state()}.
 handle_local_do(Scenario, Start, End, State) ->
-    handle_do(Scenario, lists:seq(Start, End), State).
+    handle_do(Scenario, lists:seq(Start, End), State, []).
 
 -spec handle_dist_do(amoc:scenario(), amoc_scenario:user_id(),
                      amoc_scenario:user_id(), non_neg_integer(),
                      node_id(), amoc:do_opts(), state())->
     {reply, ok | {error, term()}, state()}.
-handle_dist_do(Scenario, Start, End, NodesCount, NodeId, _Opts, State) ->
+handle_dist_do(Scenario, Start, End, NodesCount, NodeId, Opts, State) ->
     UserIds = node_userids(Start, End, NodesCount, NodeId),
     State1 = State#state{nodes = NodesCount,
                          node_id = NodeId},
-    handle_do(Scenario, UserIds, State1).
+    handle_do(Scenario, UserIds, State1, Opts).
 
--spec handle_do(amoc:scenario(), [amoc_scenario:user_id()], state()) ->
+-spec handle_do(amoc:scenario(), [amoc_scenario:user_id()], state(), amoc:do_opts()) ->
     {reply, ok | {error, term()}, state()}.
-handle_do(Scenario, UserIds, State) ->
+handle_do(Scenario, UserIds, State, Opts) ->
     case code:ensure_loaded(Scenario) of
         {module, Scenario} ->
-            case init_scenario(Scenario) of
+            case init_scenario(Scenario, Opts) of
                 {ok, ScenarioState} ->
                     self() ! {start_scenario, Scenario, UserIds, ScenarioState},
                     State1 = State#state{scenario       = Scenario,
@@ -305,16 +307,21 @@ start_scenario(Scenario, UserIds, State) ->
                [Start, End, Length]),
     start_users(Scenario, UserIds, interarrival(), State).
 
--spec init_scenario(amoc:scenario()) -> any().
-init_scenario(Scenario) ->
-    case erlang:function_exported(Scenario, init, 0) of
-        true ->
-            case Scenario:init() of
-                ok -> {ok, ok};
-                RetValue -> RetValue
+-spec init_scenario(amoc:scenario(), amoc:do_opts()) -> any().
+init_scenario(Scenario, Opts) ->
+    ScenarioConfig = proplists:get_value(config, Opts, []),
+    case amoc_config_scenario:parse_scenario_settings(Scenario, ScenarioConfig) of
+        ok ->
+            case erlang:function_exported(Scenario, init, 0) of
+                true ->
+                    case Scenario:init() of
+                        ok -> {ok, ok};
+                        RetValue -> RetValue
+                    end;
+                false ->
+                    {ok, skip}
             end;
-        false ->
-            {ok, skip}
+        Error -> Error
     end.
 
 -spec maybe_start_scenario_checking(amoc:scenario()) -> ok | skip.

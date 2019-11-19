@@ -16,15 +16,18 @@
 
 -type scenario() :: module().
 
--type do_opt() :: {nodes, [node()]} | {comment, string()} | {repeat, timeout()}
-                  | {interarrival, timeout()}.
+-type do_opt() :: {nodes, [node()]} |
+                  {comment, string()} |
+                  {repeat, timeout()} |
+                  {interarrival, timeout()} |
+                  {config, amoc_config_scenario:settings()}.
 -type do_opts() :: [do_opt()].
 
 -type remove_opt() :: {force, boolean()}.
 -type remove_opts() :: [remove_opt()].
 
 %% ------------------------------------------------------------------
-%% API for local scenario execution, use amoc_dist module to run
+%% API for the local scenario execution, use amoc_dist module to run
 %% scenarios in a distributed environment
 %% ------------------------------------------------------------------
 -spec do(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id()) ->
