@@ -5,7 +5,7 @@
 
 -spec start_listener() -> {ok, pid()}.
 start_listener() ->
-    Port = amoc_config:get(api_port, 4000),
+    Port = amoc_config_env:get(api_port, 4000),
     Handlers = [amoc_api_scenarios_handler,
                 amoc_api_scenario_handler,
                 amoc_api_node_handler,

@@ -43,7 +43,7 @@
 %% ------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
-    Nodes = amoc_config:get(nodes, []),
+    Nodes = amoc_config_env:get(nodes, []),
     gen_server:start_link({local, ?SERVER}, ?MODULE, Nodes, []).
 
 -spec connect_nodes([node()]) -> ok.

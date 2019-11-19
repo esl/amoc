@@ -30,12 +30,11 @@ initial_state() ->
 
 command(_S) ->
     oneof([
-           {call, ?MODULE, set_app_env_variable, [key(), any()]},
-           {call, amoc_config, get, [key()]},
-           {call, amoc_config, get, [key(), any()]},
-           {call, ?MODULE, set_env_variable, [key(), any()]},
-           {call, ?MODULE, safe_fetch, [key()]}
-           ]).
+              {call, ?MODULE, set_app_env_variable, [key(), any()]},
+              {call, amoc_config_env, get, [key()]},
+              {call, amoc_config_env, get, [key(), any()]},
+              {call, ?MODULE, set_env_variable, [key(), any()]}
+          ]).
 
 %%
 precondition(_S, _) ->
@@ -61,21 +60,13 @@ next_state(S, _Res, {call, _, _, _}) ->
     S.
 
 %%
-postcondition(#{vars := Vars}, {call, amoc_config, get, [Key]}, Res) ->
+postcondition(#{vars := Vars}, {call, amoc_config_env, get, [Key]}, Res) ->
     proplists:get_value(Key, Vars) =:= Res;
 
-postcondition(#{vars := Vars}, {call, amoc_config, get, [Key, Default]}, Res) ->
+postcondition(#{vars := Vars}, {call, amoc_config_env, get, [Key, Default]}, Res) ->
     proplists:get_value(Key, Vars, Default) =:= Res;
 
-postcondition(#{vars := Vars}, {call, amoc_config, safe_fetch, [Key]},
-              {key_not_found, Key}) ->
-    false =:= lists:keyfind(Key, 1, Vars);
-
-postcondition(#{vars := Vars}, {call, amoc_config, safe_fetch, [Key]}, Res) ->
-    {Key, Value} = lists:keyfind(Key, 1, Vars),
-    Value =:= Res;
-
-postcondition(_S, {call, _, _, _}, _Res) ->
+postcondition(_S, {call, ?MODULE, _, _}, _Res) ->
     true.
 
 %% statem helpers
@@ -87,8 +78,6 @@ set_env_variable(Name, Value) ->
 set_app_env_variable(Name, Value) ->
     ok = application:set_env(amoc, Name, Value).
 
-safe_fetch(Name) ->
-    catch amoc_config:fetch(Name).
 
 unset_all(#{envs := Envs}) ->
     [ true = os:unsetenv(env_name(Env)) || Env <- Envs ],

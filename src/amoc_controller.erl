@@ -451,15 +451,15 @@ total_users_in_batch(BatchStrategy) ->
 
 -spec interarrival() -> interarrival().
 interarrival() ->
-    amoc_config:get(interarrival, ?INTERARRIVAL_DEFAULT).
+    amoc_config_env:get(interarrival, ?INTERARRIVAL_DEFAULT).
 
 -spec checking_interval() -> integer().
 checking_interval() ->
-    amoc_config:get(scenario_checking_interval, ?CHECKING_INTERVAL_DEFAULT).
+    amoc_config_env:get(scenario_checking_interval, ?CHECKING_INTERVAL_DEFAULT).
 
 -spec add_batch_interval() -> integer().
 add_batch_interval() ->
-    amoc_config:get(add_batch_interval, ?ADD_BATCH_INTERVAL_DEFAULT).
+    amoc_config_env:get(add_batch_interval, ?ADD_BATCH_INTERVAL_DEFAULT).
 
 -spec get_test_status() -> scenario_status().
 get_test_status() ->

@@ -4,8 +4,7 @@
 %%==============================================================================
 -module(amoc_config).
 
--export([get/1, get/2,
-         parse_scenario_settings/1,
+-export([parse_scenario_settings/1,
          get_scenario_parameter/2]).
 
 %% exported for unittesting only.
@@ -33,18 +32,6 @@
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec get(name()) -> any().
-get(Name) ->
-    get(Name, undefined).
-
--spec get(name(), any()) -> any().
-get(Name, Default) when is_atom(Name) ->
-    DefValue = application:get_env(amoc, Name, Default),
-    get(erlang:atom_to_list(Name), DefValue);
-get(Name, Default) when is_list(Name) ->
-    EnvName = "AMOC_" ++ string:uppercase(Name),
-    get_from_env(EnvName, Default).
-
 -spec parse_scenario_settings(scenario_configuration() | module()) ->
     {ok, settings()} | {error, error()}.
 parse_scenario_settings(Module) when is_atom(Module) ->
@@ -80,7 +67,7 @@ get_scenario_parameter(Name, Settings) ->
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 get_value_and_verify({Name, DefaultValue, VerificationMethod}) ->
-    Value = amoc_config:get(Name, DefaultValue),
+    Value = amoc_config_env:get(Name, DefaultValue),
     {DefaultValueVerification, _} = verify(DefaultValue, VerificationMethod),
     {ValueVerification, NewValue} = verify(Value, VerificationMethod),
     Verification = case {DefaultValueVerification, ValueVerification} of
@@ -132,18 +119,6 @@ call_verify_fun(Fun, Value) ->
     end.
 
 is_one_of(Element, List) -> lists:any(fun(El) -> El =:= Element end, List).
-
-get_from_env(EnvName, Default) ->
-    Value = os:getenv(EnvName),
-    parse_value(Value, Default).
-
--spec parse_value(string() | false, any()) -> any().
-parse_value(false, Default) -> Default;
-parse_value("", Default) -> Default;
-parse_value(String, _) ->
-    {ok, Tokens, _} = erl_scan:string(String ++ "."),
-    {ok, Term} = erl_parse:parse_term(Tokens),
-    Term.
 
 process_var_attr(_, {Name, _}) ->
     {Name, undefined, none};

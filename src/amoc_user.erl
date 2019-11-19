@@ -75,7 +75,7 @@ repeat(F, 1) ->
     F().
 
 repeat_interval() ->
-    amoc_config:get(repeat_interval, ?REPEAT_INTERVAL).
+    amoc_config_env:get(repeat_interval, ?REPEAT_INTERVAL).
 
 repeat_num() ->
-    amoc_config:get(repeat_num, ?REPEAT_NUM).
+    amoc_config_env:get(repeat_num, ?REPEAT_NUM).

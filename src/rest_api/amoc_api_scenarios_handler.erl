@@ -226,7 +226,7 @@ write_scenario_to_file(ModuleSource, ScenarioPath) ->
 compile_and_load_scenario(BinModuleName, ScenarioPath) ->
     ok = ensure_ebin_directory(),
     DefaultCompilationFlags = [return_errors, report_errors, verbose],
-    ExtraCompilationFlags = amoc_config:get(extra_compilation_flags, []),
+    ExtraCompilationFlags = amoc_config_env:get(extra_compilation_flags, []),
     CompilationFlags = [{outdir, "scenarios_ebin"} |
                         ExtraCompilationFlags ++ DefaultCompilationFlags],
     case compile:file(ScenarioPath, CompilationFlags) of
