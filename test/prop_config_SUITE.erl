@@ -8,10 +8,15 @@
 -compile(export_all).
 
 all() ->
-    [config_prop_test].
+    [%test_any_type,
+     config_prop_test].
+
+test_any_type(_Config) ->
+    ProperTest = ?FORALL(Value, any(), not is_map(Value)),
+    ?assertEqual(true, proper:quickcheck(ProperTest, [long_result, 10000, quiet])).
 
 config_prop_test(_Config) ->
-     ?assertEqual(true, proper:quickcheck(config_prop(), [long_result, 1000])).
+     ?assertEqual(true, proper:quickcheck(config_prop(), [long_result, 1000, quiet])).
 
 config_prop() ->
     ?FORALL(Cmds, proper_statem:commands(?MODULE),
@@ -24,16 +29,21 @@ config_prop() ->
 key() ->
     oneof([a, b, c, d, e, f, g]).
 
+real_any() ->
+    %% ensure maps are tested!!!
+    weighted_union([{1, map(any(), any())},
+                    {10, any()}]).
+
 %% Abstract state machine
 initial_state() ->
     #{vars => [], envs => []}.
 
 command(_S) ->
     oneof([
-              {call, ?MODULE, set_app_env_variable, [key(), any()]},
+              {call, ?MODULE, set_app_env_variable, [key(), real_any()]},
               {call, amoc_config_env, get, [key()]},
-              {call, amoc_config_env, get, [key(), any()]},
-              {call, ?MODULE, set_env_variable, [key(), any()]}
+              {call, amoc_config_env, get, [key(), real_any()]},
+              {call, ?MODULE, set_env_variable, [key(), real_any()]}
           ]).
 
 %%
@@ -72,7 +82,9 @@ postcondition(_S, {call, ?MODULE, _, _}, _Res) ->
 %% statem helpers
 set_env_variable(Name, Value) ->
     EnvName = env_name(Name),
-    true = os:putenv(EnvName, lists:flatten(io_lib:format("~p", [Value]))),
+    StringValue=lists:flatten(io_lib:format("~p", [Value])),
+    %% io:format("~s",[StringValue]),
+    true = os:putenv(EnvName, StringValue),
     ok.
 
 set_app_env_variable(Name, Value) ->
