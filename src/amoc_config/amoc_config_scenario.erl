@@ -7,45 +7,57 @@
 %% API
 -export([parse_scenario_settings/2]).
 
-%% exported for testing only
--export([get_scenario_configuration/1,process_scenario_config/2]).
+-ifdef(TEST).
+-export([%% exported for testing only
+         get_module_attributes/1,
+         process_scenario_attributes/2,
+         process_scenario_config/2]).
+-endif.
 
--export_type([scenario_configuration/0, settings/0]).
+-export_type([settings/0]).
 
--type one_of() :: [amoc_config:value()].
--type validation_fun() :: fun((amoc_config:value()) -> boolean() | {true, amoc_config:value()}).
--type validation() :: validation_fun() | one_of() | atom().
-
+-type reason() :: any().
+-type validation_fun() :: fun((amoc_config:value()) -> boolean() |
+                                                       {true, amoc_config:value()} |
+                                                       {false, reason()}).
 -type parameter_configuration() :: {amoc_config:name(),
                                     DefValue :: amoc_config:value(),
-                                    validation()}.
+                                    validation_fun()}.
 -type scenario_configuration() :: [parameter_configuration()].
 
--type settings() :: [{amoc_config:name(), amoc_config:value()}].
+-type parameter() :: {amoc_config:name(), amoc_config:value()}.
+-type settings() :: [parameter()].
 
--type reason() :: atom().
--type error() :: invalid_settings() | invalid_module.
--type invalid_settings() :: {invalid_settings, [{amoc_config:name(),
-                                                 amoc_config:value(),
-                                                 reason()}]}.
+-type error_type() :: invalid_scenario_module | invalid_verification_module |
+                      invalid_attribute_format | parameters_verification_failed.
+-type error() :: {error, error_type(), reason()}.
+
+-type one_of() :: [amoc_config:value(), ...].
+-type verification_method() :: one_of() | atom() | validation_fun().
+-type scenario_attribute() ::
+    {amoc_config:name(), Description :: string()} |
+    {amoc_config:name(), Description :: string(), DefValue :: amoc_config:value()} |
+    {amoc_config:name(), Description :: string(), DefValue :: amoc_config:value(), verification_method()}.
+-type maybe_scenario_attribute() :: scenario_attribute() | term().
 
 -include_lib("kernel/include/logger.hrl").
 
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec parse_scenario_settings(module(), settings()) -> ok | {error, error()}.
+-spec parse_scenario_settings(module(), settings()) -> ok | error().
 parse_scenario_settings(Module, Settings) when is_atom(Module) ->
     try get_scenario_configuration(Module) of
-        Config ->
+        {ok, Config} ->
             case process_scenario_config(Config, Settings) of
                 {ok, ScenarioSettings} ->
                     store_scenario_settings(ScenarioSettings),
                     ok;
                 Error -> Error
-            end
+            end;
+        {error, _, _} = Error -> Error
     catch
-        _:_ -> {error, invalid_module}
+        _:_ -> {error, invalid_scenario_module, Module}
     end.
 
 %% ------------------------------------------------------------------
@@ -55,100 +67,136 @@ parse_scenario_settings(Module, Settings) when is_atom(Module) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% parsing scenario attributes %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec get_scenario_configuration(module()) -> scenario_configuration().
+-spec get_scenario_configuration(module()) -> {ok,scenario_configuration()} | error().
 get_scenario_configuration(Module) ->
+    case load_verification_modules() of
+        {ok, VerificationModules} ->
+            ScenarioAttributes = get_module_attributes(Module),
+            AllVerificationModules = [Module | VerificationModules],
+            process_scenario_attributes(AllVerificationModules, ScenarioAttributes);
+        Error -> Error
+    end.
+
+-spec load_verification_modules() -> {ok, [module()]} | error().
+load_verification_modules() ->
+    Modules = amoc_config_env:get(config_verification_modules, []),
+    LoadingResult = [load_module(Module) || Module <- Modules],
+    maybe_error(invalid_verification_module, LoadingResult).
+
+-spec load_module(module()) -> {ok, module()} | {error, {module(), any()}}.
+load_module(Module) ->
+    case code:ensure_loaded(Module) of
+        {module, Module} -> {ok, Module};
+        {error, Error} -> {error, {Module, Error}}
+    end.
+
+-spec get_module_attributes(module()) -> [maybe_scenario_attribute()].
+get_module_attributes(Module) ->
     ModuleAttributes = apply(Module, module_info, [attributes]),
     RequiredVariables = proplists:get_all_values(required_variable, ModuleAttributes),
-    [process_var_attr(Module, Var) || Var <- lists:append(RequiredVariables)].
+    lists:append(RequiredVariables).
 
-process_var_attr(_, {Name, _}) ->
-    {Name, undefined, none};
-process_var_attr(_, {Name, _, DefaultValue}) ->
-    {Name, DefaultValue, none};
-process_var_attr(Module, {Name, _, DefaultValue, Atom}) when is_atom(Atom) ->
-    VerificationMethod = verification_method(Module, Atom),
-    {Name, DefaultValue, VerificationMethod};
-process_var_attr(_, {Name, _, DefaultValue, VerificationMethod}) ->
-    {Name, DefaultValue, VerificationMethod}.
+-spec process_scenario_attributes([module()], [maybe_scenario_attribute()]) ->
+    {ok, scenario_configuration()} | error().
+process_scenario_attributes(VerificationModules, ScenarioAttributes) ->
+    Config = [process_var_attr(VerificationModules, Attr) || Attr <- ScenarioAttributes],
+    maybe_error(invalid_attribute_format, Config).
 
-verification_method(Module, Atom) ->
+-spec process_var_attr([module()], maybe_scenario_attribute()) ->
+    {ok, parameter_configuration()} | {error, reason()}.
+process_var_attr(_, {Name, _}) when is_atom(Name) ->
+    {ok, {Name, undefined, fun none/1}};
+process_var_attr(_, {Name, _, DefaultValue}) when is_atom(Name) ->
+    {ok, {Name, DefaultValue, fun none/1}};
+process_var_attr(Modules, {Name, _, DefaultValue, Atom} = Attribute) when is_atom(Atom),
+                                                                          is_atom(Name) ->
+    case verification_method(Modules, Atom) of
+        not_exported -> {error, {verification_method_not_exported, Attribute, Modules}};
+        VerificationMethod -> {ok, {Name, DefaultValue, VerificationMethod}}
+    end;
+process_var_attr(_, {Name, _, DefaultValue, Fun}) when is_function(Fun, 1),
+                                                       is_atom(Name) ->
+    {ok, {Name, DefaultValue, Fun}};
+process_var_attr(_, {Name, _, DefaultValue, [_ | _] = OneOF}) when is_atom(Name) ->
+    {ok, {Name, DefaultValue, one_of_fun(OneOF)}};
+process_var_attr(_, {Name, _, _, _} = InvalidAttribute) when is_atom(Name) ->
+    {error, {invalid_verification_method, InvalidAttribute}};
+process_var_attr(_, InvalidAttribute) ->
+    {error, {invalid_attribute, InvalidAttribute}}.
+
+-spec verification_method([module()], atom()) -> validation_fun() | not_exported.
+verification_method(_, none) -> fun none/1;
+verification_method([], _) ->
+    not_exported;
+verification_method([Module | T], Atom) ->
     case erlang:function_exported(Module, Atom, 1) of
         true -> fun Module:Atom/1;
-        false -> Atom
+        false -> verification_method(T, Atom)
+    end.
+
+none(_) -> true.
+
+-spec one_of_fun(one_of()) -> validation_fun().
+one_of_fun(OneOf) ->
+    fun(X) ->
+        case lists:member(X, OneOf) of
+            true -> true;
+            false -> {false, {not_one_of, OneOf}}
+        end
+    end.
+
+-spec maybe_error(error_type(), [{error, reason()} | {ok, any()}]) -> error() | {ok, [any()]}.
+maybe_error(ErrorType, List) ->
+    case [Error || {error, Error} <- List] of
+        [] ->
+            {ok, [CorrectValue || {ok, CorrectValue} <- List]};
+        Error ->
+            {error, ErrorType, Error}
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% processing scenario configuration %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec process_scenario_config(scenario_configuration(), settings()) ->
-    {ok, settings()} | {error, error()}.
+    {ok, settings()} | error().
 process_scenario_config(Config, Settings) ->
     ParametersVerification = [get_value_and_verify(C, Settings) || C <- Config],
-    case [{N, V, R} || {N, V, {false, R}} <- ParametersVerification] of
-        [] ->
-            KeyValList = [{Name, Value} || {Name, Value, _} <- ParametersVerification],
-            {ok, KeyValList};
-        InvalidSettings -> {error, {invalid_settings, InvalidSettings}}
-    end.
+    maybe_error(parameters_verification_failed, ParametersVerification).
 
+-spec get_value_and_verify(parameter_configuration(), settings()) ->
+    {ok, parameter()} | {error, reason()}.
 get_value_and_verify({Name, Default, VerificationMethod}, Settings) ->
     DefaultValue = amoc_config_env:get(Name, Default),
     Value = proplists:get_value(Name, Settings, DefaultValue),
-    {DefaultValueVerification, _} = verify(Default, VerificationMethod),
-    {ValueVerification, NewValue} = verify(Value, VerificationMethod),
-    Verification = case {DefaultValueVerification, ValueVerification} of
-                       {true, true} -> true;
-                       {false, true} ->
-                           ?LOG_ERROR("Invalid default value for ~p", [Name]),
-                           {false, bad_default_value};
-                       {true, false} ->
-                           ?LOG_ERROR("Invalid value for ~p", [Name]),
-                           {false, bad_value};
-                       {false, false} ->
-                           ?LOG_ERROR("Invalid value & default value for ~p", [Name]),
-                           {false, bad_value_bad_default_value}
-                   end,
-    {Name, NewValue, Verification}.
-
-verify(Value, VerificationMethod) ->
-    case verify_value(Value, VerificationMethod) of
-        {true, NewValue} -> {true, NewValue};
-        true -> {true, Value};
-        false -> {false, Value}
+    case verify(VerificationMethod, Value) of
+        {true, NewValue} -> {ok, {Name, NewValue}};
+        {false, Reason} -> {error, {Name, Value, Reason}}
     end.
 
-verify_value(_, none) -> true;
-verify_value(Value, Atom) when is_atom(Atom) ->
-    Fun = fun(Val) ->
-        erlang:apply(amoc_config_validation, Atom, [Val])
-          end,
-    call_verify_fun(Fun, Value);
-verify_value(Value, [_ | _] = NonemptyList) ->
-    is_one_of(Value, NonemptyList);
-verify_value(Value, Fun) when is_function(Fun, 1) ->
-    call_verify_fun(Fun,Value);
-verify_value(_, VerificationMethod) ->
-    ?LOG_ERROR("invalid verification method ~p", [VerificationMethod]),
-    false.
 
-call_verify_fun(Fun, Value) ->
-    try Fun(Value) of
-        Bool when is_boolean(Bool) -> Bool;
+-spec verify(validation_fun(), amoc_config:value()) -> {true, amoc_config:value()} |
+                                                       {false, reason()}.
+verify(Fun, Value) ->
+    try apply(Fun, [Value]) of
+        true -> {true, Value};
+        false -> {false, verification_failed};
         {true, NewValue} -> {true, NewValue};
+        {false, Reason} -> {false, {verification_failed, Reason}};
         Ret ->
-            ?LOG_ERROR("invalid verification method ~p, return value : ~p", [Fun, Ret]),
-            false
+            ?LOG_ERROR("invalid verification method ~p(~p), return value : ~p",
+                       [Fun, Value, Ret]),
+            {false, {invalid_verification_return_value, Ret}}
     catch
         C:E:S ->
-            ?LOG_ERROR("invalid verification method ~p, exception: ~p ~p ~p", [Fun, C, E, S]),
-            false
+            ?LOG_ERROR("invalid verification method ~p(~p), exception: ~p ~p ~p",
+                       [Fun, Value, C, E, S]),
+            {false, {exception_durin_verification, {C, E, S}}}
     end.
-
-is_one_of(Element, List) -> lists:any(fun(El) -> El =:= Element end, List).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% store scenario settings %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec store_scenario_settings(settings()) -> true.
 store_scenario_settings(Settings) ->
     ValidSettings = [{K, V} || {K, V} <- Settings, is_atom(K)],
     true = ets:insert(amoc_config, ValidSettings).
