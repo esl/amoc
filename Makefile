@@ -20,7 +20,10 @@ clean:
 ct:
 	$(REBAR) ct --verbose $(SUITE_OPTS)
 
-test: compile ct
+eunit:
+	$(REBAR) eunit
+
+test: compile ct eunit
 
 console:
 	rebar3 shell
