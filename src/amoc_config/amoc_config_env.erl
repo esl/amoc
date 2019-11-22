@@ -8,11 +8,6 @@
 
 -include_lib("kernel/include/logger.hrl").
 
--ifdef(EUNIT).
--include_lib("proper/include/proper.hrl").
--include_lib("eunit/include/eunit.hrl").
--endif.
-
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
@@ -58,17 +53,3 @@ parse_value(false, Default) -> {ok, Default};
 parse_value("", Default)    -> {ok, Default};
 parse_value(String, _) ->
     parse_value(String).
-
--ifdef(EUNIT).
-parse_value_test() ->
-    RealAnyType = weighted_union([{1, map(any(), any())},
-                                  {10, any()}]),
-    ProperTest = ?FORALL(Value,
-                         RealAnyType,
-                         begin
-                             StringValue = lists:flatten(io_lib:format("~p", [Value])),
-                             %% ?debugMsg(StringValue),
-                             parse_value(StringValue) =:= {ok, Value}
-                         end),
-    ?assertEqual(true, proper:quickcheck(ProperTest)).
--endif.

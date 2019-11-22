@@ -1,4 +1,4 @@
--module(config_SUITE).
+-module(amoc_config_scenario_SUITE).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -22,12 +22,7 @@ positive_integer(I) -> is_integer(I) andalso I > 0.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 all() ->
-    [config_osenv_test,
-     config_appenv_test,
-     config_none_test,
-     config_osappenv_test,
-     config_osenv_dynamic_test,
-     init_scenario,
+    [init_scenario,
      get_module_attributes,
      process_scenario_config_uses_default_values,
      process_scenario_config_shadows_default_values,
@@ -35,6 +30,7 @@ all() ->
      process_scenario_config_returns_preprocessed_value].
 
 init_per_suite(Config) ->
+    {ok, _} = application:ensure_all_started(amoc),
     meck:new(verification_module, [non_strict, no_link]),
     meck:expect(verification_module, positive_integer,
                 fun(I) -> is_integer(I) andalso I > 0 end),
@@ -49,57 +45,6 @@ end_per_suite(Config) ->
     meck:unload(),
     unset_env(config_verification_modulesv),
     Config.
-
-
-config_osenv_test(_Config) ->
-    given_osenv_set([{interarrival, 100},
-                     {something, [{a,b,c}, 9, 8, {7}]}]),
-    given_amoc_started(),
-    ?assertEqual(100, amoc_config_env:get(interarrival)),
-    ?assertEqual(60000, amoc_config_env:get(repeat_interval)),
-    ?assertEqual(something, amoc_config_env:get(anything, something)),
-    ?assertEqual([{a,b,c},9,8,{7}], amoc_config_env:get(something)).
-
-given_amoc_started() ->
-    {ok, _} = application:ensure_all_started(amoc).
-
-given_osenv_set(Envs) ->
-    [true = set_env(Name, Value) || {Name, Value} <- Envs].
-
-config_appenv_test(_) ->
-    %% given
-    given_amoc_started(),
-    %% when
-    application:set_env(amoc, foo, bar),
-    %% then
-    ?assertEqual(bar, amoc_config_env:get(foo)).
-
-config_none_test(_) ->
-    %% when
-    application:unset_env(amoc, foo),
-    %% then
-    ?assertEqual(undefined, amoc_config_env:get(foo)).
-
-config_osappenv_test(_) ->
-    %% given
-    given_amoc_started(),
-    %% when
-    set_env(foo, bar),
-    application:set_env(amoc, foo, baz),
-    %% then
-    ?assertEqual(bar, amoc_config_env:get(foo)).
-
-config_osenv_dynamic_test(_) ->
-    %% given
-    given_amoc_started(),
-    %% when
-    set_env(foo, bar),
-    %% then
-    ?assertEqual(bar, amoc_config_env:get(foo)),
-    %% when
-    set_env(foo, baz),
-    %% then
-    ?assertEqual(baz, amoc_config_env:get(foo)).
 
 init_scenario(_) ->
     ScenarioConfig = [{var0, def0}, {var5, val5}],
@@ -122,18 +67,16 @@ get_module_attributes(_) ->
                       {var3,"var3",3,positive_integer},
                       {var4,"var4",def4,[def4,another_atom]},
                       {var5,"var5",def5,test_verification_function},
-                      {var6,"var6",def6, fun config_SUITE:test_verification_function/1}],
+                      {var6,"var6",def6, fun ?MODULE:test_verification_function/1}],
     ?assertEqual(lists:sort(ExpectedResult), lists:sort(Result)).
 
 process_scenario_config_uses_default_values(_) ->
-    given_amoc_started(),
     ScenarioAttributes = correct_scenario_attributes(),
     given_scenario_parameters_not_set(ScenarioAttributes),
     Result = process_scenario_attributes(ScenarioAttributes,[]),
     assert_settings(Result, ScenarioAttributes).
 
 process_scenario_config_shadows_default_values(_) ->
-    given_amoc_started(),
     ScenarioAttributes = correct_scenario_attributes(),
     given_scenario_parameters_set(ScenarioAttributes),
     AnotherScenarioAttributes = another_correct_scenario_attributes(),
@@ -145,7 +88,6 @@ process_scenario_config_shadows_default_values(_) ->
     assert_settings(Result, [{additional_param,"", yet_another_value, none} | ScenarioAttributes]).
 
 process_scenario_config_returns_error_for_invalid_values(_) ->
-    given_amoc_started(),
     IncorrectScenarioAttributes = incorrect_scenario_attributes(),
     Defaults = correct_scenario_attributes(),
     given_scenario_parameters_set([{a_name, 3, none} | IncorrectScenarioAttributes]),
@@ -163,7 +105,6 @@ process_scenario_config_returns_error_for_invalid_values(_) ->
                  Result).
 
 process_scenario_config_returns_preprocessed_value(_) ->
-    given_amoc_started(),
     ValidationFn = fun(_) -> {true, another_atom} end,
     ScenarioParams = [{preprocessed_param, an_atom, ValidationFn}],
     {ok, Settings} = amoc_config_scenario:process_scenario_config(ScenarioParams,[]),
