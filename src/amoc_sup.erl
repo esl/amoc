@@ -39,6 +39,7 @@ init([]) ->
               ?CHILD(amoc_users_sup, supervisor),
               ?CHILD(amoc_controller, worker),
               ?CHILD(amoc_slave, worker),
+              ?CHILD(amoc_scenario, worker),
               ?CHILD(amoc_throttle_controller, worker)
           ]}}.
 

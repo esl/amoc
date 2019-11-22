@@ -2,6 +2,8 @@
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("scenario_template.hrl").
+
 
 -define(SCENARIOS_DIR_S, "scenarios").
 -define(SAMPLE_SCENARIO_S, "sample_test1.erl").
@@ -170,27 +172,14 @@ patch_scenario_returns_200_when_request_with_user_batches_ok_and_module_exists(_
 %% Helpers
 
 create_env(Config) ->
-    ok = file:make_dir(?SCENARIOS_DIR_S),
-    SampleScenario = filename:join([?SCENARIOS_DIR_S,
-                                    ?SAMPLE_SCENARIO_S]),
-    copy(data(Config, ?SAMPLE_SCENARIO_S), SampleScenario),
-    {ok, _} = compile:file(SampleScenario),
-    {module, _} = code:load_file(?SAMPLE_SCENARIO_A),
     {ok, _} = application:ensure_all_started(inets),
-    {ok, _} = application:ensure_all_started(amoc).
+    {ok, _} = application:ensure_all_started(amoc),
+    ScenarioContent = ?DUMMY_SCENARIO_MODULE(?SAMPLE_SCENARIO_A),
+    ok = amoc_scenario:install_scenario(?SAMPLE_SCENARIO_A,ScenarioContent).
 
 destroy_env() ->
-    ok = file:delete(filename:join([?SCENARIOS_DIR_S,
-                               ?SAMPLE_SCENARIO_S])),
-    ok = file:del_dir(?SCENARIOS_DIR_S),
-    code:purge(?SAMPLE_SCENARIO_A).
+    ok.
 
-copy(Src, Dst) ->
-    {ok, _} = file:copy(Src, Dst).
-
-data(Config, Path) ->
-    Dir = proplists:get_value(data_dir, Config),
-    filename:join([Dir, Path]).
 
 -spec given_amoc_dist_mocked_with_test_status(
         amoc_controller:scenario_status()) -> ok.
