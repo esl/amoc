@@ -35,8 +35,6 @@ do(Scenario, Start, End) ->
 do(Scenario, Start, End, Opts) ->
     Nodes = proplists:get_value(nodes, Opts, amoc_nodes()),
     [amoc_slave:set_master_node(Node) || Node <- [node() | Nodes]],
-
-    amoc_controller:start_scenario_checking(Scenario),
     Count = length(Nodes),
     [amoc_controller:do(Node, Scenario, Start, End, Count, Id, Opts) ||
         {Id, Node} <- lists:zip(lists:seq(1, Count), Nodes)].

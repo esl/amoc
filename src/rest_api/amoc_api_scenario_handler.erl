@@ -140,13 +140,11 @@ to_json(Req0, State = #state{resource = Resource}) ->
 -spec from_json(cowboy_req:req(), state()) ->
     {boolean(), cowboy_req:req(), state()}.
 from_json(Req, State = #state{resource = Resource}) ->
-    case get_users_and_batches_from_body(Req) of
-        {ok, Users, Batches, Req2} ->
+    case get_users_from_body(Req) of
+        {ok, Users, Req2} ->
             Scenario = erlang:list_to_atom(Resource),
             ScenarioResult = amoc_dist:do(Scenario, 1, Users),
-            BatchesResult = maybe_add_batches(Scenario, Batches),
-            Reply = jiffy:encode({[{scenario, get_result(ScenarioResult)},
-                                   {add_batches, BatchesResult}]}),
+            Reply = jiffy:encode({[{scenario, get_result(ScenarioResult)}]}),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {true, Req3, State};
         {error, bad_request, Req2} ->
@@ -157,17 +155,15 @@ from_json(Req, State = #state{resource = Resource}) ->
 
 
 %% internal function
--spec get_users_and_batches_from_body(cowboy_req:req()) -> {ok, term(), term(),
-                                                            cowboy_req:req()} |
-        {error, bad_request, cowboy_req:req()}.
-get_users_and_batches_from_body(Req) ->
+-spec get_users_from_body(cowboy_req:req()) ->
+    {ok, term(), cowboy_req:req()} | {error, bad_request, cowboy_req:req()}.
+get_users_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:read_body(Req),
     try
         {JSON} = jiffy:decode(Body),
         Users = proplists:get_value(<<"users">>, JSON),
-        Batches = proplists:get_value(<<"batches">>, JSON),
         true = is_integer(Users),
-        {ok, Users, Batches, Req2}
+        {ok, Users, Req2}
     catch _:_ ->
               {error, bad_request, Req2}
     end.
@@ -183,9 +179,4 @@ get_result(Result) ->
                 error
     end.
 
--spec maybe_add_batches(amoc:scenario(), non_neg_integer()) -> ok | skip |
-                                                               {error, term()}.
-maybe_add_batches(Scenario, Batches) when is_integer(Batches) ->
-    amoc_controller:add_batches(Batches, Scenario);
-maybe_add_batches(_, _) ->
-    skip.
+
