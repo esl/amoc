@@ -57,12 +57,12 @@ given_applications_started() ->
 
 -spec given_prepared_nodes() -> ok.
 given_prepared_nodes() ->
-    meck:new(amoc_slave, [unstick]),
+    meck:new(amoc_cluster, [unstick]),
     ConnectionStatus = #{connected => [test1],
                          failed_to_connect => [test2],
                          connection_lost => [test3, test2]},
-    meck:expect(amoc_slave, get_status, fun() -> ConnectionStatus end).
+    meck:expect(amoc_cluster, get_status, fun() -> ConnectionStatus end).
 
 -spec clean_nodes() -> ok.
 clean_nodes() ->
-    meck:unload(amoc_slave).
+    meck:unload(amoc_cluster).

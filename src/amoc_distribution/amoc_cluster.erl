@@ -2,7 +2,7 @@
 %% Copyright 2015 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
--module(amoc_slave).
+-module(amoc_cluster).
 -behaviour(gen_server).
 -define(SERVER, ?MODULE).
 
