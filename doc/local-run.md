@@ -6,7 +6,7 @@ to start the node run `_build/default/rel/amoc/bin/amoc console`.
 
 Start `my_scenario` spawning 10 amoc users with IDs from range (1,10) inclusive.
 ```erlang
-amoc:do(my_scenario, 1, 10).
+amoc:do(my_scenario, 10, []).
 ```
 
 Add 10 more user sessions.
@@ -16,7 +16,7 @@ amoc:add(10).
 
 Remove 10 users.
 ```erlang
-amoc:remove(10, [{force,true}]).
+amoc:remove(10, true).
 ```
 
 NOTE: We advise on using this mode for the scenario debugging purposes - everything you

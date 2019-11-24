@@ -21,7 +21,7 @@
 %%-------------------------------------------------------------------------
 -export_type([user_id/0, state/0]).
 
--type user_id() :: non_neg_integer().
+-type user_id() :: pos_integer().
 -type state() :: any().
 
 -callback init() -> {ok, state()} | ok | {error, Reason :: term()}.
@@ -50,7 +50,7 @@ does_scenario_exist(Scenario) ->
 
 -spec list_scenario_modules() -> [module()].
 list_scenario_modules() ->
-    [element(1, T) || T <- ets:tab2list(amoc_scenarios)].
+    [S || [S] <- ets:match(amoc_scenarios, {'$1',scenario,'_'})].
 
 %%-------------------------------------------------------------------------
 %% gen_server callbacks

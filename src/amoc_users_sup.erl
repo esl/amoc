@@ -14,27 +14,22 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
--spec init(term()) ->
-    {ok, {SupFlags :: {RestartStrategy :: supervisor:strategy(),
-                       MaxR :: non_neg_integer(), MaxT :: pos_integer()},
-          [ChildSpec :: supervisor:child_spec()]
-         }}.
+-spec init(term()) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
     process_flag(priority, max),
 
-    RestartStrategy = simple_one_for_one,
-    MaxRestarts = 5,
-    MaxSecondsBetweenRestarts = 10,
+    SupFlags = #{strategy => simple_one_for_one},
 
-    SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
-
-    Restart = temporary, %% A temporary child process is never restarted
-    %% sending exit(Child,shutdown) first. If a process doesn't stop within
-    %% the shutdown timeout, than killing it brutally with exit(Child,kill).
-    Shutdown = 2000,
-    Type = worker,
-
-    AChild = {amoc_user, {amoc_user, start_link, []},
-        Restart, Shutdown, Type, [amoc_user]},
+    AChild = #{id => amoc_user,
+               start => {amoc_user, start_link, []},
+               %% A temporary child process is never restarted
+               restart => temporary,
+               %% sending exit(Child,shutdown) first. If a process doesn't stop within
+               %% the shutdown timeout, than killing it brutally with exit(Child,kill).
+               %% don't make this too big, as supervisor:terminate_child/2 is a blocking
+               %% gen_server call, so removing N users will take N*Delay milliseconds.
+               shutdown => 500,
+               type => worker,
+               modules => [amoc_user]},
 
     {ok, {SupFlags, [AChild]}}.

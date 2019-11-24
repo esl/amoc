@@ -9,20 +9,15 @@ Now instead of `amoc` use `amoc_dist` - this will tell amoc to distribute
 and start scenarios on all known nodes (except master).
 
 ```erlang
-amoc_dist:do(my_scenario, 1, 100, Opts).
+amoc_dist:do(my_scenario, 100, Settings).
 ```
 
 Start `my_scenario` spawning 100 amoc users with IDs from the range [1,100] inclusive.
 In this case sessions are going to be distributed across all nodes except master.
-At this moment users are distributed in a round-robin fashion &mdash; user1 goes to slave1,
-user2 goes to slave2, ...., user10 goes to slave10, user11 goes to slave1 etc
-(with the assumption that there are 10 slave nodes configured).
-We are planning to make the strategy configurable.
 
-Opts may contain:
-
-* {nodes, Nodes} - list of nodes on which scenario should be started, by default all available slaves
-* {comment, String} - comment displayed used in the graphite annotations
+`Settings` is an optional proplist with scenario options that can be extracted using amoc_config module,
+ values provided in this list shadows OS and APP environment variables. also this settings will be propagated
+ automatically withing all the nodes in the amoc cluster.
 
 
 ```erlang
@@ -31,15 +26,20 @@ amoc_dist:add(50).
 Add 50 more users to the currently started scenario.
 
 ```erlang
-amoc_dist:remove(50, Opts).
+amoc_dist:remove(50, Force).
 ```
 
-Remove 50 sessions.
+Remove 50 sessions. 
 
-Where Opts may contain:
+Where ``Force`` is the boolean value, that has the next meaning:
 
-* {force, true}  - immediately kill the processes responsible for user connections
-* {force, false} (default) - stop user processes gently - do not start them again
+* ``true``  - kill the user processes using ``supervisor:terminate_child/2`` function
+* ``false`` - just send ``exit(User,shutdown)`` signal to the user process (can be ignored by the user)
+
+All the users are ``temporary`` children of the ``simple_one_for_one`` supervisor with the ``shutdown`` 
+key set to ``2000``.
+
+Also all the user processes trap exit signal.
 
 
 ### Don't stop scenario on exit

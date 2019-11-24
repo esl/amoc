@@ -34,7 +34,6 @@ stop(Pid, false) when is_pid(Pid) ->
     no_return().
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
-    ets:insert(amoc_users, {Id, self()}),
     process_flag(trap_exit, true),
     R = try
             perform_scenario(Scenario, Id, State),
@@ -43,9 +42,7 @@ init(Parent, Scenario, Id, State) ->
             throw:normal_user_stop ->
                 normal;
             E:Reason:Stacktrace ->
-                {E, {abnormal_exit, Reason}, Stacktrace}
-        after
-            ets:delete(amoc_users, Id)
+                {E, Reason, Stacktrace}
         end,
     exit(R).
 
