@@ -9,7 +9,8 @@
 -define(REPEAT_NUM, infinity). % number of scenario repetitions
 
 %% API
--export([start_link/3, stop/0]).
+-export([start_link/3]).
+-export([stop/0,stop/2]).
 -export([init/4]).
 
 -type state() :: term().
@@ -19,13 +20,26 @@
 start_link(Scenario, Id, State) ->
     proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
 
+-spec stop() -> no_return().
 stop() -> throw(normal_user_stop).
+
+-spec stop(pid(), boolean()) -> no_return() | ok | {error, any()}.
+stop(Pid, _Force) when Pid =:= self() ->
+    stop();
+stop(Pid, true) when is_pid(Pid) ->
+    Node = node(Pid),
+    supervisor:terminate_child({amoc_users_sup, Node}, Pid);
+stop(Pid, false) when is_pid(Pid) ->
+    exit(Pid, shutdown), %% do it in the same way as supervisor!!!
+    ok.
+
 
 -spec init(pid(), amoc:scenario(), amoc_scenario:user_id(), state()) ->
     no_return().
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     ets:insert(amoc_users, {Id, self()}),
+    process_flag(trap_exit, true),
     F = fun() -> perform_scenario(Scenario, Id, State) end,
     R = try
             case repeat_num() of
@@ -56,6 +70,8 @@ perform_scenario(Scenario, Id, State) ->
 -spec flush_mailbox() -> ok.
 flush_mailbox() ->
     receive
+        {'EXIT', _, _} ->
+            stop();
         _ ->
             flush_mailbox()
     after 0 ->
