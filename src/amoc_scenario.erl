@@ -136,7 +136,7 @@ write_scenario_to_file(ModuleSource, ScenarioPath) ->
 
 -spec compile_and_load_scenario(string()) -> {ok, module()} | {error, [string()], [string()]}.
 compile_and_load_scenario(ScenarioPath) ->
-    CompilationFlags = compilation_flags(),
+    CompilationFlags = [{outdir, ?EBIN_DIR}, return_errors, report_errors, verbose],
     case compile:file(ScenarioPath, CompilationFlags) of
         {ok, Module} ->
             {ok, Module};
@@ -144,11 +144,3 @@ compile_and_load_scenario(ScenarioPath) ->
             file:delete(ScenarioPath ++ ".erl"),
             {error, Errors, Warnings}
     end.
-
--spec compilation_flags() -> [compile:option()].
-compilation_flags() ->
-    ExtraCompilationFlags = amoc_config_env:get(extra_compilation_flags, []),
-    %% ensure that right outdir option is mentioned at the begging (others are ignored).
-    [{outdir, ?EBIN_DIR}, return_errors, report_errors, verbose | ExtraCompilationFlags].
-
-
