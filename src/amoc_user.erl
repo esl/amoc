@@ -4,10 +4,6 @@
 %%==============================================================================
 -module(amoc_user).
 
-%% defaults
--define(REPEAT_INTERVAL, 60000). % time between user restarts (60s)
--define(REPEAT_NUM, infinity). % number of scenario repetitions
-
 %% API
 -export([start_link/3]).
 -export([stop/0,stop/2]).
@@ -40,12 +36,8 @@ init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     ets:insert(amoc_users, {Id, self()}),
     process_flag(trap_exit, true),
-    F = fun() -> perform_scenario(Scenario, Id, State) end,
     R = try
-            case repeat_num() of
-                infinity -> repeat(F);
-                N -> repeat(F, N)
-            end,
+            perform_scenario(Scenario, Id, State),
             normal
         catch
             throw:normal_user_stop ->
@@ -64,34 +56,4 @@ perform_scenario(Scenario, Id, State) ->
             Scenario:start(Id, State);
         false ->
             Scenario:start(Id)
-    end,
-    flush_mailbox().
-
--spec flush_mailbox() -> ok.
-flush_mailbox() ->
-    receive
-        {'EXIT', _, _} ->
-            stop();
-        _ ->
-            flush_mailbox()
-    after 0 ->
-        ok
     end.
-
-repeat(F) ->
-    F(),
-    timer:sleep(repeat_interval()),
-    repeat(F).
-
-repeat(F, N) when N > 1 ->
-    F(),
-    timer:sleep(repeat_interval()),
-    repeat(F, N - 1);
-repeat(F, 1) ->
-    F().
-
-repeat_interval() ->
-    amoc_config_env:get(repeat_interval, ?REPEAT_INTERVAL).
-
-repeat_num() ->
-    amoc_config_env:get(repeat_num, ?REPEAT_NUM).
