@@ -12,24 +12,31 @@ cd `dirname "$0"`/../
 
 # First run test_docker_image.sh to start two containers with Amoc, then run this test
 
+get_scenarios() {
+    curl -s -S -H "Content-Type: application/json" -H "Accept: application/json" --request GET http://localhost:${1}/scenarios
+}
+
 list_scenarios_by_port () {
     local PORT=$1
-    local RESULT=`curl -s -S -H "Content-Type: application/json" -H "Accept: application/json" --request GET http://localhost:${PORT}/scenarios`
+    local RESULT=`get_scenarios "$PORT"`
     echo "Scenarios on node with port: ${PORT}: ${RESULT}"
 }
 
-ensure_scenario_installed () {
+ensure_scenarios_installed () {
     local PORT=$1
-    local SCENARIO_NAME=$2
-    local RESULT=`curl -s -S -H "Content-Type: application/json" -H "Accept: application/json" --request GET http://localhost:${PORT}/scenarios`
+    shift 1
+    local SCENARIO_NAME
+    local RESULT=`get_scenarios "$PORT"`
     echo "Scenarios on node with port: ${PORT}: ${RESULT}"
-    if echo ${RESULT} | grep -q ${SCENARIO_NAME} ; then
-        echo "Scenario installed"
-        return 0
-    else
-        echo "Scenario not installed"
-        return -1
-    fi
+    for SCENARIO_NAME in "$@"; do
+        if echo ${RESULT} | grep -q ${SCENARIO_NAME} ; then
+            echo "Scenario '${SCENARIO_NAME}' installed"
+            continue
+        else
+            echo "Scenario '${SCENARIO_NAME}' not installed"
+            return -1
+        fi
+    done
 }
 
 PORT1=8081
@@ -59,4 +66,5 @@ SCEN_POST=$( (echo '{"scenario":"dummy_scenario","module_source":'; echo ${SCEN_
      http://localhost:8081/scenarios)
 echo "Response: ${SCEN_POST}"
 
-ensure_scenario_installed ${PORT2} ${SCENARIO_NAME}
+ensure_scenarios_installed ${PORT2} ${SCENARIO_NAME} test1 test2
+ensure_scenarios_installed ${PORT1} ${SCENARIO_NAME} test1 test2
