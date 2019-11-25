@@ -6,7 +6,7 @@ otp_release:
     - 21.3
 env:
     - TEST_MODE=regular
-    - TEST_MODE=docker
+    - TEST_MODE=integration
 
 branches:
     only:
@@ -19,12 +19,8 @@ addons:
 
 install: make compile
 script:
-    - if [ 'regular' = $TEST_MODE ]; then make test; fi
-    - if [ 'regular' = $TEST_MODE ]; then rebar3 dialyzer; fi
-    - if [ 'regular' = $TEST_MODE ]; then rebar3 xref; fi
-    - if [ 'docker' = $TEST_MODE ]; then OTP_VSN=${TRAVIS_OTP_RELEASE}-1 ./integration_test/build_docker_image.sh; fi
-    - if [ 'docker' = $TEST_MODE ]; then ./integration_test/test_docker_image.sh; fi
-    - if [ 'docker' = $TEST_MODE ]; then ./integration_test/test_distribute_scenario.sh; fi
+    - if [ 'regular' = $TEST_MODE ]; then make test dialyzer xref; fi
+    - if [ 'integration' = $TEST_MODE ]; then make integration_test; fi
 
 cache:
     directories:
