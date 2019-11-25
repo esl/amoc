@@ -2,10 +2,11 @@
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("scenario_template.hrl").
 
 -define(SCENARIOS_URL_S, "/scenarios").
--define(SCENARIOS_DIR_S, "scenarios").
--define(SCENARIOS_EBIN_DIR_S, "scenarios_ebin").
+-define(SCENARIOS_DIR_S, filename:join(code:priv_dir(amoc), "scenarios")).
+-define(SCENARIOS_EBIN_DIR_S, filename:join(code:priv_dir(amoc), "scenarios_ebin")).
 -define(SAMPLE_SCENARIO_S, "sample_test.erl").
 -define(SAMPLE_SCENARIO_BEAM_S, "sample_test.beam").
 -define(SAMPLE_SCENARIO_A, sample_test).
@@ -30,8 +31,6 @@ all() ->
 
 
 init_per_testcase(_, Config) ->
-    ok = file:make_dir(?SCENARIOS_EBIN_DIR_S),
-    ok = file:make_dir(?SCENARIOS_DIR_S),
     {ok, _} = application:ensure_all_started(inets),
     {ok, _} = application:ensure_all_started(amoc),
     Config.
@@ -40,13 +39,10 @@ end_per_testcase(post_scenarios_returns_200_and_when_scenario_valid, _Config) ->
     ok = file:delete(filename:join([?SCENARIOS_EBIN_DIR_S,
                                     ?SAMPLE_SCENARIO_BEAM_S])),
     ok = file:delete(filename:join([?SCENARIOS_DIR_S,
-                                    ?SAMPLE_SCENARIO_S])),
-    ok = file:del_dir(?SCENARIOS_EBIN_DIR_S),
-    ok = file:del_dir(?SCENARIOS_DIR_S);
+                                    ?SAMPLE_SCENARIO_S]));
 
 end_per_testcase(_, _Config) ->
-    ok = file:del_dir(?SCENARIOS_EBIN_DIR_S),
-    ok = file:del_dir(?SCENARIOS_DIR_S).
+    ok.
 
 get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
     %% when
@@ -80,18 +76,14 @@ post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Con
     %% then
     ?assertNot(filelib:is_regular(ScenarioFileSource)),
     ?assertEqual(200, CodeHttp),
-    ?assertEqual({[{<<"compile">>, 
-                <<"[{\"scenarios/sample_test.erl\",[{1,erl_parse,"
-                  "[\"syntax error before: \",[]]}]},\n " 
-                  "{\"scenarios/sample_test.erl\",[{1,erl_lint,"
-                  "undefined_module}"
-                  "]}]">>}]},
-                 Body).
+    Error = <<"[{\"", (list_to_binary(ScenarioFileSource))/binary, "\",\n  [{1,erl_parse,[\"",
+              "syntax error before: \",[]]}]},\n {\"", (list_to_binary(ScenarioFileSource))/binary,
+              "\",\n  [{1,erl_lint,undefined_module}]}]">>,
+    ?assertEqual({[{<<"compile">>,Error}]},Body).
 
-post_scenarios_returns_200_and_when_scenario_valid(Config) ->
+post_scenarios_returns_200_and_when_scenario_valid(_Config) ->
     %% given
-    ScenarioFile = data(Config, ?SAMPLE_SCENARIO_S),
-    {ok, ScenarioContent} = file:read_file(ScenarioFile),
+    ScenarioContent = ?DUMMY_SCENARIO_MODULE(?SAMPLE_SCENARIO_A),
     RequestBody = jiffy:encode({[
                               {scenario, ?SAMPLE_SCENARIO_A},
                               {module_source, ScenarioContent}
@@ -104,13 +96,10 @@ post_scenarios_returns_200_and_when_scenario_valid(Config) ->
                                       ?SAMPLE_SCENARIO_BEAM_S]),
     %% then
     ?assertEqual(200, CodeHttp),
+    ?assertEqual({[{<<"compile">>, <<"ok">>}]}, Body),
     ?assert(filelib:is_regular(ScenarioFileSource)),
-    ?assert(filelib:is_regular(ScenarioFileBeam)),
-    ?assertEqual({[{<<"compile">>, <<"ok">>}]},
-                 Body).
+    ?assert(filelib:is_regular(ScenarioFileBeam)).
 
 %% Helpers
 
-data(Config, Path) ->
-    Dir = proplists:get_value(data_dir, Config),
-    filename:join([Dir, Path]).
+

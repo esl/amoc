@@ -7,8 +7,6 @@
 
 -define(SERVER, ?MODULE).
 -define(INTERARRIVAL_DEFAULT, 50).
--define(CHECKING_INTERVAL_DEFAULT, 60*1000).
--define(ADD_BATCH_INTERVAL_DEFAULT, 5*60*1000).
 -define(TABLE, amoc_users).
 
 -record(state, {scenario :: amoc:scenario() | undefined,
@@ -23,7 +21,6 @@
 -type scenario_status() :: error | running | finished | loaded.
 -type user_count() :: non_neg_integer().
 -type interarrival() :: non_neg_integer().
--type user_batch_strategy() :: [{node(), user_count(), interarrival()}].
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -33,8 +30,7 @@
 
 -export_type([scenario_status/0,
               user_count/0,
-              interarrival/0,
-              user_batch_strategy/0]).
+              interarrival/0]).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
@@ -49,9 +45,9 @@
          remove/2,
          remove/3,
          users/0,
-         test_status/1,
-         start_scenario_checking/1,
-         add_batches/2]).
+         test_status/1]).
+
+-export([init_scenario/2]). %% for testing purposes only
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
@@ -114,15 +110,6 @@ users() ->
 test_status(ScenarioName) ->
     gen_server:call(?SERVER, {status, ScenarioName}).
 
--spec start_scenario_checking(amoc:scenario()) -> ok | skip | {error, term()}.
-start_scenario_checking(Scenario) ->
-    gen_server:call(?SERVER, {start_scenario_checking, Scenario}).
-
--spec add_batches(non_neg_integer(), amoc:scenario()) -> ok | skip |
-                                                         {error, term()}.
-add_batches(BatchCount, Scenario) ->
-    gen_server:call(?SERVER, {add_batches, BatchCount, Scenario}).
-
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -142,14 +129,8 @@ handle_call(users, _From, State) ->
     Reply = [{count, ets:info(?TABLE, size)},
              {last, ets:last(?TABLE)}],
     {reply, {ok, Reply}, State};
-handle_call({start_scenario_checking, Scenario}, _From, State) ->
-    Reply = maybe_start_scenario_checking(Scenario),
-    {reply, Reply, State};
-handle_call({add_batches, BatchCount, Scenario}, _From, State) ->
-    Reply = maybe_add_batches(Scenario, BatchCount, 1, 0),
-    {reply, Reply, State};
 handle_call({status, Scenario}, _From, State) ->
-    Res = case does_scenario_exist(Scenario) of
+    Res = case amoc_scenario:does_scenario_exist(Scenario) of
         true -> check_test(Scenario, State#state.scenario);
         false -> error
     end,
@@ -173,14 +154,6 @@ handle_cast(_Msg, State) ->
 -spec handle_info(any(), state()) -> {noreply, state()}.
 handle_info({start_scenario, Scenario, UserIds, ScenarioState}, State) ->
     start_scenario(Scenario, UserIds, ScenarioState),
-    {noreply, State};
-handle_info({check, Scenario, Interval}, State) ->
-    handle_check(Scenario, Interval),
-    {noreply, State};
-handle_info({add_batch, {Scenario, BatchCount, CurrentBatch, PrevUserCount},
-             Interval}, State) ->
-    handle_add_batch(Scenario, BatchCount, CurrentBatch, PrevUserCount,
-                     Interval),
     {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -225,24 +198,24 @@ handle_remove(Count, Opts, _State) when
                       amoc_scenario:user_id(), state()) ->
     {reply, ok | {error, term()}, state()}.
 handle_local_do(Scenario, Start, End, State) ->
-    handle_do(Scenario, lists:seq(Start, End), State).
+    handle_do(Scenario, lists:seq(Start, End), State, []).
 
 -spec handle_dist_do(amoc:scenario(), amoc_scenario:user_id(),
                      amoc_scenario:user_id(), non_neg_integer(),
                      node_id(), amoc:do_opts(), state())->
     {reply, ok | {error, term()}, state()}.
-handle_dist_do(Scenario, Start, End, NodesCount, NodeId, _Opts, State) ->
+handle_dist_do(Scenario, Start, End, NodesCount, NodeId, Opts, State) ->
     UserIds = node_userids(Start, End, NodesCount, NodeId),
     State1 = State#state{nodes = NodesCount,
                          node_id = NodeId},
-    handle_do(Scenario, UserIds, State1).
+    handle_do(Scenario, UserIds, State1, Opts).
 
--spec handle_do(amoc:scenario(), [amoc_scenario:user_id()], state()) ->
+-spec handle_do(amoc:scenario(), [amoc_scenario:user_id()], state(), amoc:do_opts()) ->
     {reply, ok | {error, term()}, state()}.
-handle_do(Scenario, UserIds, State) ->
+handle_do(Scenario, UserIds, State, Opts) ->
     case code:ensure_loaded(Scenario) of
         {module, Scenario} ->
-            case init_scenario(Scenario) of
+            case init_scenario(Scenario, Opts) of
                 {ok, ScenarioState} ->
                     self() ! {start_scenario, Scenario, UserIds, ScenarioState},
                     State1 = State#state{scenario       = Scenario,
@@ -259,38 +232,6 @@ handle_do(Scenario, UserIds, State) ->
             {reply, {error, Error}, State}
     end.
 
--spec handle_check(amoc:scenario(), non_neg_integer()) -> any().
-handle_check(Scenario, Interval) ->
-    case apply_safely(Scenario, continue, []) of
-        {ok, continue} ->
-            schedule_scenario_checking(Scenario, Interval),
-            continue;
-        {ok, {stop, Reason}} ->
-            ?LOG_INFO("scenario should be terminated, reason=~p", [Reason]),
-            try_terminate_scenario(Scenario, Reason);
-        {error, Error, Reason} ->
-            ?LOG_ERROR("continue/1 callback failed, scenario should be"
-                       " terminated, error=~p, reason=~p", [Error, Reason]),
-            try_terminate_scenario(Scenario, {Error, Reason})
-    end.
-
--spec handle_add_batch(amoc:scenario(), non_neg_integer(), non_neg_integer(),
-                       non_neg_integer(), non_neg_integer()) ->
-   any().
-handle_add_batch(Scenario, BatchCount, CurrentBatch, PrevUserCount, Interval) ->
-    case apply_safely(Scenario, next_user_batch,
-                      [CurrentBatch, PrevUserCount]) of
-        {ok, BatchStrategy} ->
-            add_batch(BatchStrategy),
-            TotalUserCount = total_users_in_batch(BatchStrategy),
-            maybe_schedule_add_batch({Scenario, BatchCount - 1, CurrentBatch + 1,
-                                      TotalUserCount}, Interval);
-        {error, Error, Reason} ->
-            ?LOG_ERROR("next_user_batch/2 callback failed, scenario should be"
-                        " terminated, error=~p, reason=~p", [Error, Reason]),
-            try_terminate_scenario(Scenario, {Error, Reason})
-    end.
-
 %% ------------------------------------------------------------------
 %% helpers
 %% ------------------------------------------------------------------
@@ -305,89 +246,21 @@ start_scenario(Scenario, UserIds, State) ->
                [Start, End, Length]),
     start_users(Scenario, UserIds, interarrival(), State).
 
--spec init_scenario(amoc:scenario()) -> any().
-init_scenario(Scenario) ->
-    case erlang:function_exported(Scenario, init, 0) of
-        true ->
-            case Scenario:init() of
-                ok -> {ok, ok};
-                RetValue -> RetValue
+-spec init_scenario(amoc:scenario(), amoc:do_opts()) -> any().
+init_scenario(Scenario, Opts) ->
+    ScenarioConfig = proplists:get_value(config, Opts, []),
+    case amoc_config_scenario:parse_scenario_settings(Scenario, ScenarioConfig) of
+        ok ->
+            case erlang:function_exported(Scenario, init, 0) of
+                true ->
+                    case Scenario:init() of
+                        ok -> {ok, ok};
+                        RetValue -> RetValue
+                    end;
+                false ->
+                    {ok, skip}
             end;
-        false ->
-            {ok, skip}
-    end.
-
--spec maybe_start_scenario_checking(amoc:scenario()) -> ok | skip.
-maybe_start_scenario_checking(Scenario) ->
-    Callbacks = [{continue, 0}, {terminate, 1}],
-    case are_callbacks_exported(Scenario, Callbacks) of
-        true ->
-            schedule_scenario_checking(Scenario, checking_interval()),
-            ?LOG_INFO("checking has been started", []),
-            ok;
-        false ->
-            ?LOG_INFO("checking is not started as callbacks=~p are not"
-                       " exported", [Callbacks]),
-            skip
-    end.
-
--spec maybe_add_batches(amoc:scenario(), non_neg_integer(), non_neg_integer(),
-                        non_neg_integer()) -> ok | skip.
-maybe_add_batches(Scenario, BatchCount, CurrentBatch, PrevUserCount) ->
-    Callbacks = [{next_user_batch, 2}],
-    case are_callbacks_exported(Scenario, Callbacks) of
-        true ->
-            maybe_schedule_add_batch({Scenario, BatchCount, CurrentBatch,
-                                      PrevUserCount}, add_batch_interval()),
-            ok;
-        false ->
-            ?LOG_INFO("add batches is not possible as callbacks=~p are not"
-                       " exported", [Callbacks]),
-            skip
-    end.
-
--spec add_batch(user_batch_strategy()) -> any().
-add_batch(BatchStrategy) ->
-    [amoc_controller:add(Node, UserCount, [{interarrival, Interarrival}])
-     || {Node, UserCount, Interarrival} <- BatchStrategy].
-
--spec are_callbacks_exported(amoc:scenario(), proplists:proplist()) -> boolean().
-are_callbacks_exported(Scenario, Callbacks) ->
-    case code:ensure_loaded(Scenario) of
-        {module, Scenario} ->
-            lists:all(fun({Func, Arity}) ->
-                              erlang:function_exported(Scenario, Func, Arity)
-                      end, Callbacks);
-        Error ->
-            ?LOG_ERROR("scenario module ~p cannot be found, reason: ~p",
-                        [Scenario, Error]),
-            false
-    end.
-
--spec schedule_scenario_checking(amoc:scenario(), non_neg_integer()) ->
-    reference().
-schedule_scenario_checking(Scenario, Interval) ->
-    schedule_periodic_action(Scenario, Interval, check).
-
--spec maybe_schedule_add_batch(term(), non_neg_integer()) -> reference().
-maybe_schedule_add_batch({_, BatchCount, _, _}, _) when BatchCount == 0 ->
-    ok;
-maybe_schedule_add_batch(Data, Interval) ->
-    schedule_periodic_action(Data, Interval, add_batch).
-
--spec schedule_periodic_action(term(), non_neg_integer(), atom()) -> reference().
-schedule_periodic_action(Data, Interval, Action) ->
-    erlang:send_after(Interval, ?SERVER, {Action, Data, Interval}).
-
--spec try_terminate_scenario(amoc:scenario(), term()) -> term().
-try_terminate_scenario(Scenario, Reason) ->
-    case apply_safely(Scenario, terminate, [Reason]) of
-        {ok, _} ->
-            ok;
-        {error, E, R} ->
-            ?LOG_ERROR("terminate/1 callback failed, scenario cannot be"
-                       " terminated, error=~p, reason=~p", [E, R]),
-            application:stop(amoc)
+        Error -> Error
     end.
 
 -spec start_users(amoc:scenario(), [amoc_scenario:user_id()], interarrival(),
@@ -443,23 +316,9 @@ node_userids(Start, End, Nodes, NodeId) when is_integer(Nodes), Nodes > 0,
         end,
     lists:filter(F, lists:seq(Start, End)).
 
--spec total_users_in_batch(user_batch_strategy()) ->
-    non_neg_integer().
-total_users_in_batch(BatchStrategy) ->
-    lists:foldl(fun({_, UserCount, _}, Acc) -> Acc + UserCount end, 0,
-                BatchStrategy).
-
 -spec interarrival() -> interarrival().
 interarrival() ->
-    amoc_config:get(interarrival, ?INTERARRIVAL_DEFAULT).
-
--spec checking_interval() -> integer().
-checking_interval() ->
-    amoc_config:get(scenario_checking_interval, ?CHECKING_INTERVAL_DEFAULT).
-
--spec add_batch_interval() -> integer().
-add_batch_interval() ->
-    amoc_config:get(add_batch_interval, ?ADD_BATCH_INTERVAL_DEFAULT).
+    amoc_config_env:get(interarrival, ?INTERARRIVAL_DEFAULT).
 
 -spec get_test_status() -> scenario_status().
 get_test_status() ->
@@ -468,14 +327,6 @@ get_test_status() ->
         _Children -> running
     end.
 
--spec does_scenario_exist(atom()) -> boolean().
-does_scenario_exist(Scenario) ->
-    {Status, Result} = file:list_dir("scenarios/"),
-    case Status of
-        ok ->
-            lists:member(erlang:atom_to_list(Scenario) ++ ".erl", Result);
-        error -> false
-    end.
 -spec check_test(atom(), amoc:scenario()) -> scenario_status().
 check_test(Scenario, CurrentScenario) ->
     case Scenario =:= CurrentScenario of
@@ -483,12 +334,3 @@ check_test(Scenario, CurrentScenario) ->
         false -> loaded
     end.
 
--spec apply_safely(atom(), atom(), [term()]) -> term().
-apply_safely(M, F, A) ->
-    try erlang:apply(M, F, A) of
-        Result ->
-            {ok, Result}
-    catch
-        Error:Reason ->
-            {error, Error, Reason}
-    end.

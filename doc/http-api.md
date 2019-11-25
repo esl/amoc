@@ -54,10 +54,8 @@ Requests and responses format
 ```json
 {
     "users": NumberOfUsers, //integer
-    "batches": NumOfBatches //integer
 }
 ```
-> `"batches"` key is optional, see [Add users in batches](./README.md#2-add-users-in-batches)
 #### Response
 ```json
 {

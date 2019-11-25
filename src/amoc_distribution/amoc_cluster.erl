@@ -2,7 +2,7 @@
 %% Copyright 2015 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
--module(amoc_slave).
+-module(amoc_cluster).
 -behaviour(gen_server).
 -define(SERVER, ?MODULE).
 
@@ -43,7 +43,7 @@
 %% ------------------------------------------------------------------
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
-    Nodes = amoc_config:get(nodes, []),
+    Nodes = amoc_config_env:get(nodes, []),
     gen_server:start_link({local, ?SERVER}, ?MODULE, Nodes, []).
 
 -spec connect_nodes([node()]) -> ok.

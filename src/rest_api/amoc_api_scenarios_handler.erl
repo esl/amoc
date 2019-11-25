@@ -12,8 +12,6 @@
          to_json/2,
          from_json/2]).
 
--export([install_scenario/2]).
-
 -type state() :: [].
 
 -spec trails() -> trails:trails().
@@ -111,16 +109,7 @@ content_types_accepted(Req, State) ->
 -spec to_json(cowboy_req:req(), state()) ->
     {iolist(), cowboy_req:req(), state()}.
 to_json(Req0, State) ->
-    {ok, Filenames} = file:list_dir("scenarios"),
-    Filenames2 =
-        lists:filter(
-          fun(X) -> string:right(X, 3) == "erl" end,
-          Filenames),
-
-    Scenarios =
-    [ erlang:list_to_binary(Y) ||  X <- Filenames2,
-                                   Y <- string:tokens(X, "."),
-                                   Y =/= "erl" ],
+    Scenarios = amoc_scenario:list_scenario_modules(),
     Reply = jiffy:encode({[{scenarios, Scenarios}]}),
     {Reply, Req0, State}.
 
@@ -142,13 +131,6 @@ from_json(Req, State) ->
             {false, Req3, State}
     end.
 
-%% exported for rpc:multicall
--spec install_scenario(binary(), binary()) -> ok | {error, [string()], [string()]}.
-install_scenario(ModuleName, ModuleSource) ->
-    ScenarioPath = "scenarios/" ++ erlang:binary_to_list(ModuleName),
-    write_scenario_to_file(ModuleSource, ScenarioPath),
-    compile_and_load_scenario(ModuleName, ScenarioPath).
-
 %% internal function
 -spec get_vars_from_body(cowboy_req:req()) ->
     {ok, {binary(), binary()}, cowboy_req:req()} |
@@ -169,7 +151,8 @@ get_vars_from_body(Req) ->
     end.
 
 install_scenario_on_nodes(Nodes, ModuleName, ModuleSource) ->
-    rpc:multicall(Nodes, ?MODULE, install_scenario, [ModuleName, ModuleSource]).
+    Module=binary_to_atom(ModuleName,latin1),
+    rpc:multicall(Nodes, amoc_scenario, install_scenario, [Module, ModuleSource]).
 
 process_multicall_results(Nodes, {Results, BadNodes}) ->
     Errors = [{Node, Error} || {Node, {badrpc, Error}} <- lists:zip(Nodes -- BadNodes, Results)],
@@ -214,39 +197,5 @@ process_reachable_nodes(Nodes, Errors) ->
 node_error_message({Node, Error}) ->
     io_lib:format("Error on node ~s: ~p~n", [Node, Error]).
 
-write_scenario_to_file(ModuleSource, ScenarioPath) ->
-    file:write_file(
-      ScenarioPath ++ ".erl",
-      ModuleSource,
-      [write]
-     ).
 
--spec compile_and_load_scenario(binary(), string()) ->
-    ok | {error, [string()], [string()]}.
-compile_and_load_scenario(BinModuleName, ScenarioPath) ->
-    ok = ensure_ebin_directory(),
-    DefaultCompilationFlags = [return_errors, report_errors, verbose],
-    ExtraCompilationFlags = amoc_config:get(extra_compilation_flags, []),
-    CompilationFlags = [{outdir, "scenarios_ebin"} |
-                        ExtraCompilationFlags ++ DefaultCompilationFlags],
-    case compile:file(ScenarioPath, CompilationFlags) of
-        {ok, _} ->
-            Module = erlang:binary_to_atom(BinModuleName, utf8),
-            code:add_patha("scenarios_ebin"),
-            code:purge(Module),
-            code:load_file(Module),
-            ok;
-        {error, Errors, Warnings} ->
-            file:delete(ScenarioPath ++ ".erl"),
-            {error, Errors, Warnings}
-    end.
-
--spec ensure_ebin_directory() -> atom().
-ensure_ebin_directory() ->
-    Res = file:make_dir("scenarios_ebin"),
-    case Res of
-        ok -> ok;
-        {error, eexist} -> ok;
-        {error, Reason} -> Reason
-    end.
 

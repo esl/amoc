@@ -27,19 +27,21 @@ start_link() ->
 %% Supervisor callbacks
 %% ===================================================================
 -spec init(term()) ->
-        {ok, {SupFlags :: {RestartStrategy :: supervisor:strategy(),
-                           MaxR :: non_neg_integer(), MaxT :: pos_integer()},
-              [ChildSpec :: supervisor:child_spec()]
-         }}.
+    {ok, {SupFlags :: {RestartStrategy :: supervisor:strategy(),
+                       MaxR :: non_neg_integer(), MaxT :: pos_integer()},
+          [ChildSpec :: supervisor:child_spec()]
+    }}.
 init([]) ->
     amoc_users = start_users_ets(),
+    amoc_config = start_config_ets(),
     {ok, {{one_for_one, 5, 10},
-        [
-            ?CHILD(amoc_users_sup, supervisor),
-            ?CHILD(amoc_controller, worker),
-            ?CHILD(amoc_slave, worker),
-            ?CHILD(amoc_throttle_controller, worker)
-        ]}}.
+          [
+              ?CHILD(amoc_users_sup, supervisor),
+              ?CHILD(amoc_controller, worker),
+              ?CHILD(amoc_cluster, worker),
+              ?CHILD(amoc_scenario, worker),
+              ?CHILD(amoc_throttle_controller, worker)
+          ]}}.
 
 -spec start_users_ets() -> ets:tid() | atom().
 start_users_ets() ->
@@ -48,3 +50,10 @@ start_users_ets() ->
                          public,
                          {write_concurrency, true},
                          {read_concurrency, true}]).
+
+-spec start_config_ets() -> ets:tid() | atom().
+start_config_ets() ->
+    ets:new(amoc_config, [named_table,
+                          public,
+                          {write_concurrency, true},
+                          {read_concurrency, true}]).

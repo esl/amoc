@@ -35,7 +35,7 @@ ensure_scenario_installed () {
 PORT1=8081
 PORT2=8082
 
-SCENARIO_NAME="sample_test"
+SCENARIO_NAME="dummy_scenario"
 
 list_scenarios_by_port ${PORT1}
 list_scenarios_by_port ${PORT2}
@@ -46,11 +46,11 @@ list_scenarios_by_port ${PORT2}
 # -R means "raw input"
 # -s means "include linebreaks"
 # . means "output the root of the JSON document"
-SCEN_SOURCE=`cat test/amoc_api_scenarios_handler_SUITE_data/sample_test.erl | jq -aRs .`
+SCEN_SOURCE=`cat integration_test/dummy_scenario.erl | jq -aRs .`
 
-echo "Installing scenario: 'sample_test.erl' on node amoc-1 (port ${PORT1})"
+echo "Installing scenario: 'dummy_scenario.erl' on node amoc-1 (port ${PORT1})"
 
-SCEN_POST=$( (echo '{"scenario":"sample_test","module_source":'; echo ${SCEN_SOURCE} ; echo '}' ) | curl \
+SCEN_POST=$( (echo '{"scenario":"dummy_scenario","module_source":'; echo ${SCEN_SOURCE} ; echo '}' ) | curl \
      -s -S \
      -H "Content-Type: application/json" \
      -H "Accept: application/json" \

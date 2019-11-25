@@ -57,7 +57,7 @@ content_types_provided(Req, State) ->
 -spec to_json(cowboy_req:req(), state()) ->
                      {iolist(), cowboy_req:req(), state()}.
 to_json(Req, State) ->
-    Status = amoc_slave:get_status(),
+    Status = amoc_cluster:get_status(),
     Connected = maps:get(connected, Status, []),
     FailedToConnect = maps:get(failed_to_connect, Status, []),
     ConnectionLost = maps:get(connection_lost, Status, []),

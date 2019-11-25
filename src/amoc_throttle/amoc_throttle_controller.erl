@@ -16,7 +16,7 @@
          handle_info/2]).
 
 -define(SERVER, ?MODULE).
--define(MASTER_SERVER, {?SERVER, amoc_slave:get_master_node()}).
+-define(MASTER_SERVER, {?SERVER, amoc_cluster:get_master_node()}).
 
 -define(RATE(Name), {strict, [throttle, Name, rate]}).
 -define(EXEC_RATE(Name), {strict, [throttle, Name, exec_rate]}).
@@ -53,7 +53,7 @@ start_link() ->
     {ok, throttle_processes_already_started} |
     {error, any()}).
 ensure_throttle_processes_started(Name, Interval, Rate, NoOfProcesses) ->
-    case {amoc_slave:get_master_node(), node()} of
+    case {amoc_cluster:get_master_node(), node()} of
         {N, N} -> ok;
         _ -> [amoc_metrics:init(counters, E) || E <- [?EXEC_RATE(Name), ?REQ_RATE(Name)]]
     end,
@@ -195,7 +195,7 @@ handle_info({change_plan, Name}, State) ->
 %%%===================================================================
 
 maybe_update_metric(Name, Type) ->
-    case {amoc_slave:get_master_node(), node()} of
+    case {amoc_cluster:get_master_node(), node()} of
         {N, N} -> ok;
         _ -> update_metric(Name, Type)
     end.

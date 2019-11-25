@@ -34,9 +34,7 @@ do(Scenario, Start, End) ->
          amoc_scenario:user_id(), amoc:do_opts()) -> [any()].
 do(Scenario, Start, End, Opts) ->
     Nodes = proplists:get_value(nodes, Opts, amoc_nodes()),
-    [amoc_slave:set_master_node(Node) || Node <- [node() | Nodes]],
-
-    amoc_controller:start_scenario_checking(Scenario),
+    [amoc_cluster:set_master_node(Node) || Node <- [node() | Nodes]],
     Count = length(Nodes),
     [amoc_controller:do(Node, Scenario, Start, End, Count, Id, Opts) ||
         {Id, Node} <- lists:zip(lists:seq(1, Count), Nodes)].
@@ -60,7 +58,7 @@ remove(Count, Opts, Nodes) ->
 
 -spec amoc_nodes() -> [node()].
 amoc_nodes() ->
-    Status = amoc_slave:get_status(),
+    Status = amoc_cluster:get_status(),
     maps:get(connected, Status, []).
 
 %% ------------------------------------------------------------------
