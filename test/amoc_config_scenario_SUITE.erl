@@ -62,12 +62,12 @@ init_scenario(_) ->
 
 get_module_attributes(_) ->
     Result = amoc_config_scenario:get_module_attributes(?MODULE),
-    ExpectedResult = [{var1,"var1"},
-                      {var2,"var2",def2},
-                      {var3,"var3",3,positive_integer},
-                      {var4,"var4",def4,[def4,another_atom]},
-                      {var5,"var5",def5,test_verification_function},
-                      {var6,"var6",def6, fun ?MODULE:test_verification_function/1}],
+    ExpectedResult = [{var1, "var1"},
+                      {var2, "var2", def2},
+                      {var3, "var3", 3, positive_integer},
+                      {var4, "var4", def4, [def4, another_atom]},
+                      {var5, "var5", def5, test_verification_function},
+                      {var6, "var6", def6, fun ?MODULE:test_verification_function/1}],
     ?assertEqual(lists:sort(ExpectedResult), lists:sort(Result)).
 
 process_scenario_config_uses_default_values(_) ->
@@ -80,12 +80,12 @@ process_scenario_config_shadows_default_values(_) ->
     ScenarioAttributes = correct_scenario_attributes(),
     given_scenario_parameters_set(ScenarioAttributes),
     AnotherScenarioAttributes = another_correct_scenario_attributes(),
-    AdditionalAttribute = {additional_param,"", value, none},
+    AdditionalAttribute = {additional_param, "", value, none},
     set_env(additional_param, another_value),
     Result = process_scenario_attributes(
         [AdditionalAttribute | AnotherScenarioAttributes],
         [{additional_param, yet_another_value}]),
-    assert_settings(Result, [{additional_param,"", yet_another_value, none} | ScenarioAttributes]).
+    assert_settings(Result, [{additional_param, "", yet_another_value, none} | ScenarioAttributes]).
 
 process_scenario_config_returns_error_for_invalid_values(_) ->
     IncorrectScenarioAttributes = incorrect_scenario_attributes(),

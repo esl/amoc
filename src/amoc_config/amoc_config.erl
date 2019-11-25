@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2016 Erlang Solutions Ltd.
+%% Copyright 2019 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(amoc_config).
@@ -22,15 +22,15 @@ get(Name) ->
 
 -spec get(name(), value()) -> value().
 get(Name, Default) when is_atom(Name) ->
-    case ets:lookup(amoc_config,Name) of
+    case ets:lookup(amoc_config, Name) of
         [] ->
             ?LOG_ERROR("no scenario setting ~p", [Name]),
             Default;
-        [{Name,undefined}]->
+        [{Name, undefined}] ->
             Default;
-        [{Name,Value}] ->
+        [{Name, Value}] ->
             Value;
-        InvalidLookupRet->
-            ?LOG_ERROR("invalid lookup return value ~p ~p", [Name,InvalidLookupRet]),
+        InvalidLookupRet ->
+            ?LOG_ERROR("invalid lookup return value ~p ~p", [Name, InvalidLookupRet]),
             throw({invalid_lookup_ret_value, InvalidLookupRet})
     end.

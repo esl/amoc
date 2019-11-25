@@ -84,7 +84,6 @@ post_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Con
 post_scenarios_returns_200_and_when_scenario_valid(_Config) ->
     %% given
     ScenarioContent = ?DUMMY_SCENARIO_MODULE(?SAMPLE_SCENARIO_A),
-    io:format("~n!!!!!!!!!!!!!!!!!!! ~p ~n",[ScenarioContent]),
     RequestBody = jiffy:encode({[
                               {scenario, ?SAMPLE_SCENARIO_A},
                               {module_source, ScenarioContent}
