@@ -6,7 +6,7 @@
 
 %% API
 -export([start_link/3]).
--export([stop/0,stop/2]).
+-export([stop/0, stop/2]).
 -export([init/4]).
 
 -type state() :: term().
