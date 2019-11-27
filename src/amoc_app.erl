@@ -18,8 +18,6 @@ start(_StartType, _StartArgs) ->
     Ret = amoc_sup:start_link(),
     amoc_api:start_listener(),
     amoc_metrics:start(),
-    AdditionalCodePaths = amoc_config_env:get(extra_code_paths, []),
-    code:add_pathsz(AdditionalCodePaths),
     Ret.
 
 -spec stop(term()) -> ok.

@@ -28,7 +28,9 @@ init([]) ->
 
     SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
 
-    Restart = temporary,
+    Restart = temporary, %% A temporary child process is never restarted
+    %% sending exit(Child,shutdown) first. If a process doesn't stop within
+    %% the shutdown timeout, than killing it brutally with exit(Child,kill).
     Shutdown = 2000,
     Type = worker,
 

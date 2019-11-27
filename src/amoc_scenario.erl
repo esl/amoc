@@ -57,8 +57,8 @@ list_scenario_modules() ->
 %%-------------------------------------------------------------------------
 -spec init([]) -> {ok, state()}.
 init([]) ->
-    code:add_pathsz(?EBIN_DIR),
     start_scenarios_ets(),
+    ok = add_code_paths(),
     find_scenario_modules(),
     {ok, ok}.
 
@@ -81,6 +81,16 @@ start_scenarios_ets() ->
     ets:new(amoc_scenarios, [named_table,
                              protected,
                              {read_concurrency, true}]).
+
+-spec add_code_paths() -> ok | {error, {bad_directories, [file:filename()]}}.
+add_code_paths() ->
+    true = code:add_pathz(?EBIN_DIR),
+    AdditionalCodePaths = amoc_config_env:get(extra_code_paths, []),
+    Res = [{code:add_pathz(Path), Path} || Path <- [?EBIN_DIR | AdditionalCodePaths]],
+    case [Dir || {{error, bad_directory}, Dir} <- Res] of
+        [] -> ok;
+        BadDirectories -> {error, {bad_directories, BadDirectories}}
+    end.
 
 -spec find_scenario_modules() -> [module()].
 find_scenario_modules() ->
@@ -108,7 +118,7 @@ add_scenario(Module, ModuleSource) ->
     case erlang:module_loaded(Module) of
         true ->
             case ets:lookup(amoc_scenarios, Module) of
-                [{Module, {uploaded, ModuleSource}}] -> ok;
+                [{Module, _, {uploaded, ModuleSource}}] -> ok;
                 _ -> {error, ["module with such name already exists"], []}
             end;
         false ->
@@ -136,19 +146,12 @@ write_scenario_to_file(ModuleSource, ScenarioPath) ->
 
 -spec compile_and_load_scenario(string()) -> {ok, module()} | {error, [string()], [string()]}.
 compile_and_load_scenario(ScenarioPath) ->
-    CompilationFlags = compilation_flags(),
+    CompilationFlags = [{outdir, ?EBIN_DIR}, return_errors, report_errors, verbose],
     case compile:file(ScenarioPath, CompilationFlags) of
         {ok, Module} ->
+            {module, Module} = code:load_file(Module),
             {ok, Module};
         {error, Errors, Warnings} ->
             file:delete(ScenarioPath ++ ".erl"),
             {error, Errors, Warnings}
     end.
-
--spec compilation_flags() -> [compile:option()].
-compilation_flags() ->
-    ExtraCompilationFlags = amoc_config_env:get(extra_compilation_flags, []),
-    %% ensure that right outdir option is mentioned at the begging (others are ignored).
-    [{outdir, ?EBIN_DIR}, return_errors, report_errors, verbose | ExtraCompilationFlags].
-
-
