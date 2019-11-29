@@ -145,9 +145,9 @@ to_json(Req0, State = #state{resource = Resource}) ->
     {boolean(), cowboy_req:req(), state()}.
 from_json(Req, State = #state{resource = Resource}) ->
     case get_users_from_body(Req) of
-        {ok, Users, Req2} ->
+        {ok, Users, Settings, Req2} ->
             Scenario = erlang:list_to_atom(Resource),
-            ScenarioResult = amoc_dist:do(Scenario, Users, []),
+            ScenarioResult = amoc_dist:do(Scenario, Users, Settings),
             Reply = jiffy:encode({[{scenario, get_result(ScenarioResult)}]}),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {true, Req3, State};
@@ -160,17 +160,29 @@ from_json(Req, State = #state{resource = Resource}) ->
 
 %% internal function
 -spec get_users_from_body(cowboy_req:req()) ->
-    {ok, term(), cowboy_req:req()} | {error, bad_request, cowboy_req:req()}.
+    {ok, term(), amoc_config_scenario:settings(), cowboy_req:req()} |
+    {error, bad_request, cowboy_req:req()}.
 get_users_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:read_body(Req),
     try
         {JSON} = jiffy:decode(Body),
         Users = proplists:get_value(<<"users">>, JSON),
+        RawSettings = proplists:get_value(<<"settings">>, JSON, {[]}),
         true = is_integer(Users),
-        {ok, Users, Req2}
+        {ok, Settings} = process_settings(RawSettings),
+        {ok, Users, Settings, Req2}
     catch _:_ ->
               {error, bad_request, Req2}
     end.
+
+
+process_settings({RawSettings}) ->
+    Ret = [begin
+               {ok, Key} = amoc_config_env:parse_value(K),
+               {ok, Value} = amoc_config_env:parse_value(V),
+               {Key, Value}
+           end || {K, V} <- RawSettings],
+    {ok, Ret}.
 
 -spec get_result({ok, term()} | {error, term()}) -> started | error.
 get_result({error,Error}) ->
