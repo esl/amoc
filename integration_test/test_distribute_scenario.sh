@@ -66,5 +66,4 @@ SCEN_POST=$( (echo '{"scenario":"dummy_scenario","module_source":'; echo ${SCEN_
      http://localhost:8081/scenarios)
 echo "Response: ${SCEN_POST}"
 
-ensure_scenarios_installed ${PORT2} ${SCENARIO_NAME} test1 test2
-ensure_scenarios_installed ${PORT1} ${SCENARIO_NAME} test1 test2
+ensure_scenarios_installed ${PORT2} ${SCENARIO_NAME}

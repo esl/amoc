@@ -31,7 +31,7 @@ docker run --rm -t -d --name amoc-2 -h amoc-2 \
     -v "${PWD}/tmp:/test:ro" \
     -e AMOC_NODES=${AMOC_NODES} \
     -e AMOC_EXTRA_CODE_PATHS='["/test/test1", "/test/test2"]' \
-        --health-cmd="/home/amoc/amoc/bin/amoc status" \
+    --health-cmd="/home/amoc/amoc/bin/amoc status" \
     -p 8082:4000 \
     amoc:latest
 
@@ -40,5 +40,9 @@ docker run --rm -t -d --name amoc-2 -h amoc-2 \
 
 docker exec -it amoc-1 ${PATH_TO_EXEC} eval "nodes()" | grep amoc-2
 docker exec -it amoc-2 ${PATH_TO_EXEC} eval "nodes()" | grep amoc-1
+
+
+docker exec -it amoc-1 ${PATH_TO_EXEC} eval "amoc_scenario:does_scenario_exist(test1)" | grep true
+docker exec -it amoc-1 ${PATH_TO_EXEC} eval "amoc_scenario:does_scenario_exist(test2)" | grep true
 
 
