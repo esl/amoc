@@ -24,7 +24,8 @@
     {var5, "description5", def5},
     %% this is the same as {var6, "description6", undefined, none}
     {var6, "description6"},
-    {nodes,"this variable is set for docker container via AMOC_NODES env"}]).
+    {nodes,"this variable is set for docker container via AMOC_NODES env"},
+    {test, "this one to be set via REST API"}]).
 
 %% parameter verification method
 -export([test_verification_function/1]).
@@ -57,6 +58,7 @@ init() ->
     %% -required_variable(...) it is reported as undefined variable.
     def_value = amoc_config:get(undeclared_variable, def_value),
     undefined = amoc_config:get(undeclared_variable),
+    <<"test_value">> = amoc_config:get(test),
     ok.
 
 -spec start(amoc_scenario:user_id()) -> any().

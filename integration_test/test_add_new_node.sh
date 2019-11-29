@@ -21,6 +21,8 @@ docker run --rm -t -d --name amoc-3 -h amoc-3 \
 
 ./wait_for_healthcheck.sh amoc-3
 docker exec -it amoc-3 ${PATH_TO_EXEC} eval "amoc_controller:get_status()" | grep dummy_scenario | grep running
+docker exec -it amoc-3 ${PATH_TO_EXEC} eval "amoc_config:get(test)" | grep '<<"test_value">>'
+
 
 
 
