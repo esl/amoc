@@ -10,7 +10,7 @@ run_scenario() {
     curl -X PATCH --header 'Content-Type: application/json' --header 'Accept: application/json' -d "$json_body" "$1/scenarios/$2"
 }
 
-result="$(run_scenario "http://localhost:8081" dummy_scenario 3)"
+result="$(run_scenario "http://localhost:8081" dummy_scenario 10)"
 
 if echo ${result} | grep -q started ; then
     echo "Scenario executed"

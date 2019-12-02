@@ -15,9 +15,11 @@
          connect_nodes/1,
          ping/1,
          set_master_node/1,
-         get_master_node/0,
+         on_new_connection/1,
          get_status/0,
-         on_new_connection/1]).
+         all_nodes/0,
+         slave_nodes/0,
+         master_node/0]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -64,10 +66,6 @@ ping(Node) ->
         pang
     end.
 
--spec get_master_node() -> node() | undefined.
-get_master_node() ->
-    gen_server:call(?SERVER, get_master_node).
-
 -spec set_master_node(node()) -> ok | {error, any()}.
 set_master_node(Node) when Node =:= node() ->
     gen_server:call(?SERVER, {set_master_node, node()});
@@ -89,6 +87,26 @@ on_new_connection(Action) when is_function(Action, 1) ->
     %% the list of all the currently connected nodes.
     gen_server:call(?SERVER, {on_new_connection, Action}).
 
+
+-spec all_nodes() -> [node()].
+all_nodes() ->
+    Status = get_status(),
+    [node() | maps:get(connected, Status, [])].
+
+-spec slave_nodes() -> [node()].
+slave_nodes() ->
+    case master_node() of
+        undefined -> [];
+        Master ->
+            Status = gen_server:call({?SERVER, Master}, get_status),
+            maps:get(slave, Status, [])
+    end.
+
+-spec master_node() -> node().
+master_node() ->
+    Status = get_status(),
+    maps:get(master, Status, undefined).
+
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -99,8 +117,6 @@ init(Nodes) ->
     {ok, NewState}.
 
 -spec handle_call(any(), any(), state()) -> {reply, any(), state()}.
-handle_call(get_master_node, _From, #state{master = Node} = State) ->
-    {reply, Node, State};
 handle_call({set_master_node, Node}, _From, #state{master    = MasterNode,
                                                    connected = Connected} = State) ->
     {RetValue, NewState} = case MasterNode of

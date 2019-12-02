@@ -8,8 +8,7 @@
          add/1,
          add/2,
          remove/2,
-         remove/3,
-         amoc_nodes/0]).
+         remove/3]).
 
 -compile({no_auto_import, [ceil/1]}).
 %% ------------------------------------------------------------------
@@ -26,33 +25,25 @@ do(Scenario, Count, Settings) ->
 
 -spec add(pos_integer()) -> {ok, any()}| {error, any()}.
 add(Count) ->
-    add(Count, slave_nodes()).
+    add(Count, amoc_cluster:slave_nodes()).
 
 -spec add(pos_integer(), [node()]) -> {ok, any()} | {error, any()}.
 add(Count, Nodes) when is_integer(Count), Count > 0 ->
-    SlaveNodes = slave_nodes(),
-    case Nodes -- SlaveNodes of
-        [] ->
-            add_users(Count, Nodes);
-        BadNodes -> {error, {bad_nodes, BadNodes}}
+    case check_nodes(Nodes) of
+        ok -> add_users(Count, Nodes);
+        Error -> Error
     end.
 
 -spec remove(pos_integer(), boolean()) -> {ok, any()} | {error, any()}.
 remove(Count, ForceRemove) ->
-    remove(Count, ForceRemove, slave_nodes()).
+    remove(Count, ForceRemove, amoc_cluster:slave_nodes()).
 
 -spec remove(pos_integer(), boolean(), [node()]) -> {ok, any()} | {error, any()}.
 remove(Count, ForceRemove, Nodes) when is_integer(Count), Count > 0 ->
-    SlaveNodes = slave_nodes(),
-    case Nodes -- SlaveNodes of
-        [] -> remove_users(Count, ForceRemove, Nodes);
-        BadNodes -> {error, {bad_nodes, BadNodes}}
+    case check_nodes(Nodes) of
+        ok -> remove_users(Count, ForceRemove, Nodes);
+        Error -> Error
     end.
-
--spec amoc_nodes() -> [node()].
-amoc_nodes() ->
-    Status = amoc_cluster:get_status(),
-    maps:get(connected, Status, []).
 
 %% ------------------------------------------------------------------
 %% Local functions
@@ -69,10 +60,23 @@ get_param(Key) ->
 set_param(Key, Value) ->
     persistent_term:put({amoc_dist, Key}, Value).
 
--spec slave_nodes() -> [node()].
-slave_nodes() ->
-    Status = amoc_cluster:get_status(),
-    maps:get(slave, Status, []).
+-spec check_nodes([node()]) -> ok | {error, any()}.
+check_nodes(Nodes) ->
+    SlaveNodes = amoc_cluster:slave_nodes(),
+    MasterNode = amoc_cluster:master_node(),
+    case {Nodes -- SlaveNodes, Nodes, node()} of
+        {[], [_ | _], MasterNode} ->
+            %% running on the master node with the proper non-empty Nodes list
+            ok;
+        {[], [], MasterNode} ->
+            %% Nodes list is empty
+            {error, empty_nodes_list};
+        {BadNodes, _, MasterNode} ->
+            %% non-slave nodes in the list
+            {error, {bad_nodes, BadNodes}};
+        {_, _, _} ->
+            {error, not_a_master}
+    end.
 
 -spec prepare_cluster(amoc:scenario(), amoc_config_scenario:config()) -> {ok, any()} | {error, any()}.
 prepare_cluster(Scenario, Settings) ->

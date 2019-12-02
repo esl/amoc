@@ -193,8 +193,8 @@ get_result({ok,_}) ->
 
 -spec test_status(amoc:scenario()) -> scenario_status().
 test_status(ScenarioName) ->
-    Hosts = [erlang:node() | amoc_dist:amoc_nodes()],
-    Status = [get_node_test_status(ScenarioName, Host) || Host <- Hosts],
+    Nodes = amoc_cluster:all_nodes(),
+    Status = [get_node_test_status(ScenarioName, Node) || Node <- Nodes],
     pick_status(Status, [error, loaded, running, finished]).
 
 
