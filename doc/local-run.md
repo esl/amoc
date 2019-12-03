@@ -19,4 +19,14 @@ Remove 10 users.
 amoc:remove(10, true).
 ```
 
-NOTE: the exact range of the users can be added using ``amoc_controller:add_users/2`` interface 
+#### Many independent Amoc nodes
+
+Sometimes a need arises to run several Amoc nodes independently from each other.
+In this case we would like to be able to run different ranges of user ids on every node.
+To do so, the following trick could be applied:
+
+1. `amoc:start(my_scenario,0,[]).`
+2. `amoc_controller:add_users(StartId, StopId).`
+
+NODE: in case of independent Amoc nodes, it's also possible to run different scenarios on different nodes.
+
