@@ -41,11 +41,15 @@ ensure_scenarios_installed () {
 
 PORT1=8081
 PORT2=8082
+PORT3=8083
+
 
 SCENARIO_NAME="dummy_scenario"
 
 list_scenarios_by_port ${PORT1}
 list_scenarios_by_port ${PORT2}
+list_scenarios_by_port ${PORT3}
+
 
 # Use jq to convert string to safe JSON string
 # see: https://stackoverflow.com/questions/10053678/escaping-characters-in-bash-for-json/13466143
@@ -66,5 +70,6 @@ SCEN_POST=$( (echo '{"scenario":"dummy_scenario","module_source":'; echo ${SCEN_
      http://localhost:8081/scenarios)
 echo "Response: ${SCEN_POST}"
 
-ensure_scenarios_installed ${PORT2} ${SCENARIO_NAME} test1 test2
-ensure_scenarios_installed ${PORT1} ${SCENARIO_NAME} test1 test2
+ensure_scenarios_installed ${PORT2} ${SCENARIO_NAME}
+ensure_scenarios_installed ${PORT3} ${SCENARIO_NAME}
+

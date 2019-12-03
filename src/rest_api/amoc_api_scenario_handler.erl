@@ -13,11 +13,15 @@
          to_json/2,
          from_json/2]).
 
+-export([test_status/1]).
+
 -include_lib("kernel/include/logger.hrl").
 
 -record(state, {resource, users}).
 
 -type state() :: #state{}.
+
+-type scenario_status() :: error | running | finished | loaded.
 
 -spec trails() -> trails:trails().
 trails() ->
@@ -132,7 +136,7 @@ resource_exists(Req, State = #state{resource = Resource}) ->
 -spec to_json(cowboy_req:req(), state()) ->
     {iolist(), cowboy_req:req(), state()}.
 to_json(Req0, State = #state{resource = Resource}) ->
-    Status = amoc_dist:test_status(erlang:list_to_atom(Resource)),
+    Status = ?MODULE:test_status(erlang:list_to_atom(Resource)),
     Reply = jiffy:encode({[{scenario_status, Status}]}),
     {Reply, Req0, State}.
 
@@ -141,9 +145,9 @@ to_json(Req0, State = #state{resource = Resource}) ->
     {boolean(), cowboy_req:req(), state()}.
 from_json(Req, State = #state{resource = Resource}) ->
     case get_users_from_body(Req) of
-        {ok, Users, Req2} ->
+        {ok, Users, Settings, Req2} ->
             Scenario = erlang:list_to_atom(Resource),
-            ScenarioResult = amoc_dist:do(Scenario, 1, Users),
+            ScenarioResult = amoc_dist:do(Scenario, Users, Settings),
             Reply = jiffy:encode({[{scenario, get_result(ScenarioResult)}]}),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {true, Req3, State};
@@ -156,27 +160,66 @@ from_json(Req, State = #state{resource = Resource}) ->
 
 %% internal function
 -spec get_users_from_body(cowboy_req:req()) ->
-    {ok, term(), cowboy_req:req()} | {error, bad_request, cowboy_req:req()}.
+    {ok, term(), amoc_config_scenario:settings(), cowboy_req:req()} |
+    {error, bad_request, cowboy_req:req()}.
 get_users_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:read_body(Req),
     try
         {JSON} = jiffy:decode(Body),
         Users = proplists:get_value(<<"users">>, JSON),
+        RawSettings = proplists:get_value(<<"settings">>, JSON, {[]}),
         true = is_integer(Users),
-        {ok, Users, Req2}
+        {ok, Settings} = process_settings(RawSettings),
+        {ok, Users, Settings, Req2}
     catch _:_ ->
               {error, bad_request, Req2}
     end.
 
--spec get_result([ok | {error, term()}]) -> started | error.
-get_result(Result) ->
-    Res = lists:all(fun(X) -> X == ok end, Result),
-    case Res of
-        true -> started;
-        false ->
-                Errors = lists:filter(fun(X) -> X =/= ok end, Result),
-                ?LOG_ERROR("Run scenario error: ~p", [Errors]),
-                error
+
+process_settings({RawSettings}) ->
+    Ret = [begin
+               {ok, Key} = amoc_config_env:parse_value(K),
+               {ok, Value} = amoc_config_env:parse_value(V),
+               {Key, Value}
+           end || {K, V} <- RawSettings],
+    {ok, Ret}.
+
+-spec get_result({ok, term()} | {error, term()}) -> started | error.
+get_result({error,Error}) ->
+    ?LOG_ERROR("Run scenario error: ~p", [Error]),
+    error;
+get_result({ok,_}) ->
+    started.
+
+-spec test_status(amoc:scenario()) -> scenario_status().
+test_status(ScenarioName) ->
+    Nodes = amoc_cluster:all_nodes(),
+    Status = [get_node_test_status(ScenarioName, Node) || Node <- Nodes],
+    pick_status(Status, [error, loaded, running, finished]).
+
+
+-spec pick_status([scenario_status()], [scenario_status()]) -> scenario_status().
+pick_status(StatusList, [H | T]) ->
+    case lists:member(H, StatusList) of
+        true -> H;
+        false -> pick_status(StatusList, T)
     end.
 
-
+-spec get_node_test_status(amoc:scenario(), atom()) -> disabled | scenario_status().
+get_node_test_status(ScenarioName, Node) ->
+    try
+        case rpc:call(Node, amoc_controller, get_status, []) of
+            {idle, Scenarios} ->
+                case lists:member(ScenarioName, Scenarios) of
+                    true -> loaded;
+                    false -> error
+                end;
+            {running, ScenarioName, _, _} -> running;
+            {finished, ScenarioName} -> finished;
+            {error, _} -> error;
+            disabled -> disabled;
+            {badrpc, _} -> error
+        end
+    catch _:_ ->
+        error
+    end.

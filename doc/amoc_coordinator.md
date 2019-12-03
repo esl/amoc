@@ -127,7 +127,7 @@ To run it:
 $ make rel
 $ _build/default/rel/amoc/bin/amoc console
 
-1> amoc:do(example, 1, 5).
+1> amoc:do(example, 5, []).
 ```
 
 Filtered, formated and explained output:

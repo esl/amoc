@@ -119,7 +119,7 @@ to_json(Req0, State) ->
 from_json(Req, State) ->
     case get_vars_from_body(Req) of
         {ok, {ModuleName, ModuleSource}, Req2} ->
-            Nodes = [node() | amoc_dist:amoc_nodes()],
+            Nodes = amoc_cluster:all_nodes(),
             ResultBody =  erlang:list_to_bitstring(
                             process_multicall_results(Nodes, install_scenario_on_nodes(Nodes, ModuleName, ModuleSource))),
             Reply = jiffy:encode({[{compile, ResultBody}]}),

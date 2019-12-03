@@ -22,19 +22,14 @@ stop() -> throw(normal_user_stop).
 -spec stop(pid(), boolean()) -> no_return() | ok | {error, any()}.
 stop(Pid, _Force) when Pid =:= self() ->
     stop();
-stop(Pid, true) when is_pid(Pid) ->
-    Node = node(Pid),
-    supervisor:terminate_child({amoc_users_sup, Node}, Pid);
-stop(Pid, false) when is_pid(Pid) ->
-    exit(Pid, shutdown), %% do it in the same way as supervisor!!!
-    ok.
+stop(Pid, Force) when is_pid(Pid) ->
+    amoc_users_sup:stop_child(Pid, Force).
 
 
 -spec init(pid(), amoc:scenario(), amoc_scenario:user_id(), state()) ->
     no_return().
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
-    ets:insert(amoc_users, {Id, self()}),
     process_flag(trap_exit, true),
     R = try
             perform_scenario(Scenario, Id, State),
@@ -43,9 +38,7 @@ init(Parent, Scenario, Id, State) ->
             throw:normal_user_stop ->
                 normal;
             E:Reason:Stacktrace ->
-                {E, {abnormal_exit, Reason}, Stacktrace}
-        after
-            ets:delete(amoc_users, Id)
+                {E, Reason, Stacktrace}
         end,
     exit(R).
 

@@ -40,7 +40,7 @@ init() ->
 
 -spec start(amoc_scenario:user_id()) -> any().
 start(1) ->
-    MasterNode = amoc_cluster:get_master_node(),
+    MasterNode = amoc_cluster:master_node(),
     Pid = spawn(MasterNode, fun count_per_minute/0),
     rpc:call(MasterNode, erlang, register, [count_per_minute, Pid]),
     parallel_execution_scenario();
@@ -56,7 +56,7 @@ init_metrics() ->
 
 rate_change_scenario() ->
     {TimeDiff, _} = timer:tc(fun rate_change_fn/0),
-    {count_per_minute, amoc_cluster:get_master_node()} ! inc,
+    {count_per_minute, amoc_cluster:master_node()} ! inc,
     amoc_metrics:update_time(execution_delay, TimeDiff),
     rate_change_scenario().
 

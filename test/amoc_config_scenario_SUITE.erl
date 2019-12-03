@@ -7,6 +7,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% these attributes are required for the testing purposes %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-behaviour(amoc_scenario).
 -required_variable({var1, "var1"}).
 -required_variable({var2, "var2", def2}).
 -required_variable([
@@ -16,9 +17,11 @@
     {var6, "var6", def6, fun ?MODULE:test_verification_function/1}
 ]).
 
--export([test_verification_function/1, positive_integer/1]).
+-export([init/0, test_verification_function/1, positive_integer/1]).
 test_verification_function(_) -> true.
 positive_integer(I) -> is_integer(I) andalso I > 0.
+
+init() -> ok.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 all() ->
@@ -48,7 +51,7 @@ end_per_suite(Config) ->
 
 init_scenario(_) ->
     ScenarioConfig = [{var0, def0}, {var5, val5}],
-    ?assertMatch({ok, _}, amoc_controller:init_scenario(?MODULE, [{config, ScenarioConfig}])),
+    ?assertMatch(ok, amoc_controller:start_scenario(?MODULE, ScenarioConfig)),
     ?assertEqual(undefined, amoc_config:get(var00)),
     ?assertEqual(def00, amoc_config:get(var00, def00)),
     ?assertEqual(undefined, amoc_config:get(var0)),

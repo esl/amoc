@@ -21,15 +21,17 @@
 %%-------------------------------------------------------------------------
 -export_type([user_id/0, state/0]).
 
--type user_id() :: non_neg_integer().
+-type user_id() :: pos_integer().
 -type state() :: any().
 
 -callback init() -> {ok, state()} | ok | {error, Reason :: term()}.
 -callback start(user_id(), state()) -> any().
 -callback start(user_id()) -> any().
+-callback terminate(state()) -> any().
 
 %% either start/1 or start/2 must be exported from the behaviour module
 -optional_callbacks([start/1, start/2]).
+-optional_callbacks([terminate/1]).
 
 %%-------------------------------------------------------------------------
 %% API
@@ -50,7 +52,7 @@ does_scenario_exist(Scenario) ->
 
 -spec list_scenario_modules() -> [module()].
 list_scenario_modules() ->
-    [element(1, T) || T <- ets:tab2list(amoc_scenarios)].
+    [S || [S] <- ets:match(amoc_scenarios, {'$1',scenario,'_'})].
 
 %%-------------------------------------------------------------------------
 %% gen_server callbacks

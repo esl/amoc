@@ -29,6 +29,7 @@ integration_test:
 	./integration_test/test_docker_image.sh
 	./integration_test/test_distribute_scenario.sh
 	./integration_test/test_run_scenario.sh
+	./integration_test/test_add_new_node.sh
 
 dialyzer:
 	$(REBAR) as prod dialyzer
