@@ -19,6 +19,4 @@ Remove 10 users.
 amoc:remove(10, true).
 ```
 
-NOTE: We advise on using this mode for the scenario debugging purposes - everything you
-log using lager is going to be visible in the erlang shell.
-In this mode the annotations are not working, however this may change in the future.
+NOTE: the exact range of the users can be added using ``amoc_controller:add_users/2`` interface 

@@ -15,9 +15,9 @@ amoc_dist:do(my_scenario, 100, Settings).
 Start `my_scenario` spawning 100 amoc users with IDs from the range [1,100] inclusive.
 In this case sessions are going to be distributed across all nodes except master.
 
-`Settings` is an optional proplist with scenario options that can be extracted using amoc_config module,
- values provided in this list shadows OS and APP environment variables. also this settings will be propagated
- automatically withing all the nodes in the amoc cluster.
+`Settings` is an optional proplist with scenario options that can be extracted using amoc_config module.
+The values provided in this list shadow OS and APP environment variables. Note that these settings will be propagated
+ automatically among all the nodes in the amoc cluster.
 
 
 ```erlang
@@ -31,10 +31,10 @@ amoc_dist:remove(50, Force).
 
 Remove 50 sessions. 
 
-Where ``Force`` is the boolean value, that has the next meaning:
+Where ``Force`` is a boolean of value:
 
-* ``true``  - kill the user processes using ``supervisor:terminate_child/2`` function
-* ``false`` - just send ``exit(User,shutdown)`` signal to the user process (can be ignored by the user)
+* ``true``  - to kill the user processes using ``supervisor:terminate_child/2`` function
+* ``false`` - to send ``exit(User,shutdown)`` signal to the user process (can be ignored by the user)
 
 All the users are ``temporary`` children of the ``simple_one_for_one`` supervisor with the ``shutdown`` 
 key set to ``2000``.
