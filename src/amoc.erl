@@ -6,7 +6,8 @@
 
 -export([do/3,
          add/1,
-         remove/2]).
+         remove/2,
+         stop/0]).
 
 -export_type([scenario/0]).
 -type scenario() :: module().
@@ -44,6 +45,14 @@ remove(Count, ForceRemove) when is_integer(Count), Count > 0 ->
     case is_running_locally() of
         ok ->
             amoc_controller:remove_users(Count, ForceRemove);
+        Error -> Error
+    end.
+
+-spec stop() -> ok | {error, any()}.
+stop() ->
+    case is_running_locally() of
+        ok ->
+            amoc_controller:stop_scenario();
         Error -> Error
     end.
 

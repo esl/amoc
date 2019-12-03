@@ -12,7 +12,8 @@
 -record(state, {scenario :: amoc:scenario() | undefined,
                 no_of_users = 0 :: user_count(),
                 last_user_id = 0 :: last_user_id(),
-                status = idle :: idle | running | finished | {error, any()} | disabled,
+                status = idle :: idle | running | terminating | finished |
+                                 {error, any()} | disabled,
                 scenario_state :: any(),
                 create_users = [] :: [amoc_scenario:user_id()],
                 tref :: timer:tref() | undefined}).
@@ -21,6 +22,7 @@
 -type handle_call_res() :: ok | {ok, term()} | {error, term()}.
 -type amoc_status() :: {idle, [LoadedScenario :: amoc:scenario()]} |
                        {running, amoc:scenario(), user_count(), last_user_id()} |
+                       {terminating, amoc:scenario()} |
                        {finished, amoc:scenario()} |
                        {error, any()} |
                        disabled. %% amoc_controller is disabled for the master node
@@ -42,6 +44,7 @@
 %% ------------------------------------------------------------------
 -export([start_link/0,
          start_scenario/2,
+         stop_scenario/0,
          add_users/2,
          remove_users/2,
          get_status/0,
@@ -71,6 +74,10 @@ start_scenario(Scenario, Settings) ->
         false ->
             {error, {no_such_scenario, Scenario}}
     end.
+
+-spec stop_scenario() -> ok | {error, term()}.
+stop_scenario() ->
+    gen_server:call(?SERVER, stop_scenario).
 
 -spec add_users(amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     ok | {error, term()}.
@@ -104,6 +111,9 @@ init([]) ->
 -spec handle_call(any(), any(), state()) -> {reply, handle_call_res(), state()}.
 handle_call({start_scenario, Scenario, Settings}, _From, State) ->
     {RetValue, NewState} = handle_start_scenario(Scenario, Settings, State),
+    {reply, RetValue, NewState};
+handle_call(stop_scenario, _From, State) ->
+    {RetValue, NewState} = handle_stop_scenario(State),
     {reply, RetValue, NewState};
 handle_call({add, StartId, EndID}, _From, State) ->
     {RetValue, NewState} = handle_add(StartId, EndID, State),
@@ -153,6 +163,13 @@ handle_start_scenario(Scenario, Settings, #state{status = idle} = State) ->
 handle_start_scenario(_Scenario, _Settings, #state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
+-spec handle_stop_scenario(state()) -> {handle_call_res(), state()}.
+handle_stop_scenario(#state{status = running} = State) ->
+    terminate_all_users(),
+    {ok, State#state{status = terminating}};
+handle_stop_scenario(#state{status = Status} = State) ->
+    {{error, {invalid_status, Status}}, State}.
+
 -spec handle_add(amoc_scenario:user_id(), amoc_scenario:user_id(), state()) ->
     {handle_call_res(), state()}.
 handle_add(StartId, EndId, #state{last_user_id = LastId,
@@ -172,15 +189,12 @@ handle_add(_Scenario, _Settings, #state{status = Status} = State) ->
 
 -spec handle_remove(user_count(), boolean(), state()) -> handle_call_res().
 handle_remove(Count, ForceRemove, #state{status = running}) ->
-    Users = case ets:match_object(?USERS_TABLE, '$1', Count) of
-                {Objects, _} -> Objects;
-                '$end_of_table' -> []
-            end,
-    spawn( %% this can take too long, so do not block amoc_controller run it async
-        fun() ->
-            [amoc_user:stop(Pid, ForceRemove) || {_Id, Pid} <- Users]
-        end),
-    {ok, length(Users)};
+    Pids = case ets:match_object(?USERS_TABLE, '$1', Count) of
+               {Objects, _} -> [Pid || {_Id, Pid} <- Objects];
+               '$end_of_table' -> []
+           end,
+    amoc_users_sup:stop_children(Pids, ForceRemove),
+    {ok, length(Pids)};
 handle_remove(_Count, _ForceRemove, #state{status = Status}) ->
     {error, {invalid_status, Status}}.
 
@@ -190,6 +204,8 @@ handle_status(#state{status = idle}) ->
 handle_status(#state{status = running, scenario = Scenario,
                      no_of_users = N, last_user_id = LastId}) ->
     {running, Scenario, N, LastId};
+handle_status(#state{status = terminating, scenario = Scenario}) ->
+    {terminating, Scenario};
 handle_status(#state{status = finished, scenario = Scenario}) ->
     {finished, Scenario};
 handle_status(#state{status = Status}) ->
@@ -212,11 +228,11 @@ handle_start_user(#state{create_users = [], tref = TRef} = State) ->
     State#state{tref = maybe_stop_timer(TRef)}.
 
 -spec handle_stop_user(pid(), state()) -> state().
-handle_stop_user(Pid, #state{no_of_users = N} = State) ->
+handle_stop_user(Pid, State) ->
     case ets:match(?USERS_TABLE, {'$1', Pid}, 1) of
         {[[UserId]], _} ->
             ets:delete(?USERS_TABLE, UserId),
-            State#state{no_of_users = N - 1};
+            dec_no_of_users(State);
         _ ->
             State
     end.
@@ -262,6 +278,28 @@ start_user(Scenario, Id, ScenarioState) ->
     ets:insert(?USERS_TABLE, {Id, Pid}),
     erlang:monitor(process, Pid),
     ok.
+
+-spec terminate_all_users() -> any().
+terminate_all_users() ->
+    %stop all the users
+    Match = ets:match_object(?USERS_TABLE, '$1', 200),
+    terminate_all_users(Match).
+
+-spec terminate_all_users({tuple(), ets:continuation()} | '$end_of_table') -> ok.
+terminate_all_users({Objects, Continuation}) ->
+    Pids = [Pid || {_Id, Pid} <- Objects],
+    amoc_users_sup:stop_children(Pids, true),
+    Match = ets:match_object(Continuation),
+    terminate_all_users(Match);
+terminate_all_users('$end_of_table') -> ok.
+
+-spec dec_no_of_users(state()) -> state().
+dec_no_of_users(#state{scenario    = Scenario, scenario_state = ScenarioState,
+                       no_of_users = 1, status = terminating} = State) ->
+    apply_safely(Scenario, terminate, [ScenarioState]),
+    State#state{no_of_users = 0, status = finished};
+dec_no_of_users(#state{no_of_users = N} = State) ->
+    State#state{no_of_users = N - 1}.
 
 -spec interarrival() -> interarrival().
 interarrival() ->

@@ -100,22 +100,27 @@ test_amoc_dist() ->
         Nodes2 = Nodes3,
         Max3 = Max2,
         N2 = N3 + 10,
-        %% try to remove 15 more users
-        {ok, Ret} = rpc:call(Master, amoc_dist, remove, [15, true]),
+        %% try to remove N3 users
+        {ok, Ret} = rpc:call(Master, amoc_dist, remove, [N3, true]),
         RemovedN = lists:sum([N || {_, N} <- Ret]),
         timer:sleep(3000),
         {N4, Nodes4, Ids4, _Max4} = get_users_info(Slaves),
         Nodes1 = Nodes4,
         N3 = N4 + RemovedN,
-        true = RemovedN < 15,
+        true = RemovedN < N3,
         %% add 20 users
         {ok, _} = rpc:call(Master, amoc_dist, add, [20]),
         timer:sleep(3000),
         {N5, Nodes5, Ids5, Max5} = get_users_info(Slaves),
-        %Nodes2 = Nodes5,
+        Nodes2 = Nodes5,
         Max5 = Max2 + 20,
         N5 = N4 + 20,
         true = Ids5 -- Ids4 =:= lists:seq(Max2 + 1, Max5),
+        %% terminate scenario
+        {ok,_} = rpc:call(Master, amoc_dist, stop, []),
+        timer:sleep(3000),
+        [{finished, ?MODULE} = rpc:call(Node, amoc_controller, get_status, []) ||
+            Node <- Slaves],
         %% return expected value
         amoc_dist_works_as_expected
     catch

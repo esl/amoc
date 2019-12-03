@@ -8,7 +8,8 @@
          add/1,
          add/2,
          remove/2,
-         remove/3]).
+         remove/3,
+         stop/0]).
 
 -compile({no_auto_import, [ceil/1]}).
 %% ------------------------------------------------------------------
@@ -44,6 +45,10 @@ remove(Count, ForceRemove, Nodes) when is_integer(Count), Count > 0 ->
         ok -> remove_users(Count, ForceRemove, Nodes);
         Error -> Error
     end.
+
+-spec stop() -> ok | {error, any()}.
+stop() ->
+    stop_cluster().
 
 %% ------------------------------------------------------------------
 %% Local functions
@@ -160,6 +165,17 @@ remove_users(Result, Count, ForceRemove, [Node | T] = Nodes) ->
             Ret = rpc:call(Node, amoc_controller, remove_users, [N, ForceRemove]),
             remove_users([{Node, Ret} | Result], Count - N, ForceRemove, T)
     end.
+
+-spec stop_cluster() -> {ok, any()} | {error, any()}.
+stop_cluster() ->
+    case amoc_cluster:slave_nodes() of
+        [] -> {error, no_slave_nodes};
+        Slaves ->
+            Result = [{Node, rpc:call(Node, amoc_controller, stop_scenario, [])} ||
+                         Node <- Slaves],
+            maybe_error(Result)
+    end.
+
 
 -spec maybe_error([{any(), any()}]) -> {ok, any()} | {error, any()}.
 maybe_error(Result) ->

@@ -27,9 +27,11 @@
 -callback init() -> {ok, state()} | ok | {error, Reason :: term()}.
 -callback start(user_id(), state()) -> any().
 -callback start(user_id()) -> any().
+-callback terminate(state()) -> any().
 
 %% either start/1 or start/2 must be exported from the behaviour module
 -optional_callbacks([start/1, start/2]).
+-optional_callbacks([terminate/1]).
 
 %%-------------------------------------------------------------------------
 %% API
