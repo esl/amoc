@@ -71,9 +71,9 @@ set_master_node(Node) when Node =:= node() ->
     gen_server:call(?SERVER, {set_master_node, node()});
 set_master_node(Node) ->
     case get_status() of
-        #{new_connection_action:=undefined} ->
+        #{new_connection_action := undefined} ->
             {error, action_is_undefined};
-        #{new_connection_action:=Action} ->
+        #{new_connection_action := Action} ->
             set_master_node(Node, Action)
     end.
 
@@ -117,36 +117,15 @@ init(Nodes) ->
     {ok, NewState}.
 
 -spec handle_call(any(), any(), state()) -> {reply, any(), state()}.
-handle_call({set_master_node, Node}, _From, #state{master    = MasterNode,
-                                                   connected = Connected} = State) ->
-    {RetValue, NewState} = case MasterNode of
-                               undefined ->
-                                   KnownNodes = [node() | Connected],
-                                   case lists:member(Node, KnownNodes) of
-                                       true -> {ok, State#state{master = Node}};
-                                       false -> {{error, not_connected}, State}
-                                   end;
-                               Node -> %% the same master as before
-                                   {ok, State};
-                               _NewMaster ->
-                                   {{error, master_is_already_set}, State}
-                           end,
+handle_call({set_master_node, Node}, _From, State) ->
+    {RetValue, NewState} = handle_set_master(Node, State),
     {reply, RetValue, NewState};
 handle_call({ping, Node}, _From, State) ->
     {reply, {pong, node()}, merge(connected, [Node], State)};
 handle_call(get_status, _From, State) ->
     {reply, state_to_map(State), State};
-handle_call({on_new_connection, Action}, _From, #state{master = MasterNode} = State) ->
-    {RetValue, NewState} = case {node(), State#state.new_connection_action} of
-                               {MasterNode, undefined} ->
-                                   Connected = State#state.connected,
-                                   S = State#state{new_connection_action = Action},
-                                   {{ok, Connected}, S};
-                               {MasterNode, _} ->
-                                   {{error, handler_is_already_set}, State};
-                               _ ->
-                                   {{error, not_a_master}, State}
-                           end,
+handle_call({on_new_connection, Action}, _From, State) ->
+    {RetValue, NewState} = handle_on_new_connection(Action, State),
     {reply, RetValue, NewState};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
@@ -195,6 +174,32 @@ set_master_node(Node, Action) ->
         Error -> Error
     end.
 
+-spec handle_set_master(node(), state()) -> {ok | {error, any()}, state()}.
+handle_set_master(Node, #state{master = Node} = State) ->
+%% the same master as before
+    {ok, State};
+handle_set_master(Node, #state{master = undefined, connected = Connected} = State) ->
+    KnownNodes = [node() | Connected],
+    case lists:member(Node, KnownNodes) of
+        true -> {ok, State#state{master = Node}};
+        false -> {{error, not_connected}, State}
+    end;
+handle_set_master(Node, #state{master = AnotherNode} = State) when Node =/= AnotherNode ->
+    {{error, master_is_already_set}, State}.
+
+-spec handle_on_new_connection(new_connection_handler(), state()) ->
+    {{ok, [node()]} | {error, any()}, state()}.
+handle_on_new_connection(Action, #state{master = MasterNode} = State) ->
+    case {node(), State#state.new_connection_action} of
+        {MasterNode, undefined} ->
+            Connected = State#state.connected,
+            {{ok, Connected}, State#state{new_connection_action = Action}};
+        {MasterNode, _} ->
+            {{error, handler_is_already_set}, State};
+        _ ->
+            {{error, not_a_master}, State}
+    end.
+
 -spec handle_connect_nodes([node()], state()) -> state().
 handle_connect_nodes(Nodes, #state{to_ack = Ack, connected = Connected} = State) ->
     NodesToConnect = lists:usort(Nodes) -- [node() | Connected],
@@ -234,14 +239,14 @@ merge([{Type, Nodes} | Tail], State) ->
     merge(Tail, NewState).
 
 -spec merge(connected | slave | failed_to_connect | connection_lost, [node()], state()) -> state().
-merge(connected, Nodes, #state{failed_to_connect     = FailedToConnect,
-                               connection_lost       = ConnectionLost,
-                               connected             = Connected} = State) ->
+merge(connected, Nodes, #state{failed_to_connect = FailedToConnect,
+                               connection_lost   = ConnectionLost,
+                               connected         = Connected} = State) ->
     NewConnected = lists:usort(Nodes ++ Connected),
     NewNodes = NewConnected -- Connected,
     [begin
          erlang:monitor_node(Node, true),
-         maybe_set_master(Node,State),
+         maybe_set_master(Node, State),
          %% connect_nodes is based on cast,
          %% so it won't cause the deadlock.
          connect_nodes(Node, NewConnected)

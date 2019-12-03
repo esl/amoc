@@ -17,7 +17,7 @@
     {var6, "var6", def6, fun ?MODULE:test_verification_function/1}
 ]).
 
--export([init/0,test_verification_function/1, positive_integer/1]).
+-export([init/0, test_verification_function/1, positive_integer/1]).
 test_verification_function(_) -> true.
 positive_integer(I) -> is_integer(I) andalso I > 0.
 
