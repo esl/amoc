@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/)
 
+## [2.0.0](https://github.com/esl/amoc/compare/2.0.0-beta...2.0.0) - 2019-12-03
+
+### Changed:
+- extended amoc documentation
+- automatic distribution of the uploaded scenarios to all the nodes in the amoc cluster
+- amoc configuration:
+    - mandatory declaration of the required parameters for the scenario
+    - ets based ``amoc_config:get/2`` interface
+- ``amoc_controller`` - module doesn't hold any information about the cluster any more,  it's now a responsibility of the ``amoc_dist`` module
+
+
+### Added:
+- integration tests for docker based amoc cluster
+- possibility to dynamically add the new amoc node to the cluster 
+
+### Removed:
+- unused rebar dependencies
+
 ## [2.0.0-beta](https://github.com/esl/amoc/compare/1.3.0...2.0.0-beta) - 2019-10-29
 
 ### Changed:
