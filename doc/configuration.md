@@ -30,10 +30,10 @@ Amoc supports the following generic configuration parameters:
 * ``config_verification_modules`` - a list of modules with the configuration verification function 
 (see Scenario Configuration section):
     * default value - empty list (`[]`)
-    * os env example: `AMOC_EXTRA_CODE_PATHS="[some_module, another_module]"`
+    * os env example: `AMOC_CONFIG_VERIFICATION_MODULES="[some_module, another_module]"`
     * app.config example:  `{config_verification_modules, [some_module, another_module]}`
 
-In addition to that, amoc_metrics support the following configuration parameters:
+In addition to that, `amoc_metrics` support the following configuration parameters:
 
 * ``metrics_reporter`` - exometer reporter name (atom).
     * default value - `exometer_report_graphite`
@@ -73,7 +73,7 @@ parameters required for your scenario, however every scenario must declare (usin
 information, see the example [scenario module](../integration_test/dummy_scenario.erl)
 
 
-NB: the reason why the`-required_variable(...)` is preferred over the usual behaviour
+NB: the reason why the `-required_variable(...)` is preferred over the usual behaviour
 callback is because the orchestration tools can easily extract the attributes even
 without the compilation, while configuring via a callback, requires a successful
 compilation of the module. As an example, a module:
