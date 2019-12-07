@@ -38,4 +38,4 @@ xref:
 	$(REBAR) as prod xref
 
 console:
-	rebar3 shell
+	$(REBAR) shell
