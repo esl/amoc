@@ -274,7 +274,7 @@ handle_add_batch(Scenario, BatchCount, CurrentBatch, PrevUserCount, Interval) ->
                       [CurrentBatch, PrevUserCount]) of
         {ok, BatchStrategy} ->
             add_batch(BatchStrategy),
-            TotalUserCount = total_users_in_batch(BatchStrategy),
+            TotalUserCount = PrevUserCount + total_users_in_batch(BatchStrategy),
             maybe_schedule_add_batch({Scenario, BatchCount - 1, CurrentBatch + 1,
                                       TotalUserCount}, Interval);
         {error, Error, Reason} ->
