@@ -2,7 +2,7 @@
 
 Everything you need to do is to create the release. To achieve that run:
 `make rel`. Now you are ready to test our scenario locally with one Amoc node;
-to start the node run `_build/default/prod/rel/amoc/bin/amoc console`.
+to start the node run `_build/prod/rel/amoc/bin/amoc console`.
 
 Start `my_scenario` spawning 10 amoc users with IDs from range (1,10) inclusive.
 ```erlang
@@ -29,4 +29,3 @@ To do so, the following trick could be applied:
 2. `amoc_controller:add_users(StartId, StopId).`
 
 NODE: in case of independent Amoc nodes, it's also possible to run different scenarios on different nodes.
-
