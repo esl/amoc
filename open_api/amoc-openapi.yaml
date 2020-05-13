@@ -1,0 +1,148 @@
+openapi: 3.0.1
+info:
+  title: API-DOCS
+  version: 1.0.0
+servers:
+  - url: /
+paths:
+  /nodes:
+    get:
+      tags:
+        - node
+      description: Pings AMOC nodes from master node.
+      responses:
+        '200':
+          description: response object
+          content:
+            application/json:
+              schema:
+                required:
+                  - nodes
+                type: object
+                properties:
+                  nodes:
+                    type: object
+                    properties: {}
+                    description: 'nodeName: up | down'
+  /scenarios:
+    get:
+      tags:
+        - scenarios
+      description: Gets list of available scenarios
+      responses:
+        '200':
+          description: response object
+          content:
+            application/json:
+              schema:
+                required:
+                  - scenarios
+                type: object
+                properties:
+                  scenarios:
+                    type: array
+                    description: Scenario names
+                    items:
+                      type: string
+  /scenarios/upload:
+    put:
+      tags:
+        - upload
+      description: >-
+        Uploads new scenario (add '--upload-file scenario.erl' flag to the curl
+        command)
+      responses:
+        '200':
+          description: response object
+          content:
+            application/json:
+              schema:
+                required:
+                  - compile
+                type: object
+                properties:
+                  compile:
+                    type: string
+                    description: ok | Errors
+  '/scenarios/{id}':
+    get:
+      tags:
+        - scenario
+      description: Gets scenario status
+      parameters:
+        - name: id
+          in: path
+          description: Scenario id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: response object
+          content:
+            application/json:
+              schema:
+                required:
+                  - scenario_status
+                type: object
+                properties:
+                  scenario_status:
+                    type: string
+                    description: loaded | running | finished
+    patch:
+      tags:
+        - scenario
+      description: Starts scenario
+      parameters:
+        - name: id
+          in: path
+          description: Scenario id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: request body (as json)
+        content:
+          '*/*':
+            schema:
+              required:
+                - users
+              type: object
+              properties:
+                users:
+                  type: integer
+                  description: Number of users to start
+        required: true
+      responses:
+        '200':
+          description: response object
+          content:
+            application/json:
+              schema:
+                required:
+                  - scenario
+                type: object
+                properties:
+                  scenario:
+                    type: string
+                    description: started | wrong_json
+      x-codegen-request-body-name: request body
+  /status:
+    get:
+      tags:
+        - status
+      description: 'Gets AMOC status, whether it is running or not.'
+      responses:
+        '200':
+          description: response object
+          content:
+            application/json:
+              schema:
+                required:
+                  - node_status
+                type: object
+                properties:
+                  node_status:
+                    type: string
+                    description: up | down
+components: {}
