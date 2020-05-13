@@ -1,7 +1,7 @@
 FROM phusion/baseimage as amoc-build
 MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
-ARG otp_vsn=21.3.8.7-1
+ARG otp_vsn=22.3.4-1
 
 RUN useradd -ms /bin/bash amoc
 
