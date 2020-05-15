@@ -22,3 +22,9 @@ openapi-generator generate -g erlang-server \
 ```
 the full list of configuration options for the `erlang-server` generator can be found here:
 * https://openapi-generator.tech/docs/generators/erlang-server/
+### removal of cowboy-swagger REST API implementation
+* remove related source code (`../src/rest_api`)
+* remove unneeded dependencies from `../rebar.config`
+* regenerate `../rebar.lock`
+* remove unneeded dependencies from `../src/amoc.app.src`
+* remove initialisation of the REST API server from the `amoc_app:start/2` interface

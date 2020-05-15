@@ -16,7 +16,6 @@
 -spec start(application:start_type(), term()) -> {ok, pid()}.
 start(_StartType, _StartArgs) ->
     Ret = amoc_sup:start_link(),
-    amoc_api:start_listener(),
     amoc_metrics:start(),
     Ret.
 
