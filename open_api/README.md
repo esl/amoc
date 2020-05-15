@@ -9,3 +9,8 @@ curl http://localhost:4000/api-docs/swagger.json -o amoc-swagger.json
 * add mandatory `version` property in the `info` section
 * apply auto-formatting (`Edit` -> `Convert to YAML`)
 * save the yaml file (`File`->`Save As YAML`) as `amoc-openapi.yaml`
+### validation of the YAML spec:
+```bash
+alias openapi-generator='docker run --rm -v "${PWD}:/local" openapitools/openapi-generator-cli:v4.3.1'
+openapi-generator validate -i /local/amoc-openapi.yaml
+```
