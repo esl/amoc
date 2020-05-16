@@ -10,7 +10,11 @@
         exometer_core,
         exometer_report_graphite,
         exometer_report_statsd,
-        ssl
+        ssl,
+        inets,
+        jsx,
+        jesse,
+        cowboy
     ]},
     {mod, {amoc_app, []}},
     {env, [{exometer_predefined, [

@@ -28,3 +28,10 @@ the full list of configuration options for the `erlang-server` generator can be 
 * regenerate `../rebar.lock`
 * remove unneeded dependencies from `../src/amoc.app.src`
 * remove initialisation of the REST API server from the `amoc_app:start/2` interface
+### integration of generated erlang-server
+* copy OpenAPI JSON definition (`./amoc_rest/priv/openapi.json`) into the `../priv/` directory
+* copy the source code from `./amoc_rest/src/` into `../src/rest_api/amoc_rest` directory (only `*.erl` files)
+* copy required dependencies from `./amoc_rest/rebar.config` to `../rebar.config`
+* regenerate `../rebar.lock`
+* add required dependencies at `../src/amoc.app.src`
+* add `amoc_rest_server:start/2` call at `amoc` application startup

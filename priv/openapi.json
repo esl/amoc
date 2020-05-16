@@ -1,0 +1,262 @@
+{
+  "openapi" : "3.0.1",
+  "info" : {
+    "title" : "API-DOCS",
+    "version" : "1.0.0"
+  },
+  "servers" : [ {
+    "url" : "/"
+  } ],
+  "paths" : {
+    "/nodes" : {
+      "get" : {
+        "description" : "Pings AMOC nodes from master node.",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/inline_response_200"
+                }
+              }
+            },
+            "description" : "response object"
+          }
+        },
+        "tags" : [ "node" ]
+      }
+    },
+    "/scenarios" : {
+      "get" : {
+        "description" : "Gets list of available scenarios",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/inline_response_200_1"
+                }
+              }
+            },
+            "description" : "response object"
+          }
+        },
+        "tags" : [ "scenarios" ]
+      }
+    },
+    "/scenarios/{id}" : {
+      "get" : {
+        "description" : "Gets scenario status",
+        "parameters" : [ {
+          "description" : "Scenario id",
+          "explode" : false,
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          },
+          "style" : "simple"
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/inline_response_200_2"
+                }
+              }
+            },
+            "description" : "response object"
+          }
+        },
+        "tags" : [ "scenario" ]
+      },
+      "patch" : {
+        "description" : "Starts scenario",
+        "parameters" : [ {
+          "description" : "Scenario id",
+          "explode" : false,
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          },
+          "style" : "simple"
+        } ],
+        "requestBody" : {
+          "$ref" : "#/components/requestBodies/inline_object",
+          "content" : {
+            "*/*" : {
+              "schema" : {
+                "properties" : {
+                  "users" : {
+                    "description" : "Number of users to start",
+                    "type" : "integer"
+                  }
+                },
+                "required" : [ "users" ],
+                "type" : "object"
+              }
+            }
+          },
+          "description" : "request body (as json)",
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/inline_response_200_3"
+                }
+              }
+            },
+            "description" : "response object"
+          }
+        },
+        "tags" : [ "scenario" ],
+        "x-codegen-request-body-name" : "request body"
+      }
+    },
+    "/status" : {
+      "get" : {
+        "description" : "Gets AMOC status, whether it is running or not.",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/inline_response_200_4"
+                }
+              }
+            },
+            "description" : "response object"
+          }
+        },
+        "tags" : [ "status" ]
+      }
+    },
+    "/scenarios/upload" : {
+      "put" : {
+        "description" : "Uploads new scenario (add '--upload-file scenario.erl' flag to the curl command)",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/inline_response_200_5"
+                }
+              }
+            },
+            "description" : "response object"
+          }
+        },
+        "tags" : [ "upload" ]
+      }
+    }
+  },
+  "components" : {
+    "requestBodies" : {
+      "inline_object" : {
+        "content" : {
+          "*/*" : {
+            "schema" : {
+              "$ref" : "#/components/schemas/inline_object"
+            }
+          }
+        },
+        "required" : true
+      }
+    },
+    "schemas" : {
+      "inline_response_200_5" : {
+        "example" : {
+          "compile" : "compile"
+        },
+        "properties" : {
+          "compile" : {
+            "description" : "ok | Errors",
+            "type" : "string"
+          }
+        },
+        "required" : [ "compile" ]
+      },
+      "inline_response_200_1" : {
+        "example" : {
+          "scenarios" : [ "scenarios", "scenarios" ]
+        },
+        "properties" : {
+          "scenarios" : {
+            "description" : "Scenario names",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "scenarios" ]
+      },
+      "inline_response_200" : {
+        "example" : {
+          "nodes" : "{}"
+        },
+        "properties" : {
+          "nodes" : {
+            "description" : "nodeName: up | down",
+            "properties" : { },
+            "type" : "object"
+          }
+        },
+        "required" : [ "nodes" ]
+      },
+      "inline_response_200_2" : {
+        "example" : {
+          "scenario_status" : "scenario_status"
+        },
+        "properties" : {
+          "scenario_status" : {
+            "description" : "loaded | running | finished",
+            "type" : "string"
+          }
+        },
+        "required" : [ "scenario_status" ]
+      },
+      "inline_object" : {
+        "properties" : {
+          "users" : {
+            "description" : "Number of users to start",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "users" ],
+        "type" : "object"
+      },
+      "inline_response_200_3" : {
+        "example" : {
+          "scenario" : "scenario"
+        },
+        "properties" : {
+          "scenario" : {
+            "description" : "started | wrong_json",
+            "type" : "string"
+          }
+        },
+        "required" : [ "scenario" ]
+      },
+      "inline_response_200_4" : {
+        "example" : {
+          "node_status" : "node_status"
+        },
+        "properties" : {
+          "node_status" : {
+            "description" : "up | down",
+            "type" : "string"
+          }
+        },
+        "required" : [ "node_status" ]
+      }
+    }
+  }
+}
