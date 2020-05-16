@@ -14,3 +14,11 @@ curl http://localhost:4000/api-docs/swagger.json -o amoc-swagger.json
 alias openapi-generator='docker run --rm -v "${PWD}:/local" openapitools/openapi-generator-cli:v4.3.1'
 openapi-generator validate -i /local/amoc-openapi.yaml
 ```
+### erlang-server stubs generation:
+```bash
+openapi-generator generate -g erlang-server \
+  --additional-properties=packageName=amoc_rest \
+  -i /local/amoc-openapi.yaml -o /local/amoc_rest
+```
+the full list of configuration options for the `erlang-server` generator can be found here:
+* https://openapi-generator.tech/docs/generators/erlang-server/
