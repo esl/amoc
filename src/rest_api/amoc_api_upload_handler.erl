@@ -86,28 +86,30 @@ from_text(Req, State) ->
 %% internal function
 -spec get_vars_from_body(cowboy_req:req()) ->
     {ok, {atom(), binary()}, cowboy_req:req()} |
-    {error, invalid_module, cowboy_req:req()}.
+    {error, atom(), cowboy_req:req()}.
 get_vars_from_body(Req) ->
-    {ok, Body, Req2} = cowboy_req:read_body(Req),
-    try
-        ModuleName = get_module_name(Body),
-        ModuleSource = Body,
-        true = is_atom(ModuleName),
-        true = is_binary(ModuleSource),
-        {ok, {ModuleName, ModuleSource}, Req2}
-    catch _:_ ->
-        {error, invalid_module, Req2}
+    {ok, ModuleSource, Req2} = cowboy_req:read_body(Req),
+    case get_module_name(ModuleSource) of
+        {ok, ModuleName} ->
+            {ok, {ModuleName, ModuleSource}, Req2};
+        {error, Reason} ->
+            {error, Reason, Req2}
     end.
 
--spec get_module_name(binary()) -> atom() | no_return().
-get_module_name(SourceCode)->
-    {match, [ModuleStr]} =
+-spec get_module_name(binary()) -> {ok, atom()} | {error, atom()}.
+get_module_name(SourceCode) ->
+    try
+        {match, [ModuleStr]} =
         re:run(SourceCode, "^\s*-\s*module.*$", [{newline, any},
                                                  multiline,
                                                  {capture, first, list}]),
-    {ok, Tokens, _} = erl_scan:string(ModuleStr),
-    {ok, {attribute, _, module, ModuleName}} = erl_parse:parse(Tokens),
-    ModuleName.
+        {ok, Tokens, _} = erl_scan:string(ModuleStr),
+        {ok, {attribute, _, module, ModuleName}} = erl_parse:parse(Tokens),
+        true = is_atom(ModuleName),
+        {ok, ModuleName}
+    catch _:_ ->
+        {error, invalid_module}
+    end.
 
 install_scenario_on_nodes(Nodes, Module, ModuleSource) ->
     rpc:multicall(Nodes, amoc_scenario, install_scenario, [Module, ModuleSource]).

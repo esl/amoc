@@ -19,7 +19,7 @@
          get_scenarios_returns_200_and_scenarios_list_when_requested/1,
          put_scenarios_returns_400_and_error_when_scenario_is_not_valid/1,
          put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid/1,
-         put_scenarios_returns_200_and_when_scenario_valid/1
+         put_scenarios_returns_200_when_scenario_valid/1
         ]).
 
 
@@ -28,7 +28,7 @@ all() ->
      get_scenarios_returns_200_and_scenarios_list_when_requested,
      put_scenarios_returns_400_and_error_when_scenario_is_not_valid,
      put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid,
-     put_scenarios_returns_200_and_when_scenario_valid
+     put_scenarios_returns_200_when_scenario_valid
     ].
 
 
@@ -37,7 +37,7 @@ init_per_testcase(_, Config) ->
     {ok, _} = application:ensure_all_started(amoc),
     Config.
 
-end_per_testcase(put_scenarios_returns_200_and_when_scenario_valid, _Config) ->
+end_per_testcase(put_scenarios_returns_200_when_scenario_valid, _Config) ->
     ok = file:delete(filename:join([?SCENARIOS_EBIN_DIR_S, ?SAMPLE_SCENARIO_BEAM_S])),
     ok = file:delete(filename:join([?SCENARIOS_DIR_S, ?SAMPLE_SCENARIO_S]));
 end_per_testcase(_, _Config) ->
@@ -76,7 +76,7 @@ put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Conf
               "\",\n  [{2,erl_parse,[\"syntax error before: \",[]]}]}]">>,
     ?assertEqual({[{<<"compile">>, Error}]}, Body).
 
-put_scenarios_returns_200_and_when_scenario_valid(_Config) ->
+put_scenarios_returns_200_when_scenario_valid(_Config) ->
     %% given
     ScenarioContent = ?DUMMY_SCENARIO_MODULE(?SAMPLE_SCENARIO_A),
     %% when
