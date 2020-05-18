@@ -41,3 +41,6 @@ you can use [DownGit](https://downgit.github.io/) service to download just one d
 here is the direct [link](https://downgit.github.io/#/home?url=https://github.com/swagger-api/swagger-ui/tree/v3.25.3/dist&fileName=swagger_ui&rootDirectory=swagger_ui)
 * copy downloaded `swagger-ui` files into `../priv/swagger_ui` folder
 * change default `swagger-ui` url to `../openapi.json` in `../priv/swagger_ui/index.html`
+* use [raw.githack.com](https://raw.githack.com/) service to check that url change works as expected.
+you can use this [link](https://rawcdn.githack.com/esl/amoc/0c34238/priv/swagger_ui/index.html).
+* before updating `swagger-ui` you can always [test it](https://raw.githack.com/swagger-api/swagger-ui/master/dist/index.html?url=https://raw.githubusercontent.com/esl/amoc/0c34238/priv/openapi.json)
