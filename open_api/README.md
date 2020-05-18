@@ -39,3 +39,5 @@ the full list of configuration options for the `erlang-server` generator can be 
 * download the ["dist"](https://github.com/swagger-api/swagger-ui/tree/v3.25.3/dist) version of swagger-ui.
 you can use [DownGit](https://downgit.github.io/) service to download just one directory from the repo.
 here is the direct [link](https://downgit.github.io/#/home?url=https://github.com/swagger-api/swagger-ui/tree/v3.25.3/dist&fileName=swagger_ui&rootDirectory=swagger_ui)
+* copy downloaded `swagger-ui` files into `../priv/swagger_ui` folder
+* change default `swagger-ui` url to `../openapi.json` in `../priv/swagger_ui/index.html`
