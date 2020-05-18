@@ -44,3 +44,7 @@ here is the direct [link](https://downgit.github.io/#/home?url=https://github.co
 * use [raw.githack.com](https://raw.githack.com/) service to check that url change works as expected.
 you can use this [link](https://rawcdn.githack.com/esl/amoc/0c34238/priv/swagger_ui/index.html).
 * before updating `swagger-ui` you can always [test it](https://raw.githack.com/swagger-api/swagger-ui/master/dist/index.html?url=https://raw.githubusercontent.com/esl/amoc/0c34238/priv/openapi.json)
+* add static `cowboy_static` routing required for `swagger-ui`.
+notice changes in the generated code `../src/rest_api/amoc_rest/amoc_rest_server.erl`,
+this issue is already [reported](https://github.com/OpenAPITools/openapi-generator/issues/6354) to
+the `openapi generator`

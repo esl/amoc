@@ -6,10 +6,11 @@
 -export([start/2]).
 
 -spec start( ID :: any(), #{
-    ip            => inet:ip_address(),
-    port          => inet:port_number(),
-    logic_handler => module(),
-    net_opts      => []
+    ip                => inet:ip_address(),
+    port              => inet:port_number(),
+    logic_handler     => module(),
+    net_opts          => [],
+    cowboy_extra_opts => cowboy:opts()
 }) -> {ok, pid()} | {error, any()}.
 
 start(ID, #{
@@ -19,7 +20,7 @@ start(ID, #{
 } = Params) ->
     {Transport, TransportOpts} = get_socket_transport(IP, Port, NetOpts),
     LogicHandler = maps:get(logic_handler, Params, ?DEFAULT_LOGIC_HANDLER),
-    ExtraOpts = maps:get(cowboy_extra_opts, Params, []),
+    ExtraOpts = maps:get(cowboy_extra_opts, Params, #{}),
     CowboyOpts = get_cowboy_config(LogicHandler, ExtraOpts),
     case Transport of
         ssl ->
@@ -41,20 +42,12 @@ get_socket_transport(IP, Port, Options) ->
     end.
 
 get_cowboy_config(LogicHandler, ExtraOpts) ->
-    get_cowboy_config(LogicHandler, ExtraOpts, get_default_opts(LogicHandler)).
-
-get_cowboy_config(_LogicHandler, [], Opts) ->
-    Opts;
-
-get_cowboy_config(LogicHandler, [{env, Env} | Rest], Opts) ->
-    NewEnv = case proplists:get_value(dispatch, Env) of
-        undefined -> [get_default_dispatch(LogicHandler) | Env];
-        _ -> Env
-    end,
-    get_cowboy_config(LogicHandler, Rest, store_key(env, NewEnv, Opts));
-
-get_cowboy_config(LogicHandler, [{Key, Value}| Rest], Opts) ->
-    get_cowboy_config(LogicHandler, Rest, store_key(Key, Value, Opts)).
+    DefaultOpts = get_default_opts(LogicHandler),
+    DefaultEnv = maps:get(env, DefaultOpts, #{}),
+    ExtraEnv = maps:get(env, ExtraOpts, #{}),
+    Env = maps:merge(DefaultEnv, ExtraEnv),
+    Opts = maps:merge(DefaultOpts, ExtraOpts),
+    maps:put(env, Env, Opts).
 
 get_default_dispatch(LogicHandler) ->
     Paths = amoc_rest_router:get_paths(LogicHandler),
@@ -63,5 +56,3 @@ get_default_dispatch(LogicHandler) ->
 get_default_opts(LogicHandler) ->
     #{env => get_default_dispatch(LogicHandler)}.
 
-store_key(Key, Value, Opts) ->
-    lists:keystore(Key, 1, Opts, {Key, Value}).
