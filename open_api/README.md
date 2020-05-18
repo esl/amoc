@@ -35,3 +35,7 @@ the full list of configuration options for the `erlang-server` generator can be 
 * regenerate `../rebar.lock`
 * add required dependencies at `../src/amoc.app.src`
 * add `amoc_rest_server:start/2` call at `amoc` application startup
+### integration of swagger-ui
+* download the ["dist"](https://github.com/swagger-api/swagger-ui/tree/v3.25.3/dist) version of swagger-ui.
+you can use [DownGit](https://downgit.github.io/) service to download just one directory from the repo.
+here is the direct [link](https://downgit.github.io/#/home?url=https://github.com/swagger-api/swagger-ui/tree/v3.25.3/dist&fileName=swagger_ui&rootDirectory=swagger_ui)
