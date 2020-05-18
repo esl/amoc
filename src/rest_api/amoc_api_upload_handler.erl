@@ -86,7 +86,7 @@ from_text(Req, State) ->
 %% internal function
 -spec get_vars_from_body(cowboy_req:req()) ->
     {ok, {atom(), binary()}, cowboy_req:req()} |
-    {error, wrong_json, cowboy_req:req()}.
+    {error, invalid_module, cowboy_req:req()}.
 get_vars_from_body(Req) ->
     {ok, Body, Req2} = cowboy_req:read_body(Req),
     try
@@ -99,7 +99,7 @@ get_vars_from_body(Req) ->
         {error, invalid_module, Req2}
     end.
 
--spec get_module_name(binary()) -> atom().
+-spec get_module_name(binary()) -> atom() | no_return().
 get_module_name(SourceCode)->
     {match, [ModuleStr]} =
         re:run(SourceCode, "^\s*-\s*module.*$", [{newline, any},
