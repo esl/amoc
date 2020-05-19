@@ -4,7 +4,7 @@
 
 -spec start() -> {ok, pid()} | {error, any()}.
 start() ->
-    LogicHandler = amoc_rest_default_logic_handler,
+    LogicHandler = amoc_api_logic_handler,
     Routes = get_routes(LogicHandler),
     Dispatch = cowboy_router:compile(Routes),
     ServerParams = #{ip => {0, 0, 0, 0}, port => 4000, net_opts => [],
