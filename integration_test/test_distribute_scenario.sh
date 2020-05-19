@@ -50,25 +50,12 @@ list_scenarios_by_port ${PORT1}
 list_scenarios_by_port ${PORT2}
 list_scenarios_by_port ${PORT3}
 
-
-# Use jq to convert string to safe JSON string
-# see: https://stackoverflow.com/questions/10053678/escaping-characters-in-bash-for-json/13466143
-# -a means "ascii output"
-# -R means "raw input"
-# -s means "include linebreaks"
-# . means "output the root of the JSON document"
-SCEN_SOURCE=`cat integration_test/dummy_scenario.erl | jq -aRs .`
-
 echo "Installing scenario: 'dummy_scenario.erl' on node amoc-1 (port ${PORT1})"
 
-SCEN_POST=$( (echo '{"scenario":"dummy_scenario","module_source":'; echo ${SCEN_SOURCE} ; echo '}' ) | curl \
-     -s -S \
-     -H "Content-Type: application/json" \
-     -H "Accept: application/json" \
-     --request POST \
-     --data @- \
-     http://localhost:8081/scenarios)
-echo "Response: ${SCEN_POST}"
+SCEN_PUT=$(curl -s -H "Content-Type: text/plain" \
+                 -T integration_test/dummy_scenario.erl \
+                 'http://localhost:8081/upload')
+echo "Response: ${SCEN_PUT}"
 
 ensure_scenarios_installed ${PORT2} ${SCENARIO_NAME}
 ensure_scenarios_installed ${PORT3} ${SCENARIO_NAME}

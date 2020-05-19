@@ -7,6 +7,7 @@
 start_listener() ->
     Port = amoc_config_env:get(api_port, 4000),
     Handlers = [amoc_api_scenarios_handler,
+                amoc_api_upload_handler,
                 amoc_api_scenario_handler,
                 amoc_api_node_handler,
                 amoc_api_status_handler,
@@ -14,7 +15,6 @@ start_listener() ->
     Trails = trails:trails(Handlers),
     trails:store(Trails),
     Dispatch = trails:single_host_compile(Trails),
-    %% Dispatch = cowboy_router:compile(routes()),
     {ok, _Pid} = cowboy:start_clear(amoc_api,
                                    [{num_acceptors, 10}, {port, Port}],
                                    #{env => #{dispatch => Dispatch}}

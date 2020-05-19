@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Get current repo version
-OTP_VSN="${TRAVIS_OTP_RELEASE:-21.3.8.7}-1"
+OTP_VSN="${TRAVIS_OTP_RELEASE:-22.3.4}-1"
 echo "ERLANG/OTP ${OTP_VSN}"
 
 docker build \
