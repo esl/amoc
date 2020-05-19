@@ -48,3 +48,8 @@ you can use this [link](https://rawcdn.githack.com/esl/amoc/0c34238/priv/swagger
 notice changes in the generated code `../src/rest_api/amoc_rest/amoc_rest_server.erl`,
 this issue is already [reported](https://github.com/OpenAPITools/openapi-generator/issues/6354) to
 the `openapi generator`
+### implementation of the Amoc REST API
+* run `make dialyzer`, identify and fix minor issues with function specs in the generated code.
+
+        TODO: this should be also reported to the openapi generator project
+
