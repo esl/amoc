@@ -20,9 +20,9 @@ handle_request('NodesGet', _Req, _Context) ->
     Connected = maps:get(connected, Status, []),
     FailedToConnect = maps:get(failed_to_connect, Status, []),
     ConnectionLost = maps:get(connection_lost, Status, []),
-    Up = [{Node, up} || Node <- [node() | Connected]],
+    Up = [{Node, <<"up">>} || Node <- [node() | Connected]],
     DownNodes = lists:usort(FailedToConnect ++ ConnectionLost),
-    Down = [{Node, down} || Node <- DownNodes],
+    Down = [{Node, <<"down">>} || Node <- DownNodes],
     ResponseList = Up ++ Down,
     {200, #{}, [{<<"nodes">>, ResponseList}]};
 handle_request('ScenariosGet', _Req, _Context) ->

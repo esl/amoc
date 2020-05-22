@@ -22,8 +22,14 @@ paths:
                 properties:
                   nodes:
                     type: object
-                    properties: {}
-                    description: 'nodeName: up | down'
+                    additionalProperties:
+                      type: string
+                      enum:
+                        - up
+                        - down
+                    example:
+                      amoc@host1: up
+                      amoc@host2: up
   /scenarios:
     get:
       tags:
@@ -41,9 +47,11 @@ paths:
                 properties:
                   scenarios:
                     type: array
-                    description: Scenario names
                     items:
                       type: string
+                    example:
+                      - some_scenario
+                      - another_scenario
   '/scenarios/{id}':
     get:
       tags:
@@ -68,7 +76,11 @@ paths:
                 properties:
                   scenario_status:
                     type: string
-                    description: loaded | running | finished
+                    enum:
+                      - loaded
+                      - running
+                      - finished
+                      - error
     patch:
       tags:
         - scenario
@@ -124,7 +136,9 @@ paths:
                 properties:
                   node_status:
                     type: string
-                    description: up | down
+                    enum:
+                      - up
+                      - down
   /scenarios/upload:
     put:
       tags:

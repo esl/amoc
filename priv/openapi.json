@@ -185,11 +185,11 @@
       },
       "inline_response_200_1" : {
         "example" : {
-          "scenarios" : [ "scenarios", "scenarios" ]
+          "scenarios" : [ "some_scenario", "another_scenario" ]
         },
         "properties" : {
           "scenarios" : {
-            "description" : "Scenario names",
+            "example" : [ "some_scenario", "another_scenario" ],
             "items" : {
               "type" : "string"
             },
@@ -200,12 +200,21 @@
       },
       "inline_response_200" : {
         "example" : {
-          "nodes" : "{}"
+          "nodes" : {
+            "amoc@host1" : "up",
+            "amoc@host2" : "up"
+          }
         },
         "properties" : {
           "nodes" : {
-            "description" : "nodeName: up | down",
-            "properties" : { },
+            "additionalProperties" : {
+              "enum" : [ "up", "down" ],
+              "type" : "string"
+            },
+            "example" : {
+              "amoc@host1" : "up",
+              "amoc@host2" : "up"
+            },
             "type" : "object"
           }
         },
@@ -213,11 +222,11 @@
       },
       "inline_response_200_2" : {
         "example" : {
-          "scenario_status" : "scenario_status"
+          "scenario_status" : "loaded"
         },
         "properties" : {
           "scenario_status" : {
-            "description" : "loaded | running | finished",
+            "enum" : [ "loaded", "running", "finished", "error" ],
             "type" : "string"
           }
         },
@@ -247,11 +256,11 @@
       },
       "inline_response_200_4" : {
         "example" : {
-          "node_status" : "node_status"
+          "node_status" : "up"
         },
         "properties" : {
           "node_status" : {
-            "description" : "up | down",
+            "enum" : [ "up", "down" ],
             "type" : "string"
           }
         },
