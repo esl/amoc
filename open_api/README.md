@@ -54,3 +54,5 @@ the `openapi generator`
         TODO: this should be also reported to the openapi generator project
 
 * create custom `logic handler` module
+* implement HTTP `GET` methods:
+  * extract and adjust source code from `cowboy-swagger` based implementation
