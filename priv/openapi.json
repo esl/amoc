@@ -140,7 +140,18 @@
     },
     "/scenarios/upload" : {
       "put" : {
-        "description" : "Uploads new scenario (add '--upload-file scenario.erl' flag to the curl command)",
+        "description" : "Uploads new scenario",
+        "requestBody" : {
+          "content" : {
+            "text/plain" : {
+              "example" : "Past module source code here!!!",
+              "schema" : {
+                "format" : "binary",
+                "type" : "string"
+              }
+            }
+          }
+        },
         "responses" : {
           "200" : {
             "content" : {
@@ -173,11 +184,12 @@
     "schemas" : {
       "inline_response_200_5" : {
         "example" : {
-          "compile" : "compile"
+          "compile" : "ok"
         },
         "properties" : {
           "compile" : {
-            "description" : "ok | Errors",
+            "description" : "ok | Error",
+            "example" : "ok",
             "type" : "string"
           }
         },

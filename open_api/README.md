@@ -57,3 +57,5 @@ the `openapi generator`
 * implement HTTP `GET` methods:
   * extract and adjust source code from `cowboy-swagger` based implementation
   * update schemas for `GET` methods
+* implement `/upload` method:
+  * update OpenAPI definition for `/upload` method

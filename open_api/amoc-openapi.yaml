@@ -143,9 +143,14 @@ paths:
     put:
       tags:
         - upload
-      description: >-
-        Uploads new scenario (add '--upload-file scenario.erl' flag to the curl
-        command)
+      description: Uploads new scenario
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+              format: binary
+            example: Past module source code here!!!
       responses:
         '200':
           description: response object
@@ -158,5 +163,6 @@ paths:
                 properties:
                   compile:
                     type: string
-                    description: ok | Errors
+                    description: ok | Error
+                    example: ok
 components: {}
