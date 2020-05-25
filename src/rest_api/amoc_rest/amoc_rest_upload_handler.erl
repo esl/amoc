@@ -75,6 +75,7 @@ is_authorized(Req, State) ->
 
 content_types_accepted(Req, State) ->
     {[
+        {<<"application/octet-stream">>, handle_request_json},
         {<<"text/plain">>, handle_request_json}
     ], Req, State}.
 

@@ -146,6 +146,10 @@ paths:
       description: Uploads new scenario
       requestBody:
         content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
           text/plain:
             schema:
               type: string

@@ -143,6 +143,12 @@
         "description" : "Uploads new scenario",
         "requestBody" : {
           "content" : {
+            "application/octet-stream" : {
+              "schema" : {
+                "format" : "binary",
+                "type" : "string"
+              }
+            },
             "text/plain" : {
               "example" : "Past module source code here!!!",
               "schema" : {
