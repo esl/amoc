@@ -65,3 +65,4 @@ the `openapi generator`
 
   * allow `application/octet-stream` content type for the `/upload` method, it has a
 nice file selection menu in the `swagger-ui`
+  * update `/upload` description

@@ -143,7 +143,13 @@ paths:
     put:
       tags:
         - upload
-      description: Uploads new scenario
+      description: >-
+        Uploads new scenario, you can run the next command to upload a file
+        using curl utility
+
+
+        `curl -s -H "Content-Type: text/plain" -T <filename>
+        http://<amoc_host>/upload`
       requestBody:
         content:
           application/octet-stream:
