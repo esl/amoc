@@ -75,7 +75,7 @@ is_authorized(Req, State) ->
 
 content_types_accepted(Req, State) ->
     {[
-        {<<"application/json">>, handle_request_json}
+        {<<"text/plain">>, handle_request_json}
     ], Req, State}.
 
 -spec valid_content_headers(Req :: cowboy_req:req(), State :: state()) ->

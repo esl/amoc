@@ -41,6 +41,13 @@ handle_request('ScenariosIdGet', _Req, #{id := Resource}) ->
     Status = amoc_api_scenario_status:test_status(Scenario),
     BinStatus = atom_to_binary(Status, latin1),
     {200, #{}, [{<<"scenario_status">>, BinStatus}]};
+handle_request('ScenariosUploadPut', Req, _Context) ->
+    {ok, ModuleSource, _} = cowboy_req:read_body(Req),
+    BinStatus = case amoc_api_upload_scenario:upload(ModuleSource) of
+                    ok -> <<"ok">>;
+                    {error, Error} -> Error
+                end,
+    {200, #{}, [{<<"compile">>, BinStatus}]};
 handle_request(OperationID, Req, Context) ->
     error_logger:error_msg(
         "Got not implemented request to process: ~p~n",
