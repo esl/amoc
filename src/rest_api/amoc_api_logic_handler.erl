@@ -41,6 +41,19 @@ handle_request('ScenariosIdGet', _Req, #{id := Resource}) ->
     Status = amoc_api_scenario_status:test_status(Scenario),
     BinStatus = atom_to_binary(Status, latin1),
     {200, #{}, [{<<"scenario_status">>, BinStatus}]};
+handle_request('ScenariosIdPatch', _Req, #{id := Resource, inline_object := Body}) ->
+    Scenario = binary_to_atom(Resource, latin1),
+    Users = maps:get(<<"users">>, Body),
+    SettingsMap = maps:get(<<"settings">>, Body, #{}),
+    Settings = [begin
+                    Key = binary_to_atom(K, latin1),
+                    {ok, Value} = amoc_config_env:parse_value(V),
+                    {Key, Value}
+                end || {K, V} <- maps:to_list(SettingsMap)],
+    case amoc_dist:do(Scenario, Users, Settings) of
+        {ok, _} -> {200, #{}, [{<<"scenario">>, <<"started">>}]};
+        {error, _} -> {200, #{}, [{<<"scenario">>, <<"error">>}]}
+    end;
 handle_request('ScenariosUploadPut', Req, _Context) ->
     {ok, ModuleSource, _} = cowboy_req:read_body(Req),
     BinStatus = case amoc_api_upload_scenario:upload(ModuleSource) of

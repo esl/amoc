@@ -28,7 +28,11 @@ request_params('ScenariosIdGet') ->
 request_params('ScenariosIdPatch') ->
     [
         'id',
-        'InlineObject'
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %% the schema is called 'inline_object' %%
+        %% in openapi.json, not 'InlineObject'  %%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        'inline_object'
     ];
 
 
@@ -95,7 +99,7 @@ request_param_info('ScenariosIdPatch', 'id') ->
         ]
     };
 
-request_param_info('ScenariosIdPatch', 'InlineObject') ->
+request_param_info('ScenariosIdPatch', 'inline_object') ->
     #{
         source =>   body,
         rules => [

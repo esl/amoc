@@ -68,3 +68,7 @@ nice file selection menu in the `swagger-ui`
   * update `/upload` description
 * implement scenario execution REST API:
   * update OpenAPI definition
+  * implement scenario execution interface. notice the changes in generated code
+
+        TODO: this should be also reported to the openapi generator project
+
