@@ -41,7 +41,7 @@ trails() ->
                   responses => ResponseBodyPut
                  }
          },
-    [trails:trail("/upload", ?MODULE, [], Metadata)].
+    [trails:trail("/scenarios/upload", ?MODULE, [], Metadata)].
 
 -spec init(cowboy_req:req(), state()) ->
     {cowboy_rest, cowboy_req:req(), state()}.
@@ -115,7 +115,8 @@ install_scenario_on_nodes(Nodes, Module, ModuleSource) ->
     rpc:multicall(Nodes, amoc_scenario, install_scenario, [Module, ModuleSource]).
 
 process_multicall_results(Nodes, {Results, BadNodes}) ->
-    Errors = [{Node, Error} || {Node, {badrpc, Error}} <- lists:zip(Nodes -- BadNodes, Results)],
+    GoodNodes = Nodes -- BadNodes,
+    Errors = [{Node, Error} || {Node, {badrpc, Error}} <- lists:zip(GoodNodes, Results)],
     Msg = case {BadNodes, Errors} of
         {[], []} ->
                   case lists:all(fun(X) -> X == ok end, Results) of
@@ -127,7 +128,7 @@ process_multicall_results(Nodes, {Results, BadNodes}) ->
         {[], _} ->
             process_reachable_nodes(Nodes, Errors);
         {_, _} ->
-            [process_reachable_nodes(Nodes -- BadNodes, Errors)
+            [process_reachable_nodes(GoodNodes, Errors)
              | io_lib:format("Error, unreachable nodes: ~p~n", [BadNodes])]
     end,
     lists:flatten(Msg).

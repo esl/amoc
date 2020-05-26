@@ -5,7 +5,7 @@
 -include("scenario_template.hrl").
 
 -define(SCENARIOS_URL_S, "/scenarios").
--define(SCENARIOS_URL_U, "/upload").
+-define(SCENARIOS_URL_U, "/scenarios/upload").
 -define(SCENARIOS_DIR_S, filename:join(code:priv_dir(amoc), "scenarios")).
 -define(SCENARIOS_EBIN_DIR_S, filename:join(code:priv_dir(amoc), "scenarios_ebin")).
 -define(SAMPLE_SCENARIO_DECLARATION, "-module(sample_test).").

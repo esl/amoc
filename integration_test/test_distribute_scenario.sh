@@ -54,7 +54,7 @@ echo "Installing scenario: 'dummy_scenario.erl' on node amoc-1 (port ${PORT1})"
 
 SCEN_PUT=$(curl -s -H "Content-Type: text/plain" \
                  -T integration_test/dummy_scenario.erl \
-                 'http://localhost:8081/upload')
+                 'http://localhost:8081/scenarios/upload')
 echo "Response: ${SCEN_PUT}"
 
 ensure_scenarios_installed ${PORT2} ${SCENARIO_NAME}
