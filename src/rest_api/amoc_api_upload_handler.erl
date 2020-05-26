@@ -72,8 +72,7 @@ from_text(Req, State) ->
         {ok, {ModuleName, ModuleSource}, Req2} ->
             Nodes = amoc_cluster:all_nodes(),
             Result = install_scenario_on_nodes(Nodes, ModuleName, ModuleSource),
-            ResultBody =  erlang:list_to_bitstring(
-                            process_multicall_results(Nodes, Result)),
+            ResultBody =  process_multicall_results(Result),
             Reply = jiffy:encode({[{compile, ResultBody}]}),
             Req3 = cowboy_req:set_resp_body(Reply, Req2),
             {true, Req3, State};
@@ -100,9 +99,9 @@ get_vars_from_body(Req) ->
 get_module_name(SourceCode) ->
     try
         {match, [ModuleStr]} =
-        re:run(SourceCode, "^\s*-\s*module.*$", [{newline, any},
-                                                 multiline,
-                                                 {capture, first, list}]),
+            re:run(SourceCode, "^\s*-\s*module.*$", [{newline, any},
+                                                     multiline,
+                                                     {capture, first, list}]),
         {ok, Tokens, _} = erl_scan:string(ModuleStr),
         {ok, {attribute, _, module, ModuleName}} = erl_parse:parse(Tokens),
         true = is_atom(ModuleName),
@@ -114,49 +113,31 @@ get_module_name(SourceCode) ->
 install_scenario_on_nodes(Nodes, Module, ModuleSource) ->
     rpc:multicall(Nodes, amoc_scenario, install_scenario, [Module, ModuleSource]).
 
-process_multicall_results(Nodes, {Results, BadNodes}) ->
-    GoodNodes = Nodes -- BadNodes,
-    Errors = [{Node, Error} || {Node, {badrpc, Error}} <- lists:zip(GoodNodes, Results)],
-    Msg = case {BadNodes, Errors} of
-        {[], []} ->
-                  case lists:all(fun(X) -> X == ok end, Results) of
-                      true ->
-                          [<<"ok">>];
-                      _ ->
-                          [result_to_string(Res) || Res <- Results]
-                  end;
-        {[], _} ->
-            process_reachable_nodes(Nodes, Errors);
-        {_, _} ->
-            [process_reachable_nodes(GoodNodes, Errors)
-             | io_lib:format("Error, unreachable nodes: ~p~n", [BadNodes])]
-    end,
-    lists:flatten(Msg).
-
-result_to_string(Result) ->
-    case Result of
-        ok -> <<"ok">>;
-        {error, Errors, _Warnings} ->
-            R = io_lib:format("~p", [Errors]),
-            erlang:list_to_bitstring(lists:flatten(R))
+process_multicall_results({Results, []}) ->
+    case lists:all(fun(X) -> X == ok end, Results) of
+        true -> <<"ok">>;
+        _ -> results_to_binary(Results)
+    end;
+process_multicall_results({Results, BadNodes}) ->
+    BadNodesError = bad_nodes_to_binary(BadNodes),
+    case process_multicall_results({Results, []}) of
+        <<"ok">> -> BadNodesError;
+        ErrorMsg -> <<ErrorMsg/binary, BadNodesError/binary>>
     end.
 
-process_reachable_nodes([], _) ->
-    [];
-process_reachable_nodes(Nodes, Errors) ->
-    ErrorNodes = [Node || {Node, _} <- Errors],
-    SuccessNodes = Nodes -- ErrorNodes,
-    SuccessMsg = case SuccessNodes of
-                     [] ->
-                         [];
-                     _ ->
-                         io_lib:format("Success on nodes: ~p~n", [SuccessNodes])
-                 end,
-    ErrorMsg = [node_error_message({Node, Error}) || {Node, Error} <- Errors],
-    [SuccessMsg | ErrorMsg].
+results_to_binary(Results) ->
+    <<(result_to_binary(Res)) || Res <- Results>>.
 
-node_error_message({Node, Error}) ->
-    io_lib:format("Error on node ~s: ~p~n", [Node, Error]).
+result_to_binary(Result) ->
+    ErrorsMsg = case Result of
+                    ok -> [];
+                    {badrpc, BadRPC} ->
+                        io_lib:format("compilation errors: ~p~n", [BadRPC]);
+                    {error, Errors, _Warnings} ->
+                        io_lib:format("compilation errors: ~p~n", [Errors])
+                end,
+    erlang:list_to_binary(lists:flatten(ErrorsMsg)).
 
-
-
+bad_nodes_to_binary(BadNodes) ->
+    ErrorsMsg = io_lib:format("unreachable nodes: ~p~n", [BadNodes]),
+    erlang:list_to_binary(lists:flatten(ErrorsMsg)).

@@ -72,8 +72,8 @@ put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Conf
     %% then
     ?assertNot(filelib:is_regular(ScenarioFileSource)),
     ?assertEqual(200, CodeHttp),
-    Error = <<"[{\"", (list_to_binary(ScenarioFileSource))/binary,
-              "\",\n  [{2,erl_parse,[\"syntax error before: \",[]]}]}]">>,
+    Error = <<"compilation errors: [{\"", (list_to_binary(ScenarioFileSource))/binary, "\","
+              "\n                      [{2,erl_parse,[\"syntax error before: \",[]]}]}]\n">>,
     ?assertEqual({[{<<"compile">>, Error}]}, Body).
 
 put_scenarios_returns_200_when_scenario_valid(_Config) ->
