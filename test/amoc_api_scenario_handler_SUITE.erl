@@ -148,17 +148,22 @@ patch_scenario_returns_200_when_request_ok_and_module_exists_w_settings(_Config)
     {CodeHttp, _Body} = amoc_api_helper:patch(
         ?SAMPLE_GOOD_SCENARIO_PATH, RequestBody),
 
-    Settings = [{some_map, #{a=>b}},
-                {some_list, [a, b, c]},
-                {some_tuple, {a, b, c}},
-                {some_string, "aaa"},
-                {some_binary, <<"bbb">>},
-                {some_atom, 'ATOM'},
-                {some_int, 4},
-                {some_float, 4.6}],
+    Predicate = fun(S) ->
+                    Settings = [{some_map, #{a => b}},
+                                {some_list, [a, b, c]},
+                                {some_tuple, {a, b, c}},
+                                {some_string, "aaa"},
+                                {some_binary, <<"bbb">>},
+                                {some_atom, 'ATOM'},
+                                {some_int, 4},
+                                {some_float, 4.6}],
+                    ?assertEqual(lists:sort(S), lists:sort(Settings)),
+                    true
+                end,
+    SettingsMatcher = meck_matcher:new(Predicate),
     %% then
     %% Maybe check Body, as answer format will be ready
-    meck:wait(amoc_dist, do, ['sample_test1', 10, Settings], 2000),
+    meck:wait(amoc_dist, do, ['sample_test1', 10, SettingsMatcher], 2000),
     ?assertEqual(200, CodeHttp).
 
 patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
@@ -188,8 +193,8 @@ destroy_env() ->
 
 -spec given_test_status_mocked(atom()) -> ok.
 given_test_status_mocked(Value) ->
-    meck:new(amoc_api_scenario_handler, [passthrough]),
-    meck:expect(amoc_api_scenario_handler, test_status, fun(_) -> Value end).
+    meck:new(amoc_api_scenario_status, [passthrough]),
+    meck:expect(amoc_api_scenario_status, test_status, fun(_) -> Value end).
 
 -spec mock_amoc_dist_do() -> ok.
 mock_amoc_dist_do() ->
@@ -199,4 +204,4 @@ mock_amoc_dist_do() ->
 
 -spec cleanup_test_status_mock() -> ok.
 cleanup_test_status_mock() ->
-    meck:unload(amoc_api_scenario_handler).
+    meck:unload(amoc_api_scenario_status).

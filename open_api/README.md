@@ -79,3 +79,5 @@ module, `amoc_rest_utils` must be used instead.
         TODO: this should be also reported to the openapi generator project
 
   * as we do not use REST API authentication, `amoc_rest_auth` module isn't used at all. so it can be safely removed.
+* run `make test`, identify and fix all the issues with tests:
+    * fix mocking and `undefined functions` issues

@@ -1,6 +1,10 @@
+%%==============================================================================
+%% Copyright 2015 Erlang Solutions Ltd.
+%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
+%%==============================================================================
 -module(amoc_api).
 
--export([start/0]).
+-export([start/0, stop/0]).
 
 -spec start() -> {ok, pid()} | {error, any()}.
 start() ->
@@ -11,6 +15,10 @@ start() ->
                      cowboy_extra_opts => #{env => #{dispatch => Dispatch}},
                      logic_handler => LogicHandler},
     amoc_rest_server:start(http_server, ServerParams).
+
+-spec stop() -> ok | {error, not_found}.
+stop() ->
+    cowboy:stop_listener(http_server).
 
 get_routes(LogicHandler) ->
     %% this function adds static routing for swagger-ui
