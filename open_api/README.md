@@ -72,3 +72,10 @@ nice file selection menu in the `swagger-ui`
 
         TODO: this should be also reported to the openapi generator project
 
+* run `make xref`, identify and fix minor issues:
+  * `amoc_rest_auth:get_api_key/3` calls undefined function `openapi_utils:to_header/1` - there is no `openapi_utils`
+module, `amoc_rest_utils` must be used instead.
+
+        TODO: this should be also reported to the openapi generator project
+
+  * as we do not use REST API authentication, `amoc_rest_auth` module isn't used at all. so it can be safely removed.
