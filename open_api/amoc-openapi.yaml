@@ -44,26 +44,6 @@ paths:
                     description: Scenario names
                     items:
                       type: string
-  /scenarios/upload:
-    put:
-      tags:
-        - upload
-      description: >-
-        Uploads new scenario (add '--upload-file scenario.erl' flag to the curl
-        command)
-      responses:
-        '200':
-          description: response object
-          content:
-            application/json:
-              schema:
-                required:
-                  - compile
-                type: object
-                properties:
-                  compile:
-                    type: string
-                    description: ok | Errors
   '/scenarios/{id}':
     get:
       tags:
@@ -145,4 +125,24 @@ paths:
                   node_status:
                     type: string
                     description: up | down
+  /scenarios/upload:
+    put:
+      tags:
+        - upload
+      description: >-
+        Uploads new scenario (add '--upload-file scenario.erl' flag to the curl
+        command)
+      responses:
+        '200':
+          description: response object
+          content:
+            application/json:
+              schema:
+                required:
+                  - compile
+                type: object
+                properties:
+                  compile:
+                    type: string
+                    description: ok | Errors
 components: {}
