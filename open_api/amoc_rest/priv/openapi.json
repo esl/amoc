@@ -88,12 +88,27 @@
         "requestBody" : {
           "$ref" : "#/components/requestBodies/inline_object",
           "content" : {
-            "*/*" : {
+            "application/json" : {
               "schema" : {
                 "properties" : {
                   "users" : {
                     "description" : "Number of users to start",
+                    "example" : 1000,
                     "type" : "integer"
+                  },
+                  "settings" : {
+                    "additionalProperties" : {
+                      "type" : "string"
+                    },
+                    "description" : "Scenario parameters",
+                    "example" : {
+                      "atom_parameter" : "atom1",
+                      "list_parameter" : "[atom1, atom2]",
+                      "tuple_parameter" : "{atom1, atom2}",
+                      "string_parameter" : "\"some_string\"",
+                      "binary_parameter" : "<<\"some_binary\">>"
+                    },
+                    "type" : "object"
                   }
                 },
                 "required" : [ "users" ],
@@ -116,8 +131,7 @@
             "description" : "response object"
           }
         },
-        "tags" : [ "scenario" ],
-        "x-codegen-request-body-name" : "request body"
+        "tags" : [ "scenario" ]
       }
     },
     "/status" : {
@@ -178,7 +192,7 @@
     "requestBodies" : {
       "inline_object" : {
         "content" : {
-          "*/*" : {
+          "application/json" : {
             "schema" : {
               "$ref" : "#/components/schemas/inline_object"
             }
@@ -254,7 +268,22 @@
         "properties" : {
           "users" : {
             "description" : "Number of users to start",
+            "example" : 1000,
             "type" : "integer"
+          },
+          "settings" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Scenario parameters",
+            "example" : {
+              "atom_parameter" : "atom1",
+              "list_parameter" : "[atom1, atom2]",
+              "tuple_parameter" : "{atom1, atom2}",
+              "string_parameter" : "\"some_string\"",
+              "binary_parameter" : "<<\"some_binary\">>"
+            },
+            "type" : "object"
           }
         },
         "required" : [ "users" ],
@@ -262,11 +291,11 @@
       },
       "inline_response_200_3" : {
         "example" : {
-          "scenario" : "scenario"
+          "scenario" : "started"
         },
         "properties" : {
           "scenario" : {
-            "description" : "started | wrong_json",
+            "enum" : [ "started", "error" ],
             "type" : "string"
           }
         },

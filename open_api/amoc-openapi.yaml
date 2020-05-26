@@ -95,7 +95,7 @@ paths:
       requestBody:
         description: request body (as json)
         content:
-          '*/*':
+          application/json:
             schema:
               required:
                 - users
@@ -104,6 +104,18 @@ paths:
                 users:
                   type: integer
                   description: Number of users to start
+                  example: 1000
+                settings:
+                  type: object
+                  description: Scenario parameters
+                  additionalProperties:
+                    type: string
+                  example:
+                    atom_parameter: atom1
+                    list_parameter: '[atom1, atom2]'
+                    tuple_parameter: '{atom1, atom2}'
+                    string_parameter: '"some_string"'
+                    binary_parameter: <<"some_binary">>
         required: true
       responses:
         '200':
@@ -117,8 +129,9 @@ paths:
                 properties:
                   scenario:
                     type: string
-                    description: started | wrong_json
-      x-codegen-request-body-name: request body
+                    enum:
+                      - started
+                      - error
   /status:
     get:
       tags:
