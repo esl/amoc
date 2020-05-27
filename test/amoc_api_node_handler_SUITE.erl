@@ -29,7 +29,8 @@ returns_empty_list_when_amoc_up(_Config) ->
     {CodeHttp,JSON} = amoc_api_helper:get(?PATH),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch({[{<<"nodes">>, {[]}}]}, JSON).
+    ThisNode = {atom_to_binary(node(), latin1), <<"up">>},
+    ?assertMatch({[{<<"nodes">>, {[ThisNode]}}]}, JSON).
 
 returns_nodes_list_when_amoc_up(_Config) ->
     %% given
@@ -39,9 +40,11 @@ returns_nodes_list_when_amoc_up(_Config) ->
     {CodeHttp, JSON} = amoc_api_helper:get(?PATH),
     %% then
     ?assertEqual(200, CodeHttp),
+    ThisNode = {atom_to_binary(node(), latin1), <<"up">>},
     ?assertMatch(
         {[{<<"nodes">>,
-           {[{<<"test1">>, <<"up">>},
+           {[ThisNode,
+             {<<"test1">>, <<"up">>},
              {<<"test2">>, <<"down">>},
              {<<"test3">>, <<"down">>}]}}]},
         JSON),
