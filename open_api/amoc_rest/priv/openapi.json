@@ -16,7 +16,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/inline_response_200"
+                  "$ref" : "#/components/schemas/NodesKV"
                 }
               }
             },
@@ -34,7 +34,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/inline_response_200_1"
+                  "$ref" : "#/components/schemas/ScenarioList"
                 }
               }
             },
@@ -63,7 +63,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/inline_response_200_2"
+                  "$ref" : "#/components/schemas/ScenarioStatus"
                 }
               }
             },
@@ -86,33 +86,10 @@
           "style" : "simple"
         } ],
         "requestBody" : {
-          "$ref" : "#/components/requestBodies/inline_object",
           "content" : {
             "application/json" : {
               "schema" : {
-                "properties" : {
-                  "users" : {
-                    "description" : "Number of users to start",
-                    "example" : 1000,
-                    "type" : "integer"
-                  },
-                  "settings" : {
-                    "additionalProperties" : {
-                      "type" : "string"
-                    },
-                    "description" : "Scenario parameters",
-                    "example" : {
-                      "atom_parameter" : "atom1",
-                      "list_parameter" : "[atom1, atom2]",
-                      "tuple_parameter" : "{atom1, atom2}",
-                      "string_parameter" : "\"some_string\"",
-                      "binary_parameter" : "<<\"some_binary\">>"
-                    },
-                    "type" : "object"
-                  }
-                },
-                "required" : [ "users" ],
-                "type" : "object"
+                "$ref" : "#/components/schemas/ScenarioExecution"
               }
             }
           },
@@ -124,7 +101,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/inline_response_200_3"
+                  "$ref" : "#/components/schemas/ScenarioExecutionResp"
                 }
               }
             },
@@ -142,7 +119,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/inline_response_200_4"
+                  "$ref" : "#/components/schemas/AmocStatus"
                 }
               }
             },
@@ -159,15 +136,13 @@
           "content" : {
             "application/octet-stream" : {
               "schema" : {
-                "format" : "binary",
-                "type" : "string"
+                "$ref" : "#/components/schemas/UploadBody"
               }
             },
             "text/plain" : {
               "example" : "Past module source code here!!!",
               "schema" : {
-                "format" : "binary",
-                "type" : "string"
+                "$ref" : "#/components/schemas/UploadBody"
               }
             }
           }
@@ -177,7 +152,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/inline_response_200_5"
+                  "$ref" : "#/components/schemas/UploadResp"
                 }
               }
             },
@@ -189,48 +164,8 @@
     }
   },
   "components" : {
-    "requestBodies" : {
-      "inline_object" : {
-        "content" : {
-          "application/json" : {
-            "schema" : {
-              "$ref" : "#/components/schemas/inline_object"
-            }
-          }
-        },
-        "required" : true
-      }
-    },
     "schemas" : {
-      "inline_response_200_5" : {
-        "example" : {
-          "compile" : "ok"
-        },
-        "properties" : {
-          "compile" : {
-            "description" : "ok | Error",
-            "example" : "ok",
-            "type" : "string"
-          }
-        },
-        "required" : [ "compile" ]
-      },
-      "inline_response_200_1" : {
-        "example" : {
-          "scenarios" : [ "some_scenario", "another_scenario" ]
-        },
-        "properties" : {
-          "scenarios" : {
-            "example" : [ "some_scenario", "another_scenario" ],
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          }
-        },
-        "required" : [ "scenarios" ]
-      },
-      "inline_response_200" : {
+      "NodesKV" : {
         "example" : {
           "nodes" : {
             "amoc@host1" : "up",
@@ -250,9 +185,26 @@
             "type" : "object"
           }
         },
-        "required" : [ "nodes" ]
+        "required" : [ "nodes" ],
+        "type" : "object"
       },
-      "inline_response_200_2" : {
+      "ScenarioList" : {
+        "example" : {
+          "scenarios" : [ "some_scenario", "another_scenario" ]
+        },
+        "properties" : {
+          "scenarios" : {
+            "example" : [ "some_scenario", "another_scenario" ],
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "scenarios" ],
+        "type" : "object"
+      },
+      "ScenarioStatus" : {
         "example" : {
           "scenario_status" : "loaded"
         },
@@ -262,9 +214,20 @@
             "type" : "string"
           }
         },
-        "required" : [ "scenario_status" ]
+        "required" : [ "scenario_status" ],
+        "type" : "object"
       },
-      "inline_object" : {
+      "ScenarioExecution" : {
+        "example" : {
+          "settings" : {
+            "atom_parameter" : "atom1",
+            "list_parameter" : "[atom1, atom2]",
+            "tuple_parameter" : "{atom1, atom2}",
+            "string_parameter" : "\"some_string\"",
+            "binary_parameter" : "<<\"some_binary\">>"
+          },
+          "users" : 1000
+        },
         "properties" : {
           "users" : {
             "description" : "Number of users to start",
@@ -289,7 +252,7 @@
         "required" : [ "users" ],
         "type" : "object"
       },
-      "inline_response_200_3" : {
+      "ScenarioExecutionResp" : {
         "example" : {
           "scenario" : "started"
         },
@@ -299,9 +262,10 @@
             "type" : "string"
           }
         },
-        "required" : [ "scenario" ]
+        "required" : [ "scenario" ],
+        "type" : "object"
       },
-      "inline_response_200_4" : {
+      "AmocStatus" : {
         "example" : {
           "node_status" : "up"
         },
@@ -311,7 +275,26 @@
             "type" : "string"
           }
         },
-        "required" : [ "node_status" ]
+        "required" : [ "node_status" ],
+        "type" : "object"
+      },
+      "UploadBody" : {
+        "format" : "binary",
+        "type" : "string"
+      },
+      "UploadResp" : {
+        "example" : {
+          "compile" : "ok"
+        },
+        "properties" : {
+          "compile" : {
+            "description" : "ok | Error",
+            "example" : "ok",
+            "type" : "string"
+          }
+        },
+        "required" : [ "compile" ],
+        "type" : "object"
       }
     }
   }

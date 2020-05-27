@@ -28,11 +28,7 @@ request_params('ScenariosIdGet') ->
 request_params('ScenariosIdPatch') ->
     [
         'id',
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %% the schema is called 'inline_object' %%
-        %% in openapi.json, not 'InlineObject'  %%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        'inline_object'
+        'ScenarioExecution'
     ];
 
 
@@ -99,7 +95,7 @@ request_param_info('ScenariosIdPatch', 'id') ->
         ]
     };
 
-request_param_info('ScenariosIdPatch', 'inline_object') ->
+request_param_info('ScenariosIdPatch', 'ScenarioExecution') ->
     #{
         source =>   body,
         rules => [
@@ -156,26 +152,26 @@ populate_request_param(OperationID, Name, Req0, ValidatorState) ->
 
 
 validate_response('NodesGet', 200, Body, ValidatorState) ->
-    validate_response_body('inline_response_200', 'inline_response_200', Body, ValidatorState);
+    validate_response_body('NodesKV', 'NodesKV', Body, ValidatorState);
 
 
 validate_response('ScenariosIdGet', 200, Body, ValidatorState) ->
-    validate_response_body('inline_response_200_2', 'inline_response_200_2', Body, ValidatorState);
+    validate_response_body('ScenarioStatus', 'ScenarioStatus', Body, ValidatorState);
 
 validate_response('ScenariosIdPatch', 200, Body, ValidatorState) ->
-    validate_response_body('inline_response_200_3', 'inline_response_200_3', Body, ValidatorState);
+    validate_response_body('ScenarioExecutionResp', 'ScenarioExecutionResp', Body, ValidatorState);
 
 
 validate_response('ScenariosGet', 200, Body, ValidatorState) ->
-    validate_response_body('inline_response_200_1', 'inline_response_200_1', Body, ValidatorState);
+    validate_response_body('ScenarioList', 'ScenarioList', Body, ValidatorState);
 
 
 validate_response('StatusGet', 200, Body, ValidatorState) ->
-    validate_response_body('inline_response_200_4', 'inline_response_200_4', Body, ValidatorState);
+    validate_response_body('AmocStatus', 'AmocStatus', Body, ValidatorState);
 
 
 validate_response('ScenariosUploadPut', 200, Body, ValidatorState) ->
-    validate_response_body('inline_response_200_5', 'inline_response_200_5', Body, ValidatorState);
+    validate_response_body('UploadResp', 'UploadResp', Body, ValidatorState);
 
 
 validate_response(_OperationID, _Code, _Body, _ValidatorState) ->

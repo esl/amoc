@@ -41,7 +41,8 @@ handle_request('ScenariosIdGet', _Req, #{id := Resource}) ->
     Status = amoc_api_scenario_status:test_status(Scenario),
     BinStatus = atom_to_binary(Status, latin1),
     {200, #{}, [{<<"scenario_status">>, BinStatus}]};
-handle_request('ScenariosIdPatch', _Req, #{id := Resource, inline_object := Body}) ->
+handle_request('ScenariosIdPatch', _Req, #{'ScenarioExecution' := Body,
+                                           id := Resource }) ->
     Scenario = binary_to_atom(Resource, latin1),
     Users = maps:get(<<"users">>, Body),
     SettingsMap = maps:get(<<"settings">>, Body, #{}),

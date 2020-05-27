@@ -16,20 +16,7 @@ paths:
           content:
             application/json:
               schema:
-                required:
-                  - nodes
-                type: object
-                properties:
-                  nodes:
-                    type: object
-                    additionalProperties:
-                      type: string
-                      enum:
-                        - up
-                        - down
-                    example:
-                      amoc@host1: up
-                      amoc@host2: up
+                $ref: '#/components/schemas/NodesKV'
   /scenarios:
     get:
       tags:
@@ -41,17 +28,7 @@ paths:
           content:
             application/json:
               schema:
-                required:
-                  - scenarios
-                type: object
-                properties:
-                  scenarios:
-                    type: array
-                    items:
-                      type: string
-                    example:
-                      - some_scenario
-                      - another_scenario
+                $ref: '#/components/schemas/ScenarioList'
   '/scenarios/{id}':
     get:
       tags:
@@ -70,17 +47,7 @@ paths:
           content:
             application/json:
               schema:
-                required:
-                  - scenario_status
-                type: object
-                properties:
-                  scenario_status:
-                    type: string
-                    enum:
-                      - loaded
-                      - running
-                      - finished
-                      - error
+                $ref: '#/components/schemas/ScenarioStatus'
     patch:
       tags:
         - scenario
@@ -97,25 +64,7 @@ paths:
         content:
           application/json:
             schema:
-              required:
-                - users
-              type: object
-              properties:
-                users:
-                  type: integer
-                  description: Number of users to start
-                  example: 1000
-                settings:
-                  type: object
-                  description: Scenario parameters
-                  additionalProperties:
-                    type: string
-                  example:
-                    atom_parameter: atom1
-                    list_parameter: '[atom1, atom2]'
-                    tuple_parameter: '{atom1, atom2}'
-                    string_parameter: '"some_string"'
-                    binary_parameter: <<"some_binary">>
+              $ref: '#/components/schemas/ScenarioExecution'
         required: true
       responses:
         '200':
@@ -123,15 +72,7 @@ paths:
           content:
             application/json:
               schema:
-                required:
-                  - scenario
-                type: object
-                properties:
-                  scenario:
-                    type: string
-                    enum:
-                      - started
-                      - error
+                $ref: '#/components/schemas/ScenarioExecutionResp'
   /status:
     get:
       tags:
@@ -143,15 +84,7 @@ paths:
           content:
             application/json:
               schema:
-                required:
-                  - node_status
-                type: object
-                properties:
-                  node_status:
-                    type: string
-                    enum:
-                      - up
-                      - down
+                $ref: '#/components/schemas/AmocStatus'
   /scenarios/upload:
     put:
       tags:
@@ -167,12 +100,10 @@ paths:
         content:
           application/octet-stream:
             schema:
-              type: string
-              format: binary
+              $ref: '#/components/schemas/UploadBody'
           text/plain:
             schema:
-              type: string
-              format: binary
+              $ref: '#/components/schemas/UploadBody'
             example: Past module source code here!!!
       responses:
         '200':
@@ -180,12 +111,97 @@ paths:
           content:
             application/json:
               schema:
-                required:
-                  - compile
-                type: object
-                properties:
-                  compile:
-                    type: string
-                    description: ok | Error
-                    example: ok
-components: {}
+                $ref: '#/components/schemas/UploadResp'
+components:
+  schemas:
+    NodesKV:
+      required:
+        - nodes
+      type: object
+      properties:
+        nodes:
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+              - up
+              - down
+          example:
+            amoc@host1: up
+            amoc@host2: up
+    ScenarioList:
+      required:
+        - scenarios
+      type: object
+      properties:
+        scenarios:
+          type: array
+          items:
+            type: string
+          example:
+            - some_scenario
+            - another_scenario
+    ScenarioStatus:
+      required:
+        - scenario_status
+      type: object
+      properties:
+        scenario_status:
+          type: string
+          enum:
+            - loaded
+            - running
+            - finished
+            - error
+    ScenarioExecution:
+      required:
+        - users
+      type: object
+      properties:
+        users:
+          type: integer
+          description: Number of users to start
+          example: 1000
+        settings:
+          type: object
+          description: Scenario parameters
+          additionalProperties:
+            type: string
+          example:
+            atom_parameter: atom1
+            list_parameter: '[atom1, atom2]'
+            tuple_parameter: '{atom1, atom2}'
+            string_parameter: '"some_string"'
+            binary_parameter: <<"some_binary">>
+    ScenarioExecutionResp:
+      required:
+        - scenario
+      type: object
+      properties:
+        scenario:
+          type: string
+          enum:
+            - started
+            - error
+    AmocStatus:
+      required:
+        - node_status
+      type: object
+      properties:
+        node_status:
+          type: string
+          enum:
+            - up
+            - down
+    UploadBody:
+      type: string
+      format: binary
+    UploadResp:
+      required:
+        - compile
+      type: object
+      properties:
+        compile:
+          type: string
+          description: ok | Error
+          example: ok
