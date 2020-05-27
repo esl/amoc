@@ -11,7 +11,8 @@ start() ->
     LogicHandler = amoc_api_logic_handler,
     Routes = get_routes(LogicHandler),
     Dispatch = cowboy_router:compile(Routes),
-    ServerParams = #{ip => {0, 0, 0, 0}, port => 4000, net_opts => [],
+    Port = amoc_config_env:get(api_port, 4000),
+    ServerParams = #{ip => {0, 0, 0, 0}, port => Port, net_opts => [],
                      cowboy_extra_opts => #{env => #{dispatch => Dispatch}},
                      logic_handler => LogicHandler},
     amoc_rest_server:start(http_server, ServerParams).

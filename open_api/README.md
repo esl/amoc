@@ -86,3 +86,4 @@ module, `amoc_rest_utils` must be used instead.
   * fix `amoc_api_scenario_handler_SUITE`
   * fix `amoc_api_scenarios_handler_SUITE`
 * update REST API descriptions in `amoc-openapi.yaml`
+* update REST API documentation
