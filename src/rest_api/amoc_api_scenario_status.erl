@@ -6,13 +6,13 @@
 %% API
 -export([test_status/1]).
 
--type scenario_status() :: error | running | finished | loaded.
+-type scenario_status() :: error | running | finished | loaded | doesnt_exist.
 
 -spec test_status(amoc:scenario()) -> scenario_status().
 test_status(ScenarioName) ->
     Nodes = amoc_cluster:all_nodes(),
     Status = [get_node_test_status(ScenarioName, Node) || Node <- Nodes],
-    pick_status(Status, [error, loaded, running, finished]).
+    pick_status(Status, [doesnt_exist, error, loaded, running, finished]).
 
 -spec get_node_test_status(amoc:scenario(), atom()) -> disabled | scenario_status().
 get_node_test_status(ScenarioName, Node) ->
@@ -21,7 +21,7 @@ get_node_test_status(ScenarioName, Node) ->
             {idle, Scenarios} ->
                 case lists:member(ScenarioName, Scenarios) of
                     true -> loaded;
-                    false -> error
+                    false -> doesnt_exist
                 end;
             {running, ScenarioName, _, _} -> running;
             {finished, ScenarioName} -> finished;

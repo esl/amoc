@@ -38,22 +38,33 @@ handle_request('StatusGet', _Req, _Context) ->
     {200, #{}, [{<<"node_status">>, Status}]};
 handle_request('ScenariosIdGet', _Req, #{id := Resource}) ->
     Scenario = binary_to_atom(Resource, latin1),
-    Status = amoc_api_scenario_status:test_status(Scenario),
-    BinStatus = atom_to_binary(Status, latin1),
-    {200, #{}, [{<<"scenario_status">>, BinStatus}]};
+    case amoc_api_scenario_status:test_status(Scenario) of
+        doesnt_exist ->
+            {404, #{}, #{}};
+        Status ->
+            BinStatus = atom_to_binary(Status, latin1),
+            {200, #{}, [{<<"scenario_status">>, BinStatus}]}
+    end;
 handle_request('ScenariosIdPatch', _Req, #{'ScenarioExecution' := Body,
                                            id := Resource }) ->
     Scenario = binary_to_atom(Resource, latin1),
-    Users = maps:get(<<"users">>, Body),
-    SettingsMap = maps:get(<<"settings">>, Body, #{}),
-    Settings = [begin
-                    Key = binary_to_atom(K, latin1),
-                    {ok, Value} = amoc_config_env:parse_value(V),
-                    {Key, Value}
-                end || {K, V} <- maps:to_list(SettingsMap)],
-    case amoc_dist:do(Scenario, Users, Settings) of
-        {ok, _} -> {200, #{}, [{<<"scenario">>, <<"started">>}]};
-        {error, _} -> {200, #{}, [{<<"scenario">>, <<"error">>}]}
+    case amoc_api_scenario_status:test_status(Scenario) of
+        doesnt_exist ->
+            {404, #{}, #{}};
+        loaded ->
+            Users = maps:get(<<"users">>, Body),
+            SettingsMap = maps:get(<<"settings">>, Body, #{}),
+            Settings = [begin
+                            Key = binary_to_atom(K, latin1),
+                            {ok, Value} = amoc_config_env:parse_value(V),
+                            {Key, Value}
+                        end || {K, V} <- maps:to_list(SettingsMap)],
+            case amoc_dist:do(Scenario, Users, Settings) of
+                {ok, _} -> {200, #{}, [{<<"scenario">>, <<"started">>}]};
+                {error, _} -> {200, #{}, [{<<"scenario">>, <<"error">>}]}
+            end;
+        _ ->
+            {200, #{}, [{<<"scenario">>, <<"error">>}]}
     end;
 handle_request('ScenariosUploadPut', Req, _Context) ->
     {ok, ModuleSource, _} = cowboy_req:read_body(Req),

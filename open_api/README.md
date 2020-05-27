@@ -83,3 +83,4 @@ module, `amoc_rest_utils` must be used instead.
     * fix mocking and `undefined functions` issues
     * use named json schemas in `amoc-openapi.yaml`
     * fix `amoc_api_node_handler_SUITE`
+    * fix `amoc_api_scenario_handler_SUITE`
