@@ -10,7 +10,7 @@
   "paths" : {
     "/nodes" : {
       "get" : {
-        "description" : "Pings AMOC nodes from master node.",
+        "description" : "List all AMOC nodes in a cluster.",
         "responses" : {
           "200" : {
             "content" : {
@@ -28,7 +28,7 @@
     },
     "/scenarios" : {
       "get" : {
-        "description" : "Gets list of available scenarios",
+        "description" : "List all available scenarios",
         "responses" : {
           "200" : {
             "content" : {
@@ -46,9 +46,9 @@
     },
     "/scenarios/{id}" : {
       "get" : {
-        "description" : "Gets scenario status",
+        "description" : "Get scenario status",
         "parameters" : [ {
-          "description" : "Scenario id",
+          "description" : "Scenario name",
           "explode" : false,
           "in" : "path",
           "name" : "id",
@@ -68,14 +68,17 @@
               }
             },
             "description" : "response object"
+          },
+          "404" : {
+            "description" : "no scenarion with such name"
           }
         },
         "tags" : [ "scenario" ]
       },
       "patch" : {
-        "description" : "Starts scenario",
+        "description" : "Start scenario",
         "parameters" : [ {
-          "description" : "Scenario id",
+          "description" : "Scenario name",
           "explode" : false,
           "in" : "path",
           "name" : "id",
@@ -106,6 +109,9 @@
               }
             },
             "description" : "response object"
+          },
+          "404" : {
+            "description" : "no scenarion with such name"
           }
         },
         "tags" : [ "scenario" ]
@@ -113,7 +119,7 @@
     },
     "/status" : {
       "get" : {
-        "description" : "Gets AMOC status, whether it is running or not.",
+        "description" : "Get AMOC app status, whether it is running or not.",
         "responses" : {
           "200" : {
             "content" : {
@@ -298,7 +304,7 @@
         },
         "properties" : {
           "compile" : {
-            "description" : "ok | Error",
+            "description" : "ok | CompilationError",
             "example" : "ok",
             "type" : "string"
           }

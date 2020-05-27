@@ -157,9 +157,13 @@ validate_response('NodesGet', 200, Body, ValidatorState) ->
 
 validate_response('ScenariosIdGet', 200, Body, ValidatorState) ->
     validate_response_body('ScenarioStatus', 'ScenarioStatus', Body, ValidatorState);
+validate_response('ScenariosIdGet', 404, Body, ValidatorState) ->
+    validate_response_body('', '', Body, ValidatorState);
 
 validate_response('ScenariosIdPatch', 200, Body, ValidatorState) ->
     validate_response_body('ScenarioExecutionResp', 'ScenarioExecutionResp', Body, ValidatorState);
+validate_response('ScenariosIdPatch', 404, Body, ValidatorState) ->
+    validate_response_body('', '', Body, ValidatorState);
 
 
 validate_response('ScenariosGet', 200, Body, ValidatorState) ->

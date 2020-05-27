@@ -9,7 +9,7 @@ paths:
     get:
       tags:
         - node
-      description: Pings AMOC nodes from master node.
+      description: List all AMOC nodes in a cluster.
       responses:
         '200':
           description: response object
@@ -21,7 +21,7 @@ paths:
     get:
       tags:
         - scenarios
-      description: Gets list of available scenarios
+      description: List all available scenarios
       responses:
         '200':
           description: response object
@@ -33,11 +33,11 @@ paths:
     get:
       tags:
         - scenario
-      description: Gets scenario status
+      description: Get scenario status
       parameters:
         - name: id
           in: path
-          description: Scenario id
+          description: Scenario name
           required: true
           schema:
             type: string
@@ -48,14 +48,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScenarioStatus'
+        '404':
+          description: no scenarion with such name
     patch:
       tags:
         - scenario
-      description: Starts scenario
+      description: Start scenario
       parameters:
         - name: id
           in: path
-          description: Scenario id
+          description: Scenario name
           required: true
           schema:
             type: string
@@ -73,11 +75,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScenarioExecutionResp'
+        '404':
+          description: no scenarion with such name
   /status:
     get:
       tags:
         - status
-      description: 'Gets AMOC status, whether it is running or not.'
+      description: 'Get AMOC app status, whether it is running or not.'
       responses:
         '200':
           description: response object
@@ -209,7 +213,7 @@ components:
       properties:
         compile:
           type: string
-          description: ok | Error
+          description: ok | CompilationError
           example: ok
     Error:
       required:

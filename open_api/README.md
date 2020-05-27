@@ -80,8 +80,9 @@ module, `amoc_rest_utils` must be used instead.
 
   * as we do not use REST API authentication, `amoc_rest_auth` module isn't used at all. so it can be safely removed.
 * run `make test`, identify and fix all the issues with tests:
-    * fix mocking and `undefined functions` issues
-    * use named json schemas in `amoc-openapi.yaml`
-    * fix `amoc_api_node_handler_SUITE`
-    * fix `amoc_api_scenario_handler_SUITE`
-    * fix `amoc_api_scenarios_handler_SUITE`
+  * fix mocking and `undefined functions` issues
+  * use named json schemas in `amoc-openapi.yaml`
+  * fix `amoc_api_node_handler_SUITE`
+  * fix `amoc_api_scenario_handler_SUITE`
+  * fix `amoc_api_scenarios_handler_SUITE`
+* update REST API descriptions in `amoc-openapi.yaml`
