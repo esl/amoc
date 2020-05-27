@@ -186,6 +186,8 @@ validate_response('StatusGet', 200, Body, ValidatorState) ->
 
 validate_response('ScenariosUploadPut', 200, Body, ValidatorState) ->
     validate_response_body('UploadResp', 'UploadResp', Body, ValidatorState);
+validate_response('ScenariosUploadPut', 400, Body, ValidatorState) ->
+    validate_response_body('Error', 'Error', Body, ValidatorState);
 
 
 validate_response(_OperationID, _Code, _Body, _ValidatorState) ->

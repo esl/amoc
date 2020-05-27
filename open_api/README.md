@@ -84,3 +84,4 @@ module, `amoc_rest_utils` must be used instead.
     * use named json schemas in `amoc-openapi.yaml`
     * fix `amoc_api_node_handler_SUITE`
     * fix `amoc_api_scenario_handler_SUITE`
+    * fix `amoc_api_scenarios_handler_SUITE`

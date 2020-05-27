@@ -157,6 +157,16 @@
               }
             },
             "description" : "response object"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Error"
+                }
+              }
+            },
+            "description" : "response object"
           }
         },
         "tags" : [ "upload" ]
@@ -294,6 +304,16 @@
           }
         },
         "required" : [ "compile" ],
+        "type" : "object"
+      },
+      "Error" : {
+        "properties" : {
+          "error" : {
+            "example" : "error description",
+            "type" : "string"
+          }
+        },
+        "required" : [ "error" ],
         "type" : "object"
       }
     }

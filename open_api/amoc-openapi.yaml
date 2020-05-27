@@ -112,6 +112,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UploadResp'
+        '400':
+          description: response object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
     NodesKV:
@@ -205,3 +211,11 @@ components:
           type: string
           description: ok | Error
           example: ok
+    Error:
+      required:
+        - error
+      type: object
+      properties:
+        error:
+          type: string
+          example: error description

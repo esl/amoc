@@ -6,7 +6,7 @@
 %% API
 -export([upload/1]).
 
--spec upload(binary()) -> ok | {error, binary()}.
+-spec upload(binary()) -> ok | {error, invalid_module | binary()}.
 upload(ModuleSrc) ->
     case get_module_name(ModuleSrc) of
         {ok, ModuleName} ->
@@ -17,7 +17,7 @@ upload(ModuleSrc) ->
             {error, Reason}
     end.
 
--spec get_module_name(binary()) -> {ok, atom()} | {error, binary()}.
+-spec get_module_name(binary()) -> {ok, atom()} | {error, invalid_module | binary()}.
 get_module_name(SourceCode) ->
     try
         {match, [ModuleStr]} =
@@ -29,7 +29,7 @@ get_module_name(SourceCode) ->
         true = is_atom(ModuleName),
         {ok, ModuleName}
     catch _:_ ->
-        {error, <<"invalid_module">>}
+        {error, invalid_module}
     end.
 
 install_scenario_on_nodes(Nodes, Module, ModuleSource) ->

@@ -69,10 +69,13 @@ handle_request('ScenariosIdPatch', _Req, #{'ScenarioExecution' := Body,
 handle_request('ScenariosUploadPut', Req, _Context) ->
     {ok, ModuleSource, _} = cowboy_req:read_body(Req),
     BinStatus = case amoc_api_upload_scenario:upload(ModuleSource) of
-                    ok -> <<"ok">>;
-                    {error, Error} -> Error
-                end,
-    {200, #{}, [{<<"compile">>, BinStatus}]};
+                    ok ->
+                        {200, #{}, [{<<"compile">>,<<"ok">>}]};
+                    {error, invalid_module}->
+                        {400, #{}, [{<<"error">>, <<"invalid module">>}]};
+                    {error, Error} ->
+                        {200, #{}, [{<<"compile">>,Error}]}
+                end;
 handle_request(OperationID, Req, Context) ->
     error_logger:error_msg(
         "Got not implemented request to process: ~p~n",

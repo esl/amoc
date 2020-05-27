@@ -61,7 +61,7 @@ put_scenarios_returns_400_and_error_when_scenario_is_not_valid(_Config) ->
     %% then
     ?assertNot(filelib:is_regular(ScenarioFileSource)),
     ?assertEqual(400, CodeHttp),
-    ?assertEqual({[{<<"error">>, <<"invalid_module">>}]}, Body).
+    ?assertEqual({[{<<"error">>, <<"invalid module">>}]}, Body).
 
 put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Config) ->
     %% given
