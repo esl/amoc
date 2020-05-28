@@ -28,3 +28,9 @@ This will install a sample `dummy_scenario.erl` on node `amoc-1` using curl and 
 To stop containers and remove Amoc image run:
 
 `./integration_test/cleanup_containers.sh`
+
+## OpenAPI spec verification
+
+To validate OpenAPI spec run:
+
+`./integration_test/check_openapi_spec.sh`
