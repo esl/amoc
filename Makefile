@@ -30,7 +30,6 @@ integration_test:
 	./integration_test/test_distribute_scenario.sh
 	./integration_test/test_run_scenario.sh
 	./integration_test/test_add_new_node.sh
-	./integration_test/check_openapi_spec.sh
 
 dialyzer:
 	$(REBAR) as prod dialyzer

@@ -11,10 +11,7 @@
         exometer_report_graphite,
         exometer_report_statsd,
         ssl,
-        inets,
-        jsx,
-        jesse,
-        cowboy
+        amoc_rest
     ]},
     {mod, {amoc_app, []}},
     {env, [{exometer_predefined, [
