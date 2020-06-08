@@ -6,11 +6,8 @@
         kernel,
         stdlib,
         compiler,
-        sasl,
         exometer_core,
         exometer_report_graphite,
-        exometer_report_statsd,
-        ssl,
         amoc_rest
     ]},
     {mod, {amoc_app, []}},
