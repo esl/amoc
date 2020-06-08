@@ -66,7 +66,7 @@ get_scenario_status_returns_404_when_scenario_not_exists(_Config) ->
 
 get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
     %% given
-    given_test_status_mocked(running),
+    given_test_status_mocked({running, ?SAMPLE_SCENARIO_A}),
     %% when
     {CodeHttp, Body} = amoc_api_helper:get(?SAMPLE_GOOD_SCENARIO_PATH),
     %% then
@@ -77,7 +77,7 @@ get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
 
 get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
     %% given
-    given_test_status_mocked(finished),
+    given_test_status_mocked({finished, ?SAMPLE_SCENARIO_A}),
     %% when
     {CodeHttp, Body} = amoc_api_helper:get(?SAMPLE_GOOD_SCENARIO_PATH),
     %% then
@@ -88,7 +88,7 @@ get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
 
 get_scenario_status_returns_loaded_when_scenario_exists_but_not_running(_Config) ->
     %% given
-    given_test_status_mocked(loaded),
+    given_test_status_mocked({loaded, ?SAMPLE_SCENARIO_A}),
     %% when
     {CodeHttp, Body} = amoc_api_helper:get(?SAMPLE_GOOD_SCENARIO_PATH),
     %% then
@@ -180,7 +180,7 @@ destroy_env() ->
 
 -spec given_test_status_mocked(atom()) -> ok.
 given_test_status_mocked(Value) ->
-    meck:new(amoc_api_scenario_status, [passthrough]),
+    meck:new(amoc_api_scenario_status, []),
     meck:expect(amoc_api_scenario_status, test_status, fun(_) -> Value end).
 
 -spec mock_amoc_dist_do() -> ok.

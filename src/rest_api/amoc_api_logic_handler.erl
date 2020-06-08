@@ -6,15 +6,13 @@
 
 -behaviour(amoc_rest_logic_handler).
 
+-include_lib("kernel/include/logger.hrl").
+
 -export([handle_request/3]).
 
--spec handle_request(
-    OperationID :: amoc_rest_api:operation_id(),
-    Req :: cowboy_req:req(),
-    Context :: #{}
-) ->
+-spec handle_request(OperationID :: amoc_rest_api:operation_id(),
+                     Req :: cowboy_req:req(), Context :: #{}) ->
     {Status :: cowboy:http_status(), Headers :: cowboy:http_headers(), Body :: jsx:json_term()}.
-
 handle_request('NodesGet', _Req, _Context) ->
     Status = amoc_cluster:get_status(),
     Connected = maps:get(connected, Status, []),
@@ -27,7 +25,7 @@ handle_request('NodesGet', _Req, _Context) ->
     {200, #{}, [{<<"nodes">>, ResponseList}]};
 handle_request('ScenariosGet', _Req, _Context) ->
     Scenarios = amoc_scenario:list_scenario_modules(),
-    BinaryScenarios = [atom_to_binary(S, latin1) || S <- Scenarios],
+    BinaryScenarios = [atom_to_binary(S, utf8) || S <- Scenarios],
     {200, #{}, [{<<"scenarios">>, BinaryScenarios}]};
 handle_request('StatusGet', _Req, _Context) ->
     Apps = application:which_applications(),
@@ -36,26 +34,24 @@ handle_request('StatusGet', _Req, _Context) ->
                  false -> <<"down">>
              end,
     {200, #{}, [{<<"node_status">>, Status}]};
-handle_request('ScenariosIdGet', _Req, #{id := Resource}) ->
-    Scenario = binary_to_atom(Resource, latin1),
-    case amoc_api_scenario_status:test_status(Scenario) of
-        doesnt_exist ->
+handle_request('ScenariosIdGet', _Req, #{id := ScenarioName}) ->
+    case amoc_api_scenario_status:test_status(ScenarioName) of
+        {doesnt_exist, _} ->
             {404, #{}, #{}};
-        Status ->
-            BinStatus = atom_to_binary(Status, latin1),
+        {Status, _Scenario} ->
+            BinStatus = atom_to_binary(Status, utf8),
             {200, #{}, [{<<"scenario_status">>, BinStatus}]}
     end;
 handle_request('ScenariosIdPatch', _Req, #{'ScenarioExecution' := Body,
-                                           id := Resource }) ->
-    Scenario = binary_to_atom(Resource, latin1),
-    case amoc_api_scenario_status:test_status(Scenario) of
-        doesnt_exist ->
+                                           id := ScenarioName}) ->
+    case amoc_api_scenario_status:test_status(ScenarioName) of
+        {doesnt_exist, _} ->
             {404, #{}, #{}};
-        loaded ->
+        {loaded, Scenario} ->
             Users = maps:get(<<"users">>, Body),
             SettingsMap = maps:get(<<"settings">>, Body, #{}),
             Settings = [begin
-                            Key = binary_to_atom(K, latin1),
+                            Key = binary_to_atom(K, utf8),
                             {ok, Value} = amoc_config_env:parse_value(V),
                             {Key, Value}
                         end || {K, V} <- maps:to_list(SettingsMap)],
@@ -77,8 +73,6 @@ handle_request('ScenariosUploadPut', Req, _Context) ->
             {200, #{}, [{<<"compile">>, Error}]}
     end;
 handle_request(OperationID, Req, Context) ->
-    error_logger:error_msg(
-        "Got not implemented request to process: ~p~n",
-        [{OperationID, Req, Context}]
-    ),
+    ?LOG_ERROR("Got not implemented request to process: ~p~n",
+               [{OperationID, Req, Context}]),
     {501, #{}, #{}}.

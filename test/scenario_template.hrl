@@ -1,5 +1,5 @@
 -define(DUMMY_SCENARIO_MODULE(Name), <<"
--module(",(atom_to_binary(Name,latin1))/binary,").
+-module(",(atom_to_binary(Name,utf8))/binary,").
 -behaviour(amoc_scenario).
 
 -export([start/1]).
