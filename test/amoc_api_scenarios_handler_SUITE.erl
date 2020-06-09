@@ -5,7 +5,7 @@
 -include("scenario_template.hrl").
 
 -define(SCENARIOS_URL_S, "/scenarios").
--define(SCENARIOS_URL_U, "/upload").
+-define(SCENARIOS_URL_U, "/scenarios/upload").
 -define(SCENARIOS_DIR_S, filename:join(code:priv_dir(amoc), "scenarios")).
 -define(SCENARIOS_EBIN_DIR_S, filename:join(code:priv_dir(amoc), "scenarios_ebin")).
 -define(SAMPLE_SCENARIO_DECLARATION, "-module(sample_test).").
@@ -61,7 +61,7 @@ put_scenarios_returns_400_and_error_when_scenario_is_not_valid(_Config) ->
     %% then
     ?assertNot(filelib:is_regular(ScenarioFileSource)),
     ?assertEqual(400, CodeHttp),
-    ?assertEqual({[{<<"error">>, <<"invalid_module">>}]}, Body).
+    ?assertEqual({[{<<"error">>, <<"invalid module">>}]}, Body).
 
 put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Config) ->
     %% given
@@ -72,8 +72,8 @@ put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Conf
     %% then
     ?assertNot(filelib:is_regular(ScenarioFileSource)),
     ?assertEqual(200, CodeHttp),
-    Error = <<"[{\"", (list_to_binary(ScenarioFileSource))/binary,
-              "\",\n  [{2,erl_parse,[\"syntax error before: \",[]]}]}]">>,
+    Error = <<"compilation errors: [{\"", (list_to_binary(ScenarioFileSource))/binary, "\","
+              "\n                      [{2,erl_parse,[\"syntax error before: \",[]]}]}]\n">>,
     ?assertEqual({[{<<"compile">>, Error}]}, Body).
 
 put_scenarios_returns_200_when_scenario_valid(_Config) ->

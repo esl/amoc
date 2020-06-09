@@ -6,15 +6,9 @@
         kernel,
         stdlib,
         compiler,
-        sasl,
-        jiffy,
         exometer_core,
         exometer_report_graphite,
-        exometer_report_statsd,
-        ssl,
-        trails,
-        cowboy,
-        cowboy_swagger
+        amoc_rest
     ]},
     {mod, {amoc_app, []}},
     {env, [{exometer_predefined, [

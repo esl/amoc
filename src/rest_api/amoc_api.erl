@@ -1,25 +1,19 @@
+%%==============================================================================
+%% Copyright 2020 Erlang Solutions Ltd.
+%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
+%%==============================================================================
 -module(amoc_api).
 
--export([start_listener/0, stop/0]).
+-export([start/0, stop/0]).
 
-
--spec start_listener() -> {ok, pid()}.
-start_listener() ->
+-spec start() -> {ok, pid()} | {error, any()}.
+start() ->
+    LogicHandler = amoc_api_logic_handler,
     Port = amoc_config_env:get(api_port, 4000),
-    Handlers = [amoc_api_scenarios_handler,
-                amoc_api_upload_handler,
-                amoc_api_scenario_handler,
-                amoc_api_node_handler,
-                amoc_api_status_handler,
-                cowboy_swagger_handler],
-    Trails = trails:trails(Handlers),
-    trails:store(Trails),
-    Dispatch = trails:single_host_compile(Trails),
-    {ok, _Pid} = cowboy:start_clear(amoc_api,
-                                   [{num_acceptors, 10}, {port, Port}],
-                                   #{env => #{dispatch => Dispatch}}
-                                  ).
+    ServerParams = #{ip => {0, 0, 0, 0}, port => Port, net_opts => [],
+                     logic_handler => LogicHandler},
+    amoc_rest_server:start(http_server, ServerParams).
 
 -spec stop() -> ok | {error, not_found}.
 stop() ->
-    cowboy:stop_listener(amoc_api).
+    cowboy:stop_listener(http_server).

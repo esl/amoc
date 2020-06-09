@@ -1,13 +1,8 @@
-%%%-------------------------------------------------------------------
-%%% @author denys
-%%% @copyright (C) 2019, <COMPANY>
-%%% @doc
-%%%   simple scenario for throttle helper manual testing
-%%% @end
-%%% Created : 29. Mar 2019 17:09
-%%%-------------------------------------------------------------------
+%%==============================================================================
+%% Copyright 2019 Erlang Solutions Ltd.
+%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
+%%==============================================================================
 -module(throttle_test).
--author("denys").
 
 %% API
 -behavior(amoc_scenario).
