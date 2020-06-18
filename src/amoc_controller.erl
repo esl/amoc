@@ -6,8 +6,11 @@
 -behaviour(gen_server).
 
 -define(SERVER, ?MODULE).
--define(INTERARRIVAL_DEFAULT, 50).
 -define(USERS_TABLE, amoc_users).
+
+-required_variable({interarrival, "a delay between creating the processes "
+                                  "for two consecutive users (ms, def: 50ms)",
+                    50, positive_integer}).
 
 -record(state, {scenario :: amoc:scenario() | undefined,
                 no_of_users = 0 :: user_count(),
@@ -51,6 +54,10 @@
          disable/0]).
 
 %% ------------------------------------------------------------------
+%% Parameters validation functions
+%% ------------------------------------------------------------------
+-export([positive_integer/1]).
+%% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
 -export([init/1,
@@ -65,7 +72,7 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec start_scenario(amoc:scenario(), amoc_config_scenario:settings()) ->
+-spec start_scenario(amoc:scenario(), amoc_config:settings()) ->
     ok | {error, term()}.
 start_scenario(Scenario, Settings) ->
     case amoc_scenario:does_scenario_exist(Scenario) of
@@ -98,6 +105,9 @@ get_status() ->
 -spec disable() -> ok | {error, term()}.
 disable() ->
     gen_server:call(?SERVER, disable).
+
+positive_integer(Interarrival) ->
+    is_integer(Interarrival) andalso Interarrival > 0.
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -147,7 +157,7 @@ handle_info(_Msg, State) ->
 %% ------------------------------------------------------------------
 %% internal functions
 %% ------------------------------------------------------------------
--spec handle_start_scenario(module(), amoc_config_scenario:settings(), state()) ->
+-spec handle_start_scenario(module(), amoc_config:settings(), state()) ->
     {handle_call_res(), state()}.
 handle_start_scenario(Scenario, Settings, #state{status = idle} = State) ->
     case init_scenario(Scenario, Settings) of
@@ -251,7 +261,7 @@ start_tables() -> %% ETS creation
                                         {read_concurrency, true}]),
     ok.
 
--spec init_scenario(amoc:scenario(), amoc_config_scenario:settings()) ->
+-spec init_scenario(amoc:scenario(), amoc_config:settings()) ->
     {ok | error, any()}.
 init_scenario(Scenario, Settings) ->
     case amoc_config_scenario:parse_scenario_settings(Scenario, Settings) of
@@ -303,7 +313,7 @@ dec_no_of_users(#state{no_of_users = N} = State) ->
 
 -spec interarrival() -> interarrival().
 interarrival() ->
-    amoc_config_env:get(amoc, interarrival, ?INTERARRIVAL_DEFAULT).
+    amoc_config:get(interarrival).
 
 -spec apply_safely(atom(), atom(), [term()]) -> {ok | error, term()}.
 apply_safely(M, F, A) ->

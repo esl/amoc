@@ -57,10 +57,12 @@ init() ->
     undefined = amoc_config:get(var6),
     [_ | _] = amoc_config:get(nodes),
     %% it doesn't matter if an undeclared_variable is passed through the
-    %% os or app environment variable. if it's not declared using the
-    %% -required_variable(...) it is reported as undefined variable.
-    def_value = amoc_config:get(undeclared_variable, def_value),
-    undefined = amoc_config:get(undeclared_variable),
+    %% os/app environment variable or via JSON parameters (REST API). if
+    %% it's not declared using the -required_variable(...) attribute then
+    %% any attempt to get it results in exception.
+    {invalid_setting, undeclared_variable} =
+        (catch amoc_config:get(undeclared_variable)),
+    %% this variable is set via REST API
     <<"test_value">> = amoc_config:get(test),
     ok.
 

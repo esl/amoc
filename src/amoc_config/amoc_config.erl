@@ -4,14 +4,11 @@
 %%==============================================================================
 -module(amoc_config).
 
--export([get/1, get/2]).
-
--export_type([name/0, value/0]).
-
--type name() :: atom().
--type value() :: any().
-
 -include_lib("kernel/include/logger.hrl").
+-include("amoc_config.hrl").
+
+-export([get/1, get/2]).
+-export_type([name/0, value/0, settings/0]).
 
 %% ------------------------------------------------------------------
 %% API
@@ -25,10 +22,10 @@ get(Name, Default) when is_atom(Name) ->
     case ets:lookup(amoc_config, Name) of
         [] ->
             ?LOG_ERROR("no scenario setting ~p", [Name]),
+            throw({invalid_setting, Name});
+        [{Name, _Module, undefined, _VerifyFn}] ->
             Default;
-        [{Name, undefined}] ->
-            Default;
-        [{Name, Value}] ->
+        [{Name, _Module, Value, _VerifyFn}] ->
             Value;
         InvalidLookupRet ->
             ?LOG_ERROR("invalid lookup return value ~p ~p", [Name, InvalidLookupRet]),

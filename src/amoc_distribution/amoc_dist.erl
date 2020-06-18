@@ -15,7 +15,7 @@
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec do(amoc:scenario(), non_neg_integer(), amoc_config_scenario:config()) ->
+-spec do(amoc:scenario(), non_neg_integer(), amoc_config:settings()) ->
     {ok, any()} | {error, any()}.
 do(Scenario, Count, Settings) ->
     case {prepare_cluster(Scenario, Settings), Count} of
@@ -83,7 +83,7 @@ check_nodes(Nodes) ->
             {error, not_a_master}
     end.
 
--spec prepare_cluster(amoc:scenario(), amoc_config_scenario:config()) -> {ok, any()} | {error, any()}.
+-spec prepare_cluster(amoc:scenario(), amoc_config:settings()) -> {ok, any()} | {error, any()}.
 prepare_cluster(Scenario, Settings) ->
     case setup_master_node() of
         ok ->
