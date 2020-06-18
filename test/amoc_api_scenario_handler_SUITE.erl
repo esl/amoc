@@ -172,7 +172,7 @@ create_env(Config) ->
     {ok, _} = application:ensure_all_started(inets),
     {ok, _} = application:ensure_all_started(amoc),
     ScenarioContent = ?DUMMY_SCENARIO_MODULE(?SAMPLE_SCENARIO_A),
-    ok = amoc_scenario:install_scenario(?SAMPLE_SCENARIO_A,ScenarioContent).
+    ok = amoc_scenario:install_module(?SAMPLE_SCENARIO_A, ScenarioContent).
 
 destroy_env() ->
     ok.

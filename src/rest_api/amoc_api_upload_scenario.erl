@@ -33,7 +33,7 @@ get_module_name(SourceCode) ->
     end.
 
 install_scenario_on_nodes(Nodes, Module, ModuleSource) ->
-    rpc:multicall(Nodes, amoc_scenario, install_scenario, [Module, ModuleSource]).
+    rpc:multicall(Nodes, amoc_scenario, install_module, [Module, ModuleSource]).
 
 process_multicall_results({Results, []}) ->
     case lists:all(fun(X) -> X == ok end, Results) of

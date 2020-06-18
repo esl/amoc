@@ -125,10 +125,13 @@ setup_slave_node(Node) ->
 
 -spec propagate_uploaded_modules(node()) -> {ok, any()} | {error, any()}.
 propagate_uploaded_modules(Node) ->
-    UploadedModules = ets:match(amoc_scenarios, {'$1', '_', {uploaded, '$2'}}),
-    Result = [{Module, rpc:call(Node, amoc_scenario, install_scenario, Args)} ||
-                 [Module, _] = Args <- UploadedModules],
+    UploadedModules = amoc_scenario:list_uploaded_modules(),
+    Result = [{Module, propagate_module(Node, Module, SourceCode)}
+              || {Module, SourceCode} <- UploadedModules],
     maybe_error(Result).
+
+propagate_module(Node, Module, SourceCode) ->
+    rpc:call(Node, amoc_scenario, install_module, [Module, SourceCode]).
 
 -spec add_users(pos_integer(), [node()]) -> {ok, any()} | {error, any()}.
 add_users(Count, Nodes) ->
