@@ -97,7 +97,7 @@ start_scenarios_ets() ->
 -spec add_code_paths() -> ok | {error, {bad_directories, [file:filename()]}}.
 add_code_paths() ->
     true = code:add_pathz(?EBIN_DIR),
-    AdditionalCodePaths = amoc_config_env:get(extra_code_paths, []),
+    AdditionalCodePaths = amoc_config_env:get(amoc, extra_code_paths, []),
     Res = [{code:add_pathz(Path), Path} || Path <- [?EBIN_DIR | AdditionalCodePaths]],
     case [Dir || {{error, bad_directory}, Dir} <- Res] of
         [] -> ok;

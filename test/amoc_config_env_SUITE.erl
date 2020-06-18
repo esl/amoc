@@ -27,46 +27,46 @@ parse_value_prop_test(_) ->
 
 
 config_os_env_test(_) ->
-    ?assertEqual(undefined, amoc_config_env:get(some_variable)),
-    ?assertEqual(default_value, amoc_config_env:get(some_variable, default_value)),
+    ?assertEqual(undefined, get_env(some_variable)),
+    ?assertEqual(default_value, get_env(some_variable, default_value)),
     set_os_env(some_variable, some_value),
-    ?assertEqual(some_value, amoc_config_env:get(some_variable)),
-    ?assertEqual(some_value, amoc_config_env:get(some_variable, default_value)),
+    ?assertEqual(some_value, get_env(some_variable)),
+    ?assertEqual(some_value, get_env(some_variable, default_value)),
     set_os_env(some_variable, another_value),
-    ?assertEqual(another_value, amoc_config_env:get(some_variable)),
-    ?assertEqual(another_value, amoc_config_env:get(some_variable, default_value)),
+    ?assertEqual(another_value, get_env(some_variable)),
+    ?assertEqual(another_value, get_env(some_variable, default_value)),
     unset_os_env(some_variable),
-    ?assertEqual(undefined, amoc_config_env:get(some_variable)),
-    ?assertEqual(default_value, amoc_config_env:get(some_variable, default_value)).
+    ?assertEqual(undefined, get_env(some_variable)),
+    ?assertEqual(default_value, get_env(some_variable, default_value)).
 
 config_app_env_test(_) ->
-    ?assertEqual(undefined, amoc_config_env:get(some_variable)),
-    ?assertEqual(default_value, amoc_config_env:get(some_variable, default_value)),
+    ?assertEqual(undefined, get_env(some_variable)),
+    ?assertEqual(default_value, get_env(some_variable, default_value)),
     set_app_env(some_variable, some_value),
-    ?assertEqual(some_value, amoc_config_env:get(some_variable)),
-    ?assertEqual(some_value, amoc_config_env:get(some_variable, default_value)),
+    ?assertEqual(some_value, get_env(some_variable)),
+    ?assertEqual(some_value, get_env(some_variable, default_value)),
     set_app_env(some_variable, another_value),
-    ?assertEqual(another_value, amoc_config_env:get(some_variable)),
-    ?assertEqual(another_value, amoc_config_env:get(some_variable, default_value)),
+    ?assertEqual(another_value, get_env(some_variable)),
+    ?assertEqual(another_value, get_env(some_variable, default_value)),
     unset_app_env(some_variable),
-    ?assertEqual(undefined, amoc_config_env:get(some_variable)),
-    ?assertEqual(default_value, amoc_config_env:get(some_variable, default_value)).
+    ?assertEqual(undefined, get_env(some_variable)),
+    ?assertEqual(default_value, get_env(some_variable, default_value)).
 
 config_os_env_shadows_app_env_test(_) ->
-    ?assertEqual(undefined, amoc_config_env:get(some_variable)),
-    ?assertEqual(default_value, amoc_config_env:get(some_variable, default_value)),
+    ?assertEqual(undefined, get_env(some_variable)),
+    ?assertEqual(default_value, get_env(some_variable, default_value)),
     set_app_env(some_variable, some_value),
-    ?assertEqual(some_value, amoc_config_env:get(some_variable)),
-    ?assertEqual(some_value, amoc_config_env:get(some_variable, default_value)),
+    ?assertEqual(some_value, get_env(some_variable)),
+    ?assertEqual(some_value, get_env(some_variable, default_value)),
     set_os_env(some_variable, another_value),
-    ?assertEqual(another_value, amoc_config_env:get(some_variable)),
-    ?assertEqual(another_value, amoc_config_env:get(some_variable, default_value)),
+    ?assertEqual(another_value, get_env(some_variable)),
+    ?assertEqual(another_value, get_env(some_variable, default_value)),
     unset_os_env(some_variable),
-    ?assertEqual(some_value, amoc_config_env:get(some_variable)),
-    ?assertEqual(some_value, amoc_config_env:get(some_variable, default_value)),
+    ?assertEqual(some_value, get_env(some_variable)),
+    ?assertEqual(some_value, get_env(some_variable, default_value)),
     unset_app_env(some_variable),
-    ?assertEqual(undefined, amoc_config_env:get(some_variable)),
-    ?assertEqual(default_value, amoc_config_env:get(some_variable, default_value)).
+    ?assertEqual(undefined, get_env(some_variable)),
+    ?assertEqual(default_value, get_env(some_variable, default_value)).
 
 
 set_app_env(Name, Value) ->
@@ -83,6 +83,12 @@ unset_os_env(Name) ->
 
 env_name(Name) ->
     "AMOC_" ++ string:uppercase(erlang:atom_to_list(Name)).
+
+get_env(Name) ->
+    amoc_config_env:get(amoc, Name).
+
+get_env(Name, Default) ->
+    amoc_config_env:get(amoc, Name, Default).
 
 format_value(Value) ->
     lists:flatten(io_lib:format("~tp", [Value])).

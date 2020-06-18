@@ -79,7 +79,7 @@ get_scenario_configuration(Module) ->
 
 -spec load_verification_modules() -> {ok, [module()]} | error().
 load_verification_modules() ->
-    Modules = amoc_config_env:get(config_verification_modules, []),
+    Modules = amoc_config_env:find_all_vars(config_verification_modules),
     LoadingResult = [load_module(Module) || Module <- Modules],
     maybe_error(invalid_verification_module, LoadingResult).
 
@@ -166,7 +166,7 @@ process_scenario_config(Config, Settings) ->
 -spec get_value_and_verify(parameter_configuration(), settings()) ->
     {ok, parameter()} | {error, reason()}.
 get_value_and_verify({Name, Default, VerificationMethod}, Settings) ->
-    DefaultValue = amoc_config_env:get(Name, Default),
+    DefaultValue = amoc_config_env:get(amoc, Name, Default),
     Value = proplists:get_value(Name, Settings, DefaultValue),
     case verify(VerificationMethod, Value) of
         {true, NewValue} -> {ok, {Name, NewValue}};

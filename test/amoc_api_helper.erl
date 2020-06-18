@@ -52,5 +52,5 @@ request(BaseUrl, Path, Method, RequestBody, ContentType) ->
 
 -spec get_url() -> string().
 get_url() ->
-    Port = amoc_config_env:get(api_port, 4000),
+    Port = amoc_config_env:get(amoc, api_port, 4000),
     "http://localhost:" ++ erlang:integer_to_list(Port).

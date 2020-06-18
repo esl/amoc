@@ -303,7 +303,7 @@ dec_no_of_users(#state{no_of_users = N} = State) ->
 
 -spec interarrival() -> interarrival().
 interarrival() ->
-    amoc_config_env:get(interarrival, ?INTERARRIVAL_DEFAULT).
+    amoc_config_env:get(amoc, interarrival, ?INTERARRIVAL_DEFAULT).
 
 -spec apply_safely(atom(), atom(), [term()]) -> {ok | error, term()}.
 apply_safely(M, F, A) ->
