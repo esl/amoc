@@ -14,17 +14,13 @@ all() ->
      returns_nodes_list_when_amoc_up].
 
 init_per_testcase(_, Config) ->
-    application:ensure_all_started(inets),
+    amoc_api_helper:start_amoc(),
     Config.
 
 end_per_testcase(_, _Config) ->
-    application:stop(inets),
-    application:stop(amoc),
-    amoc_api:stop().
+    amoc_api_helper:stop_amoc().
 
 returns_empty_list_when_amoc_up(_Config) ->
-    %% given
-    given_applications_started(),
     %% when
     {CodeHttp,JSON} = amoc_api_helper:get(?PATH),
     %% then
@@ -34,7 +30,6 @@ returns_empty_list_when_amoc_up(_Config) ->
 
 returns_nodes_list_when_amoc_up(_Config) ->
     %% given
-    given_applications_started(),
     given_prepared_nodes(),
     %% when
     {CodeHttp, JSON} = amoc_api_helper:get(?PATH),
@@ -54,9 +49,6 @@ returns_nodes_list_when_amoc_up(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% HELPERS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec given_applications_started() -> {ok, [atom()]} | {error, term()}.
-given_applications_started() ->
-    application:ensure_all_started(amoc).
 
 -spec given_prepared_nodes() -> ok.
 given_prepared_nodes() ->
