@@ -19,8 +19,10 @@
 -type maybe_module_attribute() :: module_attribute() | term().
 
 -type maybe_verification_method() :: verification_method() | term().
+-type maybe_update_method() :: update_method() | term().
 -type raw_module_parameter() ::
-    {amoc_config:name(), module(), amoc_config:value(), maybe_verification_method()}.
+    {amoc_config:name(), module(), amoc_config:value(),
+     maybe_verification_method(), maybe_update_method()}.
 
 -type attribute_name() :: required_variable | override_variable.
 
@@ -60,24 +62,49 @@ process_var_attr(_, Module, Attr) when not is_atom(element(1, Attr));
                                        not is_list(element(2, Attr)) ->
     {error, {invalid_attribute, Attr}};
 process_var_attr(_, Module, {Name, _}) ->
-    {ok, {Name, Module, undefined, fun none/1}};
+    {ok, {Name, Module, undefined, fun none/1, read_only}};
 process_var_attr(_, Module, {Name, _, DefaultValue}) ->
-    {ok, {Name, Module, DefaultValue, fun none/1}};
+    {ok, {Name, Module, DefaultValue, fun none/1, read_only}};
 process_var_attr(VerificationModules, Module, {Name, _, DefaultValue,
                                                VerificationMethod}) ->
-    Parameter = {Name, Module, DefaultValue, VerificationMethod},
+    Parameter = {Name, Module, DefaultValue, VerificationMethod, read_only},
     check_verification_method(VerificationModules, Parameter);
+process_var_attr(VerificationModules, Module, {Name, _, DefaultValue,
+                                               VerificationMethod,
+                                               UpdateMethod}) ->
+    Parameter = {Name, Module, DefaultValue, VerificationMethod, UpdateMethod},
+    check_verification_and_update_method(VerificationModules, Parameter);
 process_var_attr(_, _, InvalidAttribute) ->
     {error, {invalid_attribute, InvalidAttribute}}.
 
--spec check_verification_method([module()], raw_module_parameter()) ->
+-spec check_verification_and_update_method([module()], raw_module_parameter()) ->
     {ok, module_parameter()} | {error, reason()}.
+check_verification_and_update_method(Modules, Param) ->
+    case check_verification_method(Modules, Param) of
+        {ok, Param2} -> check_update_method(Modules, Param2);
+        Error -> Error
+    end.
+
+-spec check_verification_method([module()], raw_module_parameter()) ->
+    {ok, raw_module_parameter()} | {error, reason()}.
 check_verification_method(Modules, {Name, Module, DefaultValue,
-                                    VerificationMethod} = Param) ->
+                                    VerificationMethod,
+                                    UpdateMethod} = Param) ->
     case verification_fun(Modules, VerificationMethod) of
         not_exported -> {error, {verification_method_not_exported, Param, Modules}};
         invalid_method -> {error, {invalid_verification_method, Param}};
-        VerificationFn -> {ok, {Name, Module, DefaultValue, VerificationFn}}
+        VerificationFn -> {ok, {Name, Module, DefaultValue, VerificationFn, UpdateMethod}}
+    end.
+
+-spec check_update_method([module()], raw_module_parameter()) ->
+    {ok, module_parameter()} | {error, reason()}.
+check_update_method(Modules, {Name, Module, DefaultValue,
+                              VerificationMethod,
+                              UpdateMethod} = Attr) ->
+    case update_fun(Modules, UpdateMethod) of
+        not_exported -> {error, {update_method_not_exported, Attr, Modules}};
+        invalid_method -> {error, {invalid_update_method, Attr}};
+        UpdateFn -> {ok, {Name, Module, DefaultValue, VerificationMethod, UpdateFn}}
     end.
 
 -spec verification_fun([module()], maybe_verification_method()) ->
@@ -93,6 +120,19 @@ verification_fun(Modules, Atom) when is_atom(Atom) ->
 verification_fun(_, _) ->
     invalid_method.
 
+-spec update_fun([module()], maybe_update_method()) ->
+    update_fun() | not_exported | invalid_method | read_only.
+update_fun(_, read_only) ->
+    read_only;
+update_fun(_, none) ->
+    fun none/2;
+update_fun(_, Fun) when is_function(Fun, 2) ->
+    Fun;
+update_fun(Modules, Atom) when is_atom(Atom) ->
+    is_exported(Modules, Atom, 2);
+update_fun(_, _) ->
+    invalid_method.
+
 -spec is_exported([module()], atom(), non_neg_integer()) ->
     function() | not_exported.
 is_exported([], _, _) ->
@@ -104,6 +144,8 @@ is_exported([Module | T], Function, Arity) ->
     end.
 
 none(_) -> true.
+
+none(_, _) -> ok.
 
 -spec one_of_fun(one_of()) -> verification_fun().
 one_of_fun(OneOf) ->

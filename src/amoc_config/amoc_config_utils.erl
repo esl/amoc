@@ -58,11 +58,11 @@ try_apply_fn(Fun, Args) ->
     {ok, module_configuration()} | error().
 merge_config(MergedConfig, []) ->
     {ok, MergedConfig};
-merge_config(OldConfig, [{ParamName, Module, _, _} = Param | L]) ->
+merge_config(OldConfig, [{ParamName, Module, _, _, _} = Param | L]) ->
     case lists:keyfind(ParamName, 1, OldConfig) of
         false ->
             merge_config([Param | OldConfig], L);
-        {ParamName, AnotherModule, _, _} ->
+        {ParamName, AnotherModule, _, _, _} ->
             {error, parameter_overriding, {ParamName, Module, AnotherModule}}
     end.
 

@@ -51,7 +51,7 @@ process_scenario_config_shadows_default_values(_) ->
 process_scenario_config_returns_error_for_invalid_values(_) ->
     VerificationFN = fun(_) -> {false, some_reason} end,
     IncorrectScenarioConfig =
-        [{wrong_param, ?MOD, any_value, VerificationFN}
+        [{wrong_param, ?MOD, any_value, VerificationFN, read_only}
          | incorrect_scenario_config()],
     given_scenario_os_parameters_not_set(IncorrectScenarioConfig),
     given_scenario_app_parameters_not_set(IncorrectScenarioConfig),
@@ -65,9 +65,9 @@ process_scenario_config_returns_error_for_invalid_values(_) ->
 
 process_scenario_config_returns_preprocessed_value(_) ->
     ValidationFn = fun(_) -> {true, another_atom} end,
-    ScenarioConfig = [{preprocessed_param, ?MOD, an_atom, ValidationFn}],
+    ScenarioConfig = [{preprocessed_param, ?MOD, an_atom, ValidationFn, read_only}],
     Result = amoc_config_validation:process_scenario_config(ScenarioConfig, []),
-    ?assertMatch({ok, [{preprocessed_param, ct, another_atom, _}]}, Result).
+    ?assertMatch({ok, [{preprocessed_param, ct, another_atom, _, read_only}]}, Result).
 
 correct_scenario_config() ->
     scenario_configuration(1, some_atom, <<"some_binary">>).
@@ -83,22 +83,22 @@ incorrect_scenario_config() ->
 
 scenario_configuration(Int, Atom, Binary) ->
     [
-        {some_int, ?MOD, Int, fun erlang:is_integer/1},
-        {some_atom, ?MOD, Atom, fun erlang:is_atom/1},
-        {some_binary, ?MOD, Binary, fun erlang:is_binary/1}
+        {some_int, ?MOD, Int, fun erlang:is_integer/1, read_only},
+        {some_atom, ?MOD, Atom, fun erlang:is_atom/1, read_only},
+        {some_binary, ?MOD, Binary, fun erlang:is_binary/1, read_only}
     ].
 
 settings_from_scenario_config(ScenarioConfig) ->
-    [{Name, Value} || {Name, _, Value, _} <- ScenarioConfig].
+    [{Name, Value} || {Name, _, Value, _, _} <- ScenarioConfig].
 
 given_scenario_os_parameters_not_set(ScenarioConfig) ->
-    [unset_os_env(Name) || {Name, _, _, _} <- ScenarioConfig].
+    [unset_os_env(Name) || {Name, _, _, _, _} <- ScenarioConfig].
 
 given_scenario_os_parameters_set(ScenarioConfig) ->
-    [set_os_env(Name, Value) || {Name, _, Value, _} <- ScenarioConfig].
+    [set_os_env(Name, Value) || {Name, _, Value, _, _} <- ScenarioConfig].
 
 given_scenario_app_parameters_not_set(ScenarioConfig) ->
-    [unset_app_env(?APP, Name) || {Name, _, _, _} <- ScenarioConfig].
+    [unset_app_env(?APP, Name) || {Name, _, _, _, _} <- ScenarioConfig].
 
 given_scenario_app_parameters_set(ScenarioConfig) ->
-    [set_app_env(?APP, Name, Value) || {Name, _, Value, _} <- ScenarioConfig].
+    [set_app_env(?APP, Name, Value) || {Name, _, Value, _, _} <- ScenarioConfig].

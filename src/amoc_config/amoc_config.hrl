@@ -30,20 +30,25 @@
                                                       {true, NewValue :: value()} |
                                                       {false, reason()}).
 
+-type update_fun() :: fun((ParamName :: name(), NewValue :: value()) -> any()).
+
 -type module_parameter() :: {ParamName :: name(), module(), DefValue :: value(),
-                             verification_fun()}.
+                             verification_fun(), update_fun() | read_only}.
 
 -type module_configuration() :: [module_parameter()].
 
 -type one_of() :: [value(), ...].
 -type fn_name() :: atom().
 -type verification_method() :: none | one_of() | fn_name() | verification_fun().
+-type update_method() :: read_only | none | fn_name() | update_fun().
 
 -type module_attribute() ::
     {ParamName :: name(), Description :: string()} |
     {ParamName :: name(), Description :: string(), DefValue :: value()} |
     {ParamName :: name(), Description :: string(), DefValue :: value(),
-                          verification_method()}.
+                          verification_method()} |
+    {ParamName :: name(), Description :: string(), DefValue :: value(),
+                          verification_method(), update_method()}.
 
 
 

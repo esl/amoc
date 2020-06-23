@@ -5,7 +5,8 @@
 -module(amoc_config_scenario).
 
 %% API
--export([parse_scenario_settings/2]).
+-export([parse_scenario_settings/2,
+         update_settings/1]).
 
 -include_lib("kernel/include/logger.hrl").
 -include("amoc_config.hrl").
@@ -18,8 +19,24 @@ parse_scenario_settings(Module, Settings) when is_atom(Module) ->
     PipelineActions = [
         {fun amoc_config_utils:load_verification_modules/0, []},
         {fun get_configuration/2, [Module]},
+        {fun verify_settings/2, [Settings]},
         {fun amoc_config_validation:process_scenario_config/2, [Settings]},
         {fun amoc_config_utils:store_scenario_config/1, []}],
+    case amoc_config_utils:pipeline(PipelineActions, ok) of
+        ok -> ok;
+        {error, _, _} = Error -> Error;
+        UnexpectedReturnValue ->
+            {error, invalid_return_value, UnexpectedReturnValue}
+    end.
+
+-spec update_settings(settings()) -> ok | error().
+update_settings(Settings) ->
+    PipelineActions = [
+        {fun get_existing_configuration/0, []},
+        {fun verify_settings/2, [Settings]},
+        {fun filter_configuration/2, [Settings]},
+        {fun amoc_config_validation:process_scenario_config/2, [Settings]},
+        {fun store_scenario_config/1, []}],
     case amoc_config_utils:pipeline(PipelineActions, ok) of
         ok -> ok;
         {error, _, _} = Error -> Error;
@@ -71,3 +88,35 @@ compose_configuration(Config, [M | L], VerificationModules) ->
             end;
         {error, _, _} = Error -> Error
     end.
+
+verify_settings(Config, Settings) ->
+    verify_settings([], Config, Settings).
+
+verify_settings([], Config, []) ->
+    {ok, Config};
+verify_settings(UndefinedParameters, _Config, []) ->
+    {error, undefined_parameters, UndefinedParameters};
+verify_settings(UndefinedParameters, Config, [{Name, _} | T]) ->
+    case lists:keyfind(Name, 1, Config) of
+        false ->
+            verify_settings([Name | UndefinedParameters], Config, T);
+        Tuple when is_tuple(Tuple) ->
+            verify_settings(UndefinedParameters, Config, T)
+    end.
+
+get_existing_configuration() ->
+    {ok, ets:tab2list(amoc_config)}.
+
+filter_configuration(Config, Settings) ->
+    Keys = proplists:get_keys(Settings),
+    FilteredConfig = [lists:keyfind(Name, 1, Config) || Name <- Keys],
+    case [{Name, Module} || {Name, Module, _, _, read_only} <- FilteredConfig] of
+        [] -> {ok, FilteredConfig};
+        ReadOnlyParameters ->
+            {error, readonly_parameters, ReadOnlyParameters}
+    end.
+
+store_scenario_config(Config) ->
+    amoc_config_utils:store_scenario_config(Config),
+    [spawn(fun() -> apply(Fn, [Name, Value]) end) || {Name, _, Value, _, Fn} <- Config],
+    ok.

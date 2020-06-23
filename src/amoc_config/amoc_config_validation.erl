@@ -20,13 +20,13 @@ process_scenario_config(Config, Settings) ->
 
 -spec get_value_and_verify(module_parameter(), settings()) ->
     {ok, module_parameter()} | {error, reason()}.
-get_value_and_verify({Name, Module, Default, VerificationMethod}, Settings) ->
+get_value_and_verify({Name, Module, Default, VerificationMethod, UpdateMethod}, Settings) ->
     App = get_application(Module),
     DefaultValue = amoc_config_env:get(App, Name, Default),
     Value = proplists:get_value(Name, Settings, DefaultValue),
     case verify(VerificationMethod, Value) of
         {true, NewValue} ->
-            {ok, {Name, Module, NewValue, VerificationMethod}};
+            {ok, {Name, Module, NewValue, VerificationMethod, UpdateMethod}};
         {false, Reason} ->
             {error, {Name, Value, Reason}}
     end.

@@ -23,9 +23,9 @@ get(Name, Default) when is_atom(Name) ->
         [] ->
             ?LOG_ERROR("no scenario setting ~p", [Name]),
             throw({invalid_setting, Name});
-        [{Name, _Module, undefined, _VerifyFn}] ->
+        [{Name, _Module, undefined, _VerifyFn, _UpdateFn}] ->
             Default;
-        [{Name, _Module, Value, _VerifyFn}] ->
+        [{Name, _Module, Value, _VerifyFn, _UpdateFn}] ->
             Value;
         InvalidLookupRet ->
             ?LOG_ERROR("invalid lookup return value ~p ~p", [Name, InvalidLookupRet]),

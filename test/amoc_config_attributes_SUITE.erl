@@ -19,13 +19,24 @@
     {var4, "var4", def4, is_atom},
     {var5, "var5", def5, fun ?MODULE:is_atom/1}
 ]).
--required_variable({var6, "var6", "def6", is_list}).
+-required_variable({var6, "var6", "def6", is_list, read_only}).
+-required_variable({var7, "var7", def7, none, none}).
+-required_variable([
+    {var8, "var8", def8, none, update_value},
+    {var9, "var9", def9, none, fun ?MODULE:update_value/2}
+]).
 
 %% verification functions
 -export([is_atom/1, none/1]).
 
+%% update functions
+-export([update_value/2, none/2]).
+
 is_atom(_) -> true.
 none(_) -> true.
+
+update_value(_, _) -> ok.
+none(_, _) -> ok.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 all() ->
@@ -41,7 +52,10 @@ get_module_attributes(_) ->
                       {var3, "var3", def3, [def3, another_atom]},
                       {var4, "var4", def4, is_atom},
                       {var5, "var5", def5, fun ?MODULE:is_atom/1},
-                      {var6, "var6", "def6", is_list}],
+                      {var6, "var6", "def6", is_list, read_only},
+                      {var7, "var7", def7, none, none},
+                      {var8, "var8", def8, none, update_value},
+                      {var9, "var9", def9, none, fun ?MODULE:update_value/2}],
     ?assertEqual(ExpectedResult, Result).
 
 get_module_configuration(_) ->
@@ -49,17 +63,23 @@ get_module_configuration(_) ->
                                                                    ?MODULE, [erlang]),
     IsAtomFN = fun ?MODULE:is_atom/1,
     IsListFN = fun erlang:is_list/1,
+    UpdateValueFN = fun ?MODULE:update_value/2,
     ?assertMatch(
-        [{var0, ?MODULE, undefined, _},
-         {var1, ?MODULE, def1, _},
-         {var2, ?MODULE, def2, _},
-         {var3, ?MODULE, def3, _},
-         {var4, ?MODULE, def4, IsAtomFN},
-         {var5, ?MODULE, def5, IsAtomFN},
-         {var6, ?MODULE, "def6", IsListFN}],
+        [{var0, ?MODULE, undefined, _, read_only},
+         {var1, ?MODULE, def1, _, read_only},
+         {var2, ?MODULE, def2, _, read_only},
+         {var3, ?MODULE, def3, _, read_only},
+         {var4, ?MODULE, def4, IsAtomFN, read_only},
+         {var5, ?MODULE, def5, IsAtomFN, read_only},
+         {var6, ?MODULE, "def6", IsListFN, read_only},
+         {var7, ?MODULE, def7, _, _},
+         {var8, ?MODULE, def8, _, UpdateValueFN},
+         {var9, ?MODULE, def9, _, UpdateValueFN}],
         Config),
     [assert_fn(FN, amoc_config_attributes, 1) || {_, _, _, FN, _} <- Config,
-                                                 FN =/= IsAtomFN, FN =/= IsListFN].
+                                                 FN =/= IsAtomFN, FN =/= IsListFN],
+    [assert_fn(FN, amoc_config_attributes, 2) || {_, _, _,  _, FN} <- Config,
+                                                 FN =/= UpdateValueFN, FN =/= read_only].
 
 assert_fn(FN, Module, Arity) ->
     ?assertEqual({arity, Arity}, erlang:fun_info(FN, arity)),
@@ -71,15 +91,22 @@ errors_reporting(_) ->
         {invalid_var1, <<"var1">>, def1},
         {invalid_var2, "var2", def2, <<"invalid_verification_method">>},
         {valid_var3, "var3", def3, [def3, another_atom]},
-        {invalid_var4, "var4", def4, not_exported_function}],
+        {invalid_var4, "var4", def4, not_exported_function},
+        {invalid_var5, "var5", def5, is_atom, {invalid_update_method}},
+        {invalid_var5, "var5", def5, is_atom, not_exported_function}],
     {error, invalid_attribute_format, Reason} =
         amoc_config_attributes:process_module_attributes([?MODULE], ?MODULE, Attributes),
     ?assertEqual(
         [{invalid_attribute, {"invalid_var0", "var0"}},
          {invalid_attribute, {invalid_var1, <<"var1">>, def1}},
          {invalid_verification_method,
-            {invalid_var2, ?MODULE, def2, <<"invalid_verification_method">>}},
+            {invalid_var2, ?MODULE, def2, <<"invalid_verification_method">>, read_only}},
          {verification_method_not_exported,
-            {invalid_var4, ?MODULE, def4, not_exported_function},
+            {invalid_var4, ?MODULE, def4, not_exported_function, read_only},
+            [?MODULE]},
+         {invalid_update_method,
+            {invalid_var5, ?MODULE, def5, fun ?MODULE:is_atom/1, {invalid_update_method}}},
+         {update_method_not_exported,
+            {invalid_var5, ?MODULE, def5, fun ?MODULE:is_atom/1, not_exported_function},
             [?MODULE]}],
         Reason).

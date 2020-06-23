@@ -48,6 +48,7 @@
 -export([start_link/0,
          start_scenario/2,
          stop_scenario/0,
+         update_settings/1,
          add_users/2,
          remove_users/2,
          get_status/0,
@@ -85,6 +86,10 @@ start_scenario(Scenario, Settings) ->
 -spec stop_scenario() -> ok | {error, term()}.
 stop_scenario() ->
     gen_server:call(?SERVER, stop_scenario).
+
+-spec update_settings(amoc_config:settings()) -> ok | {error, term()}.
+update_settings(Settings) ->
+    gen_server:call(?SERVER, {update_settings, Settings}).
 
 -spec add_users(amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     ok | {error, term()}.
@@ -125,6 +130,9 @@ handle_call({start_scenario, Scenario, Settings}, _From, State) ->
 handle_call(stop_scenario, _From, State) ->
     {RetValue, NewState} = handle_stop_scenario(State),
     {reply, RetValue, NewState};
+handle_call({update_settings, Settings}, _From, State) ->
+    RetValue = handle_update_settings(Settings),
+    {reply, RetValue, State};
 handle_call({add, StartId, EndID}, _From, State) ->
     {RetValue, NewState} = handle_add(StartId, EndID, State),
     {reply, RetValue, NewState};
@@ -179,6 +187,13 @@ handle_stop_scenario(#state{status = running} = State) ->
     {ok, State#state{status = terminating}};
 handle_stop_scenario(#state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
+
+-spec handle_update_settings(amoc_config:settings()) -> handle_call_res().
+handle_update_settings(Settings) ->
+    case amoc_config_scenario:update_settings(Settings) of
+        ok -> ok;
+        {error, Type, Reason} -> {error, {Type, Reason}}
+    end.
 
 -spec handle_add(amoc_scenario:user_id(), amoc_scenario:user_id(), state()) ->
     {handle_call_res(), state()}.
