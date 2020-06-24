@@ -13,13 +13,15 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% these attributes are required for the testing purposes %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--required_variable({var0, "var0"}).
--required_variable({var1, "var1"}).
--required_variable({var2, "var2", def2}).
--override_variable({var2, "var2", val2, [def2, val2], update}).
--override_variable({var3, "var3", def3, none, update}).
+-required_variable(#{name => var0, description => "var0"}).
+-required_variable(#{name => var1, description => "var1"}).
+-required_variable(#{name => var2, description => "var2", value => def2}).
+-override_variable(#{name => var2, description => "var2", value => val2,
+                     verification => [def2, val2], update => update_fn}).
+-override_variable(#{name => var3, description => "var3", value => def3,
+                     update => update_fn}).
 
-update(Name, Value) -> apply(?MOCK_MOD, update, [Name, Value]).
+update_fn(Name, Value) -> apply(?MOCK_MOD, update, [Name, Value]).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 

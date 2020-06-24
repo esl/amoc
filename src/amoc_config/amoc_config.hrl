@@ -49,13 +49,11 @@
 -type verification_method() :: none | one_of() | fn_name() | verification_fun().
 -type update_method() :: read_only | none | fn_name() | update_fun().
 
--type module_attribute() ::
-    {ParamName :: name(), Description :: string()} |
-    {ParamName :: name(), Description :: string(), DefValue :: value()} |
-    {ParamName :: name(), Description :: string(), DefValue :: value(),
-                          verification_method()} |
-    {ParamName :: name(), Description :: string(), DefValue :: value(),
-                          verification_method(), update_method()}.
+-type module_attribute() :: #{ name := name(),
+                               description := string(),
+                               value => value(),
+                               verification => verification_method(),
+                               update => update_method()}.
 
 
 

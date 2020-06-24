@@ -12,19 +12,25 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% these attributes and functions are required for the testing purposes %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--required_variable({var0, "var0"}).
--required_variable({var1, "var1", def1}).
+-required_variable(#{name => var0, description => "var0"}).
+-required_variable(#{name => var1, description => "var1", value => def1}).
 -required_variable([
-    {var2, "var2", def2, none},
-    {var3, "var3", def3, [def3, another_atom]},
-    {var4, "var4", def4, is_atom},
-    {var5, "var5", def5, fun ?MODULE:is_atom/1}
+    #{name => var2, description => "var2", value => def2, verification => none},
+    #{name => var3, description => "var3", value => def3,
+      verification => [def3, another_atom]},
+    #{name => var4, description => "var4", value => def4, verification => is_atom},
+    #{name => var5, description => "var5", value => def5,
+      verification => fun ?MODULE:is_atom/1}
 ]).
--required_variable({var6, "var6", "def6", is_list, read_only}).
--required_variable({var7, "var7", def7, none, none}).
+-required_variable(#{name => var6, description => "var6", value => "def6",
+                     verification => is_list, update => read_only}).
+-required_variable(#{name => var7, description => "var7", value => def7,
+                     verification => none, update => none}).
 -required_variable([
-    {var8, "var8", def8, none, update_value},
-    {var9, "var9", def9, none, fun ?MODULE:update_value/2}
+    #{name => var8, description => "var8", value => def8,
+      verification => none, update => update_value},
+    #{name => var9, description => "var9", value => def9,
+      verification => none, update => fun ?MODULE:update_value/2}
 ]).
 
 %% verification functions
@@ -47,16 +53,23 @@ all() ->
 
 get_module_attributes(_) ->
     Result = amoc_config_attributes:get_module_attributes(required_variable, ?MODULE),
-    ExpectedResult = [{var0, "var0"},
-                      {var1, "var1", def1},
-                      {var2, "var2", def2, none},
-                      {var3, "var3", def3, [def3, another_atom]},
-                      {var4, "var4", def4, is_atom},
-                      {var5, "var5", def5, fun ?MODULE:is_atom/1},
-                      {var6, "var6", "def6", is_list, read_only},
-                      {var7, "var7", def7, none, none},
-                      {var8, "var8", def8, none, update_value},
-                      {var9, "var9", def9, none, fun ?MODULE:update_value/2}],
+    ExpectedResult = [
+        #{name => var0, description => "var0"},
+        #{name => var1, description => "var1", value => def1},
+        #{name => var2, description => "var2", value => def2, verification => none},
+        #{name => var3, description => "var3", value => def3,
+          verification => [def3, another_atom]},
+        #{name => var4, description => "var4", value => def4, verification => is_atom},
+        #{name => var5, description => "var5", value => def5,
+          verification => fun ?MODULE:is_atom/1},
+        #{name => var6, description => "var6", value => "def6",
+          verification => is_list, update => read_only},
+        #{name => var7, description => "var7", value => def7,
+          verification => none, update => none},
+        #{name => var8, description => "var8", value => def8,
+          verification => none, update => update_value},
+        #{name => var9, description => "var9", value => def9,
+          verification => none, update => fun ?MODULE:update_value/2}],
     ?assertEqual(ExpectedResult, Result).
 
 get_module_configuration(_) ->
@@ -98,27 +111,27 @@ assert_fn(FN, Module, Arity) ->
     ?assertEqual({module, Module}, erlang:fun_info(FN, module)).
 
 errors_reporting(_) ->
-    Attributes = [
-        {"invalid_var0", "var0"},
-        {invalid_var1, <<"var1">>, def1},
-        {invalid_var2, "var2", def2, <<"invalid_verification_method">>},
-        {valid_var3, "var3", def3, [def3, another_atom]},
-        {invalid_var4, "var4", def4, not_exported_function},
-        {invalid_var5, "var5", def5, is_atom, {invalid_update_method}},
-        {invalid_var6, "var6", def6, is_atom, not_exported_function}],
+    InvalidParam0 = #{name => "invalid_var0", description => "var0"},
+    InvalidParam1 = #{name => invalid_var1, description => [$a, <<"b">>]},
+    InvalidParam2 = #{name => invalid_var2, description => "var2",
+                      verification => <<"invalid_verification_method">>},
+    ValidParam3 = #{name => valid_var3, description => "var3", value => def3,
+                    verification => [def3, another_atom]},
+    InvalidParam4 = #{name => invalid_var4, description => "var4",
+                      verification => not_exported_function},
+    InvalidParam5 = #{name => invalid_var5, description => "var5",
+                      update => {invalid_update_method}},
+    InvalidParam6 = #{name => invalid_var6, description => "var6",
+                      update => not_exported_function},
+    Attributes = [InvalidParam0, InvalidParam1, InvalidParam2,ValidParam3,
+                  InvalidParam4, InvalidParam5,InvalidParam6],
     {error, invalid_attribute_format, Reason} =
-        amoc_config_attributes:process_module_attributes([?MODULE], ?MODULE, Attributes),
+        amoc_config_attributes:process_module_attributes([mod1, mod2], ?MODULE, Attributes),
     ?assertEqual(
-        [{invalid_attribute, {"invalid_var0", "var0"}},
-         {invalid_attribute, {invalid_var1, <<"var1">>, def1}},
-         {invalid_verification_method,
-          {invalid_var2, "var2", def2, <<"invalid_verification_method">>}},
-         {verification_method_not_exported,
-          {invalid_var4, "var4", def4, not_exported_function},
-          [?MODULE]},
-         {invalid_update_method,
-          {invalid_var5, "var5", def5, is_atom, {invalid_update_method}}},
-         {update_method_not_exported,
-          {invalid_var6, "var6", def6, is_atom, not_exported_function},
-          [?MODULE]}],
+        [{invalid_attribute, InvalidParam0},
+         {invalid_attribute, InvalidParam1},
+         {invalid_verification_method, InvalidParam2},
+         {verification_method_not_exported, InvalidParam4, [?MODULE, mod1, mod2]},
+         {invalid_update_method, InvalidParam5},
+         {update_method_not_exported, InvalidParam6, [?MODULE, mod1, mod2]}],
         Reason).

@@ -8,9 +8,9 @@
 -define(SERVER, ?MODULE).
 -define(USERS_TABLE, amoc_users).
 
--required_variable({interarrival, "a delay between creating the processes "
-                                  "for two consecutive users (ms, def: 50ms)",
-                    50, positive_integer}).
+-required_variable(#{name => interarrival, value => 50, verification => positive_integer,
+                     description => "a delay between creating the processes for two "
+                                    "consecutive users (ms, def: 50ms)"}).
 
 -record(state, {scenario :: amoc:scenario() | undefined,
                 no_of_users = 0 :: user_count(),
@@ -55,7 +55,7 @@
          disable/0]).
 
 %% ------------------------------------------------------------------
-%% Parameters validation functions
+%% Parameters verification functions
 %% ------------------------------------------------------------------
 -export([positive_integer/1]).
 %% ------------------------------------------------------------------

@@ -30,8 +30,7 @@
 get_module_configuration(AttrName, Module, VerificationModules) ->
     try
         ScenarioAttributes = get_module_attributes(AttrName, Module),
-        AllVerificationModules = [Module | VerificationModules],
-        process_module_attributes(AllVerificationModules, Module, ScenarioAttributes)
+        process_module_attributes(VerificationModules, Module, ScenarioAttributes)
     catch
         _:_ -> {error, invalid_module, Module}
     end.
@@ -54,53 +53,57 @@ process_module_attributes(VerificationModules, Module, ScenarioAttributes) ->
 
 -spec process_var_attr([module()], module(), maybe_module_attribute()) ->
     {ok, module_parameter()} | {error, reason()}.
-process_var_attr(_, _Module, Attr) when not is_atom(element(1, Attr));
-                                        not is_list(element(2, Attr)) ->
-    {error, {invalid_attribute, Attr}};
-process_var_attr(_, Module, {Name, _}) ->
-    {ok, #module_parameter{name =Name, mod = Module,
-                           verification_fn = fun none/1}};
-process_var_attr(_, Module, {Name, _, DefaultValue}) ->
-    {ok, #module_parameter{name = Name, mod = Module, value = DefaultValue,
-                           verification_fn = fun none/1}};
-process_var_attr(VerificationModules, Module, {Name, _, DefaultValue,
-                                               VerificationMethod} = Attr) ->
+process_var_attr(VerificationModules, Module, Attr) ->
+    AllVerificationModules = [Module | VerificationModules],
+    PipelineActions = [
+        {fun check_mandatory_fields/1, []},
+        {fun check_default_value/1, []},
+        {fun check_verification_method/3, [AllVerificationModules,Attr]},
+        {fun check_update_method/3, [AllVerificationModules,Attr]},
+        {fun make_module_parameter/2, [Module]}],
+    amoc_config_utils:pipeline(PipelineActions, {ok, Attr}).
+
+check_mandatory_fields(#{description := List, name := Atom} = Attr) when is_atom(Atom),
+                                                                         is_list(List) ->
+    case io_lib:char_list(List) of
+        true -> {ok, Attr};
+        false -> {error, {invalid_attribute, Attr}}
+    end;
+check_mandatory_fields(Attr) ->
+    {error, {invalid_attribute, Attr}}.
+
+check_default_value(Attr) ->
+    DefaultValue = maps:get(value, Attr, undefined),
+    {ok, Attr#{value => DefaultValue}}.
+
+check_verification_method(Attr, VerificationModules, OriginalAttr) ->
+    VerificationMethod = maps:get(verification, Attr, none),
     case verification_fn(VerificationModules, VerificationMethod) of
         not_exported ->
-            {error, {verification_method_not_exported, Attr, VerificationModules}};
+            {error, {verification_method_not_exported, OriginalAttr,
+                     VerificationModules}};
         invalid_method ->
-            {error, {invalid_verification_method, Attr}};
+            {error, {invalid_verification_method, OriginalAttr}};
         VerificationFn ->
-            {ok, #module_parameter{name = Name, mod = Module, value = DefaultValue,
-                                   verification_fn = VerificationFn}}
-    end;
-process_var_attr(VerificationModules, Module, {Name, _, DefaultValue,
-                                               VerificationMethod,
-                                               UpdateMethod} = Attr) ->
-    VerificationFn = case verification_fn(VerificationModules, VerificationMethod) of
+            {ok, Attr#{verification => VerificationFn}}
+    end.
+
+check_update_method(Attr, VerificationModules, OriginalAttr) ->
+    UpdateMethod = maps:get(update, Attr, read_only),
+    case update_fn(VerificationModules, UpdateMethod) of
         not_exported ->
-            {error, {verification_method_not_exported, Attr, VerificationModules}};
+            {error, {update_method_not_exported, OriginalAttr,
+                     VerificationModules}};
         invalid_method ->
-            {error, {invalid_verification_method, Attr}};
-        VerFn -> VerFn
-    end,
-    UpdateFn = case update_fn(VerificationModules, UpdateMethod) of
-        not_exported ->
-            {error, {update_method_not_exported, Attr, VerificationModules}};
-        invalid_method ->
-            {error, {invalid_update_method, Attr}};
-        UpdFn -> UpdFn
-    end,
-    case {VerificationFn,UpdateFn} of
-        {{error,Reason1},{error,Reason2}} -> {error,[Reason1,Reason2]};
-        {{error,VerFnReason},_} -> {error,VerFnReason};
-        {_,{error,UpdFnReason}} -> {error,UpdFnReason};
-        {VerificationFn,UpdateFn} ->
-            {ok, #module_parameter{name = Name, mod = Module, value = DefaultValue,
-                                   verification_fn = VerificationFn, update_fn = UpdateFn}}
-    end;
-process_var_attr(_, _, InvalidAttribute) ->
-    {error, {invalid_attribute, InvalidAttribute}}.
+            {error, {invalid_update_method, OriginalAttr}};
+        UpdateFn ->
+            {ok, Attr#{update=>UpdateFn}}
+    end.
+
+make_module_parameter(#{name := Name, value := Value, update := UpdateFn,
+                        verification := VerificationFn}, Module) ->
+    {ok, #module_parameter{name = Name, mod = Module, value = Value,
+                           verification_fn = VerificationFn,update_fn = UpdateFn}}.
 
 -spec verification_fn([module()], maybe_verification_method()) ->
     maybe_verification_fun() | not_exported | invalid_method.
@@ -139,6 +142,8 @@ is_exported([Module | T], Function, Arity) ->
     end.
 
 none(_) -> true.
+
+
 
 none(_, _) -> ok.
 
