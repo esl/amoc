@@ -32,9 +32,16 @@
 
 -type update_fun() :: fun((ParamName :: name(), NewValue :: value()) -> any()).
 
--type module_parameter() :: {ParamName :: name(), module(), DefValue :: value(),
-                             verification_fun(), update_fun() | read_only}.
+-type maybe_verification_fun() :: verification_fun() | fun((_)-> any()).
+-type maybe_update_fun() :: verification_fun() | fun((_,_)-> any()).
 
+-record(module_parameter, {name :: name(),
+                           mod :: module(),
+                           value :: value(),
+                           verification_fn :: maybe_verification_fun(),
+                           update_fn = read_only :: maybe_update_fun() | read_only}).
+
+-type module_parameter() :: #module_parameter{}.
 -type module_configuration() :: [module_parameter()].
 
 -type one_of() :: [value(), ...].

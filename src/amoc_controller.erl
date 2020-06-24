@@ -271,9 +271,7 @@ start_tables() -> %% ETS creation
                                           ordered_set,
                                           protected,
                                           {read_concurrency, true}]),
-    amoc_config = ets:new(amoc_config, [named_table,
-                                        protected,
-                                        {read_concurrency, true}]),
+    amoc_config_utils:create_amoc_config_ets(),
     ok.
 
 -spec init_scenario(amoc:scenario(), amoc_config:settings()) ->

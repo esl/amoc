@@ -179,8 +179,8 @@ invalid_module_attributes(_) ->
 
 mock_ets_tables() ->
     EtsOptions = [named_table, protected, {read_concurrency, true}],
-    amoc_config = ets:new(amoc_config, EtsOptions),
-    amoc_scenarios = ets:new(amoc_scenarios, EtsOptions).
+    amoc_scenarios = ets:new(amoc_scenarios, EtsOptions),
+    amoc_config_utils:create_amoc_config_ets().
 
 isEqualList(List1, List2) ->
     ?assertEqual(lists:sort(List1), lists:sort(List2)).

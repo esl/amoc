@@ -12,6 +12,7 @@
 -include_lib("kernel/include/logger.hrl").
 -include("amoc_config.hrl").
 
+
 -spec process_scenario_config(module_configuration(), settings()) ->
     {ok, module_configuration()} | error().
 process_scenario_config(Config, Settings) ->
@@ -20,18 +21,20 @@ process_scenario_config(Config, Settings) ->
 
 -spec get_value_and_verify(module_parameter(), settings()) ->
     {ok, module_parameter()} | {error, reason()}.
-get_value_and_verify({Name, Module, Default, VerificationMethod, UpdateMethod}, Settings) ->
+get_value_and_verify(#module_parameter{name = Name, mod = Module, value = Default,
+                                       verification_fn = VerificationFn} = Param,
+                     Settings) ->
     App = get_application(Module),
     DefaultValue = amoc_config_env:get(App, Name, Default),
     Value = proplists:get_value(Name, Settings, DefaultValue),
-    case verify(VerificationMethod, Value) of
+    case verify(VerificationFn, Value) of
         {true, NewValue} ->
-            {ok, {Name, Module, NewValue, VerificationMethod, UpdateMethod}};
+            {ok, Param#module_parameter{value = NewValue}};
         {false, Reason} ->
             {error, {Name, Value, Reason}}
     end.
 
--spec verify(verification_fun(), value()) -> {true, value()} | {false, reason()}.
+-spec verify(maybe_verification_fun(), value()) -> {true, value()} | {false, reason()}.
 verify(Fun, Value) ->
     try apply(Fun, [Value]) of
         true -> {true, Value};

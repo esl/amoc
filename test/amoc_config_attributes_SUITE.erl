@@ -2,6 +2,7 @@
 -module(amoc_config_attributes_SUITE).
 
 -include_lib("eunit/include/eunit.hrl").
+-include("../src/amoc_config/amoc_config.hrl").
 
 -export([all/0]).
 -export([get_module_attributes/1,
@@ -65,21 +66,32 @@ get_module_configuration(_) ->
     IsListFN = fun erlang:is_list/1,
     UpdateValueFN = fun ?MODULE:update_value/2,
     ?assertMatch(
-        [{var0, ?MODULE, undefined, _, read_only},
-         {var1, ?MODULE, def1, _, read_only},
-         {var2, ?MODULE, def2, _, read_only},
-         {var3, ?MODULE, def3, _, read_only},
-         {var4, ?MODULE, def4, IsAtomFN, read_only},
-         {var5, ?MODULE, def5, IsAtomFN, read_only},
-         {var6, ?MODULE, "def6", IsListFN, read_only},
-         {var7, ?MODULE, def7, _, _},
-         {var8, ?MODULE, def8, _, UpdateValueFN},
-         {var9, ?MODULE, def9, _, UpdateValueFN}],
+        [#module_parameter{name = var0, mod = ?MODULE, value = undefined,
+                           update_fn = read_only},
+         #module_parameter{name = var1, mod = ?MODULE, value = def1,
+                           update_fn = read_only},
+         #module_parameter{name = var2, mod = ?MODULE, value = def2,
+                           update_fn = read_only},
+         #module_parameter{name = var3, mod = ?MODULE, value = def3,
+                           update_fn = read_only},
+         #module_parameter{name = var4, mod = ?MODULE, value = def4,
+                           verification_fn = IsAtomFN, update_fn = read_only},
+         #module_parameter{name = var5, mod = ?MODULE, value = def5,
+                           verification_fn = IsAtomFN, update_fn = read_only},
+         #module_parameter{name = var6, mod = ?MODULE, value = "def6",
+                           verification_fn = IsListFN, update_fn = read_only},
+         #module_parameter{name = var7, mod = ?MODULE, value = def7},
+         #module_parameter{name = var8, mod = ?MODULE, value = def8,
+                           update_fn = UpdateValueFN},
+         #module_parameter{name = var9, mod = ?MODULE, value = def9,
+                           update_fn = UpdateValueFN}],
         Config),
-    [assert_fn(FN, amoc_config_attributes, 1) || {_, _, _, FN, _} <- Config,
-                                                 FN =/= IsAtomFN, FN =/= IsListFN],
-    [assert_fn(FN, amoc_config_attributes, 2) || {_, _, _,  _, FN} <- Config,
-                                                 FN =/= UpdateValueFN, FN =/= read_only].
+    [assert_fn(FN, amoc_config_attributes, 1)
+     || #module_parameter{verification_fn = FN} <- Config,
+        FN =/= IsAtomFN, FN =/= IsListFN],
+    [assert_fn(FN, amoc_config_attributes, 2)
+     || #module_parameter{update_fn = FN} <- Config,
+        FN =/= UpdateValueFN, FN =/= read_only].
 
 assert_fn(FN, Module, Arity) ->
     ?assertEqual({arity, Arity}, erlang:fun_info(FN, arity)),
@@ -93,20 +105,20 @@ errors_reporting(_) ->
         {valid_var3, "var3", def3, [def3, another_atom]},
         {invalid_var4, "var4", def4, not_exported_function},
         {invalid_var5, "var5", def5, is_atom, {invalid_update_method}},
-        {invalid_var5, "var5", def5, is_atom, not_exported_function}],
+        {invalid_var6, "var6", def6, is_atom, not_exported_function}],
     {error, invalid_attribute_format, Reason} =
         amoc_config_attributes:process_module_attributes([?MODULE], ?MODULE, Attributes),
     ?assertEqual(
         [{invalid_attribute, {"invalid_var0", "var0"}},
          {invalid_attribute, {invalid_var1, <<"var1">>, def1}},
          {invalid_verification_method,
-            {invalid_var2, ?MODULE, def2, <<"invalid_verification_method">>, read_only}},
+          {invalid_var2, "var2", def2, <<"invalid_verification_method">>}},
          {verification_method_not_exported,
-            {invalid_var4, ?MODULE, def4, not_exported_function, read_only},
-            [?MODULE]},
+          {invalid_var4, "var4", def4, not_exported_function},
+          [?MODULE]},
          {invalid_update_method,
-            {invalid_var5, ?MODULE, def5, fun ?MODULE:is_atom/1, {invalid_update_method}}},
+          {invalid_var5, "var5", def5, is_atom, {invalid_update_method}}},
          {update_method_not_exported,
-            {invalid_var5, ?MODULE, def5, fun ?MODULE:is_atom/1, not_exported_function},
-            [?MODULE]}],
+          {invalid_var6, "var6", def6, is_atom, not_exported_function},
+          [?MODULE]}],
         Reason).

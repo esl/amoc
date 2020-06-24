@@ -97,7 +97,7 @@ verify_settings([], Config, []) ->
 verify_settings(UndefinedParameters, _Config, []) ->
     {error, undefined_parameters, UndefinedParameters};
 verify_settings(UndefinedParameters, Config, [{Name, _} | T]) ->
-    case lists:keyfind(Name, 1, Config) of
+    case lists:keyfind(Name, #module_parameter.name, Config) of
         false ->
             verify_settings([Name | UndefinedParameters], Config, T);
         Tuple when is_tuple(Tuple) ->
@@ -109,8 +109,10 @@ get_existing_configuration() ->
 
 filter_configuration(Config, Settings) ->
     Keys = proplists:get_keys(Settings),
-    FilteredConfig = [lists:keyfind(Name, 1, Config) || Name <- Keys],
-    case [{Name, Module} || {Name, Module, _, _, read_only} <- FilteredConfig] of
+    KeyPos = #module_parameter.name,
+    FilteredConfig = [lists:keyfind(Name, KeyPos, Config) || Name <- Keys],
+    case [{N, M} || #module_parameter{name = N, mod = M,
+                                      update_fn = read_only} <- FilteredConfig] of
         [] -> {ok, FilteredConfig};
         ReadOnlyParameters ->
             {error, readonly_parameters, ReadOnlyParameters}
@@ -118,5 +120,6 @@ filter_configuration(Config, Settings) ->
 
 store_scenario_config(Config) ->
     amoc_config_utils:store_scenario_config(Config),
-    [spawn(fun() -> apply(Fn, [Name, Value]) end) || {Name, _, Value, _, Fn} <- Config],
+    [spawn(fun() -> apply(Fn, [Name, Value]) end)
+     || #module_parameter{name = Name, value = Value, update_fn = Fn} <- Config],
     ok.

@@ -12,7 +12,8 @@
          pipeline/2,
          merge_config/2,
          override_config/2,
-         store_scenario_config/1]).
+         store_scenario_config/1,
+         create_amoc_config_ets/0]).
 
 -spec load_verification_modules() -> {ok, [module()]} | error().
 load_verification_modules() ->
@@ -58,22 +59,28 @@ try_apply_fn(Fun, Args) ->
     {ok, module_configuration()} | error().
 merge_config(MergedConfig, []) ->
     {ok, MergedConfig};
-merge_config(OldConfig, [{ParamName, Module, _, _, _} = Param | L]) ->
-    case lists:keyfind(ParamName, 1, OldConfig) of
+merge_config(OldConfig, [#module_parameter{name = Name, mod = Module} = Param | L]) ->
+    case lists:keyfind(Name, #module_parameter.name, OldConfig) of
         false ->
             merge_config([Param | OldConfig], L);
-        {ParamName, AnotherModule, _, _, _} ->
-            {error, parameter_overriding, {ParamName, Module, AnotherModule}}
+        #module_parameter{name = Name, mod = AnotherModule} ->
+            {error, parameter_overriding, {Name, Module, AnotherModule}}
     end.
 
 -spec override_config(module_configuration(), module_configuration()) ->
     {ok, module_configuration()}.
-override_config(OldConfig,NewConfig)->
+override_config(OldConfig, NewConfig) ->
     ReversedNewConfig = lists:reverse(NewConfig),
     FullConfig = ReversedNewConfig ++ OldConfig,
-    {ok, lists:ukeysort(1,FullConfig)}.
+    {ok, lists:ukeysort(#module_parameter.name, FullConfig)}.
 
 -spec store_scenario_config(module_configuration()) -> ok.
 store_scenario_config(Config) ->
     true = ets:insert(amoc_config, Config),
     ok.
+
+create_amoc_config_ets() ->
+    amoc_config = ets:new(amoc_config, [named_table,
+                                        protected,
+                                        {keypos, #module_parameter.name},
+                                        {read_concurrency, true}]).
