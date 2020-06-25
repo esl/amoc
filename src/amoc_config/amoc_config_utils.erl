@@ -17,10 +17,15 @@
 
 -spec load_verification_modules() -> {ok, [module()]} | error().
 load_verification_modules() ->
-    Modules = amoc_config_env:find_all_vars(config_verification_modules),
-    UniqueModules = lists:usort(lists:concat(Modules)),
-    LoadingResult = [load_module(Module) || Module <- UniqueModules],
+    Modules = get_all_verification_modules(),
+    LoadingResult = [load_module(Module) || Module <- Modules],
     maybe_error(invalid_verification_module, LoadingResult).
+
+-spec get_all_verification_modules() -> [module()].
+get_all_verification_modules() ->
+    ModuleSets = amoc_config_env:find_all_vars(config_verification_modules),
+    Modules = lists:flatten(ModuleSets),
+    lists:usort(Modules).
 
 -spec load_module(module()) -> {ok, module()} | {error, {module(), any()}}.
 load_module(Module) ->
@@ -80,6 +85,7 @@ store_scenario_config(Config) ->
     true = ets:insert(amoc_config, Config),
     ok.
 
+-spec create_amoc_config_ets() -> any().
 create_amoc_config_ets() ->
     amoc_config = ets:new(amoc_config, [named_table,
                                         protected,

@@ -7,7 +7,6 @@
 -import(amoc_config_helper, [set_app_env/3,
                              unset_app_env/2]).
 
--define(APP, common_test).
 -define(MOCK_MOD, mock_mod).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -156,11 +155,23 @@ invalid_value(_) ->
 
 invalid_verification_module(_) ->
     mock_ets_tables(),
-    set_app_env(?APP, config_verification_modules, [invalid_module_name]),
+    [{App1, _, _}, {App2, _, _} | _] = application:loaded_applications(),
+    io:format("!!! ~p~n",[application:loaded_applications()]),
+    VerificationModules1 = [invalid_module_name,
+                           ct, % just some existing module
+                           amoc,% just some existing module
+                           another_invalid_module],
+    VerificationModules2 = [invalid_module_name,
+                            yet_another_invalid_module],
+    set_app_env(App1, config_verification_modules, VerificationModules1),
+    set_app_env(App2, config_verification_modules, VerificationModules2),
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, []),
-    unset_app_env(?APP, config_verification_modules),
+    unset_app_env(App1, config_verification_modules),
+    unset_app_env(App2, config_verification_modules),
     ?assertEqual({error, invalid_verification_module,
-                  [{invalid_module_name, nofile}]},
+                  [{another_invalid_module, nofile},
+                   {invalid_module_name, nofile},
+                   {yet_another_invalid_module, nofile}]},
                  Ret).
 
 invalid_parametrised_module(_) ->
