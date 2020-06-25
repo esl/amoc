@@ -10,7 +10,8 @@
 
 -required_variable(#{name => interarrival, value => 50, verification => positive_integer,
                      description => "a delay between creating the processes for two "
-                                    "consecutive users (ms, def: 50ms)"}).
+                                    "consecutive users (ms, def: 50ms)",
+                     update => maybe_update_interarrival_timer}).
 
 -record(state, {scenario :: amoc:scenario() | undefined,
                 no_of_users = 0 :: user_count(),
@@ -57,7 +58,9 @@
 %% ------------------------------------------------------------------
 %% Parameters verification functions
 %% ------------------------------------------------------------------
--export([positive_integer/1]).
+-export([maybe_update_interarrival_timer/2,
+         positive_integer/1]).
+
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
@@ -115,6 +118,8 @@ disable() ->
 positive_integer(Interarrival) ->
     is_integer(Interarrival) andalso Interarrival > 0.
 
+maybe_update_interarrival_timer(interarrival, _) ->
+    gen_server:cast(?SERVER, maybe_update_interarrival_timer).
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -150,6 +155,8 @@ handle_call(_Request, _From, State) ->
     {reply, {error, not_implemented}, State}.
 
 -spec handle_cast(any(), state()) -> {noreply, state()}.
+handle_cast(maybe_update_interarrival_timer, State) ->
+    {noreply,maybe_update_interarrival_timer(State)};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -339,3 +346,10 @@ apply_safely(M, F, A) ->
         Class:Exception:Stacktrace ->
             {error, {Class, Exception, Stacktrace}}
     end.
+
+maybe_update_interarrival_timer(#state{tref = undefined} = State) ->
+    State;
+maybe_update_interarrival_timer(#state{tref = TRef} = State) ->
+    {ok, cancel} = timer:cancel(TRef),
+    {ok, NewTRef} = timer:send_interval(interarrival(), start_user),
+    State#state{tref = NewTRef}.
