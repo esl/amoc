@@ -7,7 +7,8 @@
 -export([all/0]).
 -export([get_module_attributes/1,
          get_module_configuration/1,
-         errors_reporting/1]).
+         errors_reporting/1,
+         multiple_exports_error/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% these attributes and functions are required for the testing purposes %%
@@ -49,7 +50,8 @@ none(_, _) -> ok.
 all() ->
     [get_module_attributes,
      get_module_configuration,
-     errors_reporting].
+     errors_reporting,
+     multiple_exports_error].
 
 get_module_attributes(_) ->
     Result = amoc_config_attributes:get_module_attributes(required_variable, ?MODULE),
@@ -135,3 +137,26 @@ errors_reporting(_) ->
          {invalid_update_method, InvalidParam5},
          {update_method_not_exported, InvalidParam6, [?MODULE, mod1, mod2]}],
         Reason).
+
+multiple_exports_error(_)->
+    Module = ct, %% use some dummy module that belongs to some application
+    {ok, App} = application:get_application(Module),
+    Param = #{name => var0, description => "var0", verification=>add},
+    AllVerificationModules = [amoc, amoc_dist],
+    [code:ensure_loaded(Module) || Module <- AllVerificationModules],
+    {error, invalid_attribute_format, Reason} =
+        amoc_config_attributes:process_module_attributes(
+            AllVerificationModules, Module, [Param]),
+    ?assertEqual(
+        [{multiple_functions_found,
+          [fun amoc_dist:add/1, fun amoc:add/1],
+          #{description => "var0", name => var0, verification => add}}],
+        Reason),
+    %% now try to set 'config_verification_modules' env variable for App
+    amoc_config_helper:set_app_env(App, config_verification_modules, [amoc, amoc]),
+    {ok, Result} = amoc_config_attributes:process_module_attributes(
+                       AllVerificationModules, Module, [Param]),
+    ?assertEqual(
+        [{module_parameter, var0, ct, undefined, fun amoc:add/1, read_only}],
+        Result),
+    amoc_config_helper:unset_app_env(App, config_verification_modules).

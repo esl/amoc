@@ -38,9 +38,9 @@ parse_value(String) when is_list(String) ->
 
 -spec find_all_vars(atom()) -> [any()].
 find_all_vars(Name) ->
-    AllVars = [application:get_env(App, Name, [])
-               || {App, _, _} <- application:loaded_applications()],
-    lists:flatten(AllVars).
+    AllValues = [application:get_env(App, Name)
+                 || {App, _, _} <- application:loaded_applications()],
+    [Value || {ok, Value} <- AllValues].
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

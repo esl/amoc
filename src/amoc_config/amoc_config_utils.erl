@@ -18,7 +18,8 @@
 -spec load_verification_modules() -> {ok, [module()]} | error().
 load_verification_modules() ->
     Modules = amoc_config_env:find_all_vars(config_verification_modules),
-    LoadingResult = [load_module(Module) || Module <- Modules],
+    UniqueModules = lists:usort(lists:concat(Modules)),
+    LoadingResult = [load_module(Module) || Module <- UniqueModules],
     maybe_error(invalid_verification_module, LoadingResult).
 
 -spec load_module(module()) -> {ok, module()} | {error, {module(), any()}}.

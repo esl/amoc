@@ -111,6 +111,7 @@ get_status() ->
 disable() ->
     gen_server:call(?SERVER, disable).
 
+-spec positive_integer(any()) -> boolean().
 positive_integer(Interarrival) ->
     is_integer(Interarrival) andalso Interarrival > 0.
 
