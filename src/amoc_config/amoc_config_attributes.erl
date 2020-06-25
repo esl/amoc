@@ -61,12 +61,30 @@ process_module_attributes(VerificationModules, Module, ScenarioAttributes) ->
     {ok, module_parameter()} | {error, reason()}.
 process_var_attr(VerificationModules, Module, Attr) ->
     PipelineActions = [
+        {fun maybe_convert_old_attribute_format/1, []},
         {fun check_mandatory_fields/1, []},
         {fun check_default_value/1, []},
-        {fun check_verification_method/4, [VerificationModules, Module, Attr]},
-        {fun check_update_method/4, [VerificationModules, Module, Attr]},
+        {fun check_verification_method/3, [VerificationModules, Module]},
+        {fun check_update_method/3, [VerificationModules, Module]},
         {fun make_module_parameter/2, [Module]}],
-    amoc_config_utils:pipeline(PipelineActions, {ok, Attr}).
+    case amoc_config_utils:pipeline(PipelineActions, {ok, Attr}) of
+        {error, Reason} -> {error, add_original_attribute(Reason, Attr)};
+        {ok, Param} -> {ok, Param}
+    end.
+
+-spec maybe_convert_old_attribute_format(maybe_module_attribute()) ->
+    {ok, maybe_module_attribute()}.
+maybe_convert_old_attribute_format({Name, Description}) ->
+    {ok, #{name => Name, description => maybe_convert_description(Description)}};
+maybe_convert_old_attribute_format({Name, Description, DefaultValue}) ->
+    {ok, #{name => Name, description => maybe_convert_description(Description),
+           value => DefaultValue}};
+maybe_convert_old_attribute_format({Name, Description, DefaultValue,
+                                    VerificationMethod}) ->
+    {ok, #{name => Name, description => maybe_convert_description(Description),
+           value => DefaultValue, verification => VerificationMethod}};
+maybe_convert_old_attribute_format(Attr) ->
+    {ok, Attr}.
 
 -spec check_mandatory_fields(maybe_module_attribute()) ->
     {ok, maybe_module_attribute()} | {error, reason()}.
@@ -74,46 +92,43 @@ check_mandatory_fields(#{description := List, name := Atom} = Attr) when is_atom
                                                                          is_list(List) ->
     case io_lib:char_list(List) of
         true -> {ok, Attr};
-        false -> {error, {invalid_attribute, Attr}}
+        false -> {error, invalid_attribute}
     end;
-check_mandatory_fields(Attr) ->
-    {error, {invalid_attribute, Attr}}.
+check_mandatory_fields(_Attr) ->
+    {error, invalid_attribute}.
 
 -spec check_default_value(maybe_module_attribute()) -> {ok, maybe_module_attribute()}.
 check_default_value(Attr) ->
     DefaultValue = maps:get(value, Attr, undefined),
     {ok, Attr#{value => DefaultValue}}.
 
--spec check_verification_method(maybe_module_attribute(), [module()],
-                                module(), maybe_module_attribute()) ->
+-spec check_verification_method(maybe_module_attribute(), [module()], module()) ->
     {ok, maybe_module_attribute()} | {error, reason()}.
-check_verification_method(Attr, VerificationModules, Module, OriginalAttr) ->
+check_verification_method(Attr, VerificationModules, Module) ->
     VerificationMethod = maps:get(verification, Attr, none),
     case verification_fn(VerificationModules, Module, VerificationMethod) of
         not_exported ->
-            {error, {verification_method_not_exported, OriginalAttr,
+            {error, {verification_method_not_exported,
                      [Module | VerificationModules]}};
         invalid_method ->
-            {error, {invalid_verification_method, OriginalAttr}};
+            {error, invalid_verification_method};
         {multiple_functions_found, Functions} ->
-            {error, {multiple_functions_found, Functions, OriginalAttr}};
+            {error, {multiple_functions_found, Functions}};
         VerificationFn ->
             {ok, Attr#{verification => VerificationFn}}
     end.
 
--spec check_update_method(maybe_module_attribute(), [module()],
-                          module(), maybe_module_attribute()) ->
+-spec check_update_method(maybe_module_attribute(), [module()], module()) ->
     {ok, maybe_module_attribute()} | {error, reason()}.
-check_update_method(Attr, VerificationModules, Module, OriginalAttr) ->
+check_update_method(Attr, VerificationModules, Module) ->
     UpdateMethod = maps:get(update, Attr, read_only),
     case update_fn(VerificationModules, Module, UpdateMethod) of
         not_exported ->
-            {error, {update_method_not_exported, OriginalAttr,
-                     [Module | VerificationModules]}};
+            {error, {update_method_not_exported, [Module | VerificationModules]}};
         invalid_method ->
-            {error, {invalid_update_method, OriginalAttr}};
+            {error, invalid_update_method};
         {multiple_functions_found, Functions} ->
-            {error, {multiple_functions_found, Functions, OriginalAttr}};
+            {error, {multiple_functions_found, Functions}};
         UpdateFn ->
             {ok, Attr#{update => UpdateFn}}
     end.
@@ -209,3 +224,13 @@ one_of_fun(OneOf) ->
             false -> {false, {not_one_of, OneOf}}
         end
     end.
+
+add_original_attribute(Reason, Attr) when is_tuple(Reason) ->
+    list_to_tuple([Attr | tuple_to_list(Reason)]);
+add_original_attribute(Reason, Attr) ->
+    {Attr, Reason}.
+
+maybe_convert_description(Binary) when is_binary(Binary) ->
+    binary_to_list(Binary);
+maybe_convert_description(Description) ->
+    Description.
