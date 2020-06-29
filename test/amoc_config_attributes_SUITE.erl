@@ -16,23 +16,23 @@
 %% these attributes and functions are required for the testing purposes %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -required_variable(#{name => var0, description => "var0"}).
--required_variable(#{name => var1, description => "var1", value => def1}).
+-required_variable(#{name => var1, description => "var1", default_value => def1}).
 -required_variable([
-    #{name => var2, description => "var2", value => def2, verification => none},
-    #{name => var3, description => "var3", value => def3,
+    #{name => var2, description => "var2", default_value => def2, verification => none},
+    #{name => var3, description => "var3", default_value => def3,
       verification => [def3, another_atom]},
-    #{name => var4, description => "var4", value => def4, verification => is_atom},
-    #{name => var5, description => "var5", value => def5,
+    #{name => var4, description => "var4", default_value => def4, verification => is_atom},
+    #{name => var5, description => "var5", default_value => def5,
       verification => fun ?MODULE:is_atom/1}
 ]).
--required_variable(#{name => var6, description => "var6", value => "def6",
+-required_variable(#{name => var6, description => "var6", default_value => "def6",
                      verification => is_list, update => read_only}).
--required_variable(#{name => var7, description => "var7", value => def7,
+-required_variable(#{name => var7, description => "var7", default_value => def7,
                      verification => none, update => none}).
 -required_variable([
-    #{name => var8, description => "var8", value => def8,
+    #{name => var8, description => "var8", default_value => def8,
       verification => none, update => update_value},
-    #{name => var9, description => "var9", value => def9,
+    #{name => var9, description => "var9", default_value => def9,
       verification => none, update => fun ?MODULE:update_value/2}
 ]).
 
@@ -61,20 +61,22 @@ get_module_attributes(_) ->
     Result = amoc_config_attributes:get_module_attributes(required_variable, ?MODULE),
     ExpectedResult = [
         #{name => var0, description => "var0"},
-        #{name => var1, description => "var1", value => def1},
-        #{name => var2, description => "var2", value => def2, verification => none},
-        #{name => var3, description => "var3", value => def3,
+        #{name => var1, description => "var1", default_value => def1},
+        #{name => var2, description => "var2", default_value => def2,
+          verification => none},
+        #{name => var3, description => "var3", default_value => def3,
           verification => [def3, another_atom]},
-        #{name => var4, description => "var4", value => def4, verification => is_atom},
-        #{name => var5, description => "var5", value => def5,
+        #{name => var4, description => "var4", default_value => def4,
+          verification => is_atom},
+        #{name => var5, description => "var5", default_value => def5,
           verification => fun ?MODULE:is_atom/1},
-        #{name => var6, description => "var6", value => "def6",
+        #{name => var6, description => "var6", default_value => "def6",
           verification => is_list, update => read_only},
-        #{name => var7, description => "var7", value => def7,
+        #{name => var7, description => "var7", default_value => def7,
           verification => none, update => none},
-        #{name => var8, description => "var8", value => def8,
+        #{name => var8, description => "var8", default_value => def8,
           verification => none, update => update_value},
-        #{name => var9, description => "var9", value => def9,
+        #{name => var9, description => "var9", default_value => def9,
           verification => none, update => fun ?MODULE:update_value/2}],
     ?assertEqual(ExpectedResult, Result).
 
@@ -115,7 +117,7 @@ errors_reporting(_) ->
     InvalidParam1 = #{name => invalid_var1, description => [$a, <<"b">>]},
     InvalidParam2 = #{name => invalid_var2, description => "var2",
                       verification => <<"invalid_verification_method">>},
-    ValidParam3 = #{name => valid_var3, description => "var3", value => def3,
+    ValidParam3 = #{name => valid_var3, description => "var3", default_value => def3,
                     verification => [def3, another_atom]},
     InvalidParam4 = #{name => invalid_var4, description => "var4",
                       verification => not_exported_function},
@@ -186,7 +188,7 @@ old_attributes_format(_) ->
 
 one_of_function(_) ->
     OneOf = [def3, another_atom],
-    Param = #{name => var0, description => "var0", value => def0,
+    Param = #{name => var0, description => "var0", default_value => def0,
               verification => OneOf},
     {ok, [#module_parameter{verification_fn = OneOfFN}]} =
         amoc_config_attributes:process_module_attributes([],?MODULE,[Param]),

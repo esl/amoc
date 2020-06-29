@@ -13,8 +13,7 @@
 %%------------------------------------------------------------------------------
 %% runtime supplied settings
 %%------------------------------------------------------------------------------
--type parameter() :: {name(), value()}.
--type settings() :: [parameter()].
+-type settings() :: [{name(), value()}].
 
 %%------------------------------------------------------------------------------
 %% error types
@@ -33,7 +32,7 @@
 -type update_fun() :: fun((ParamName :: name(), NewValue :: value()) -> any()).
 
 -type maybe_verification_fun() :: verification_fun() | fun((_)-> any()).
--type maybe_update_fun() :: verification_fun() | fun((_,_)-> any()).
+-type maybe_update_fun() :: update_fun() | fun((_,_)-> any()).
 
 -record(module_parameter, {name :: name(),
                            mod :: module(),
@@ -51,10 +50,6 @@
 
 -type module_attribute() :: #{ name := name(),
                                description := string(),
-                               value => value(),
+                               default_value => value(),
                                verification => verification_method(),
                                update => update_method()}.
-
-
-
-

@@ -14,10 +14,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -required_variable(#{name => var0, description => "var0"}).
 -required_variable(#{name => var1, description => "var1"}).
--required_variable(#{name => var2, description => "var2", value => def2}).
--override_variable(#{name => var2, description => "var2", value => val2,
+-required_variable(#{name => var2, description => "var2", default_value => def2}).
+-override_variable(#{name => var2, description => "var2", default_value => val2,
                      verification => [def2, val2], update => update_fn}).
--override_variable(#{name => var3, description => "var3", value => def3,
+-override_variable(#{name => var3, description => "var3", default_value => def3,
                      update => update_fn}).
 
 update_fn(Name, Value) -> apply(?MOCK_MOD, update, [Name, Value]).

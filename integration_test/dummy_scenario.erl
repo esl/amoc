@@ -3,30 +3,32 @@
 
 %% var1 must be equal to one of the values in the verification list
 %% and the default value is def1
--required_variable(#{name=>var1, description=>"description1", value=>def1,
-                     verification=>[def1, another_value]}).
+-required_variable(#{name => var1, description => "description1",
+                     default_value => def1,
+                     verification => [def1, another_value]}).
 
 -required_variable([
     %% var2 must be positively verified by the test_verification_function/1 function.
     %% this function must be exported from the scenario module, or from any of
     %% the modules specified in the config_verification_modules erlang application
     %% configuration variable.
-    #{name=>var2, description=> "description2", value=>def2,
-      verification=>test_verification_function},
+    #{name => var2, description => "description2", default_value => def2,
+      verification => test_verification_function},
     %% alternatively the verification function can be supplied as a function pointer
     %% in a 'fun module:function/arity' format. Note that it must be an exported function.
     %% usage of 'fun function/arity' format in the module attribute simply will
     %% not pass compilation.
-    #{name=>var3,  description=>"description3", value=>def3,
-      verification=>fun ?MODULE:test_verification_function/1}]).
+    #{name => var3, description => "description3", default_value => def3,
+      verification => fun ?MODULE:test_verification_function/1}]).
 
 %% 'none' is a predefined verification function which accepts all the values
--required_variable(#{name => var4, description => "description4", value => def4,
+-required_variable(#{name => var4, description => "description4",
+                     default_value => def4,
                      verification => none}).
 
 -required_variable([
     %% when verification method is not set, it defaults to `none`
-    #{name => var5, description => "description5", value => def5},
+    #{name => var5, description => "description5", default_value => def5},
     %% when value is not set, it defaults to `undefined`
     #{name => var6, description => "description6"},
     #{name => nodes, description => "this variable is set for docker "

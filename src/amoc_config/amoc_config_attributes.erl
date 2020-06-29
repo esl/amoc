@@ -78,11 +78,11 @@ maybe_convert_old_attribute_format({Name, Description}) ->
     {ok, #{name => Name, description => maybe_convert_description(Description)}};
 maybe_convert_old_attribute_format({Name, Description, DefaultValue}) ->
     {ok, #{name => Name, description => maybe_convert_description(Description),
-           value => DefaultValue}};
+           default_value => DefaultValue}};
 maybe_convert_old_attribute_format({Name, Description, DefaultValue,
                                     VerificationMethod}) ->
     {ok, #{name => Name, description => maybe_convert_description(Description),
-           value => DefaultValue, verification => VerificationMethod}};
+           default_value => DefaultValue, verification => VerificationMethod}};
 maybe_convert_old_attribute_format(Attr) ->
     {ok, Attr}.
 
@@ -99,8 +99,8 @@ check_mandatory_fields(_Attr) ->
 
 -spec check_default_value(maybe_module_attribute()) -> {ok, maybe_module_attribute()}.
 check_default_value(Attr) ->
-    DefaultValue = maps:get(value, Attr, undefined),
-    {ok, Attr#{value => DefaultValue}}.
+    DefaultValue = maps:get(default_value, Attr, undefined),
+    {ok, Attr#{default_value => DefaultValue}}.
 
 -spec check_verification_method(maybe_module_attribute(), [module()], module()) ->
     {ok, maybe_module_attribute()} | {error, reason()}.
@@ -135,7 +135,7 @@ check_update_method(Attr, VerificationModules, Module) ->
 
 -spec make_module_parameter(maybe_module_attribute(), module()) ->
     {ok, module_parameter()}.
-make_module_parameter(#{name := Name, value := Value, update := UpdateFn,
+make_module_parameter(#{name := Name, default_value := Value, update := UpdateFn,
                         verification := VerificationFn}, Module) ->
     {ok, #module_parameter{name = Name, mod = Module, value = Value,
                            verification_fn = VerificationFn, update_fn = UpdateFn}}.

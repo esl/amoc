@@ -8,7 +8,8 @@
 -define(SERVER, ?MODULE).
 -define(USERS_TABLE, amoc_users).
 
--required_variable(#{name => interarrival, value => 50, verification => positive_integer,
+-required_variable(#{name => interarrival, default_value => 50,
+                     verification => positive_integer,
                      description => "a delay between creating the processes for two "
                                     "consecutive users (ms, def: 50ms)",
                      update => maybe_update_interarrival_timer}).
