@@ -9,15 +9,12 @@
 
 -required_variable([
     %% var2 must be positively verified by the test_verification_function/1 function.
-    %% this function must be exported from the scenario module, or from any of
-    %% the modules specified in the config_verification_modules erlang application
-    %% configuration variable.
-    #{name => var2, description => "description2", default_value => def2,
-      verification => test_verification_function},
-    %% alternatively the verification function can be supplied as a function pointer
-    %% in a 'fun module:function/arity' format. Note that it must be an exported function.
+    %% verification function must be supplied as a function pointer in a
+    %% 'fun module:function/arity' format. Note that it must be an exported function.
     %% usage of 'fun function/arity' format in the module attribute simply will
     %% not pass compilation.
+    #{name => var2, description => "description2", default_value => def2,
+      verification => fun ?MODULE:test_verification_function/1},
     #{name => var3, description => "description3", default_value => def3,
       verification => fun ?MODULE:test_verification_function/1}]).
 

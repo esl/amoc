@@ -44,9 +44,8 @@
 -type module_configuration() :: [module_parameter()].
 
 -type one_of() :: [value(), ...].
--type fn_name() :: atom().
--type verification_method() :: none | one_of() | fn_name() | verification_fun().
--type update_method() :: read_only | none | fn_name() | update_fun().
+-type verification_method() :: none | one_of() | verification_fun().
+-type update_method() :: read_only | none | update_fun().
 
 -type module_attribute() :: #{ name := name(),
                                description := string(),

@@ -9,10 +9,10 @@
 -define(USERS_TABLE, amoc_users).
 
 -required_variable(#{name => interarrival, default_value => 50,
-                     verification => positive_integer,
+                     verification => fun ?MODULE:positive_integer/1,
                      description => "a delay between creating the processes for two "
                                     "consecutive users (ms, def: 50ms)",
-                     update => maybe_update_interarrival_timer}).
+                     update => fun ?MODULE:maybe_update_interarrival_timer/2}).
 
 -record(state, {scenario :: amoc:scenario() | undefined,
                 no_of_users = 0 :: user_count(),

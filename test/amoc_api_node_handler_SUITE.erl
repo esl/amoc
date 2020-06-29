@@ -52,7 +52,7 @@ returns_nodes_list_when_amoc_up(_Config) ->
 
 -spec given_prepared_nodes() -> ok.
 given_prepared_nodes() ->
-    meck:new(amoc_cluster, [unstick]),
+    meck:new(amoc_cluster, []),
     ConnectionStatus = #{connected => [test1],
                          failed_to_connect => [test2],
                          connection_lost => [test3, test2]},

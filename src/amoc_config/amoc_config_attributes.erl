@@ -9,12 +9,12 @@
 -include("amoc_config.hrl").
 
 %% API
--export([get_module_configuration/3]).
+-export([get_module_configuration/2]).
 -export([none/1, none/2]).
 -ifdef(TEST).
 -export([%% exported for testing only
          get_module_attributes/2,
-         process_module_attributes/3]).
+         process_module_attributes/2]).
 -endif.
 
 -type maybe_module_attribute() :: module_attribute() | term().
@@ -26,12 +26,12 @@
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec get_module_configuration(attribute_name(), module(), [module()]) ->
+-spec get_module_configuration(attribute_name(), module()) ->
     {ok, module_configuration()} | amoc_config_utils:error().
-get_module_configuration(AttrName, Module, VerificationModules) ->
+get_module_configuration(AttrName, Module) ->
     try
         ScenarioAttributes = get_module_attributes(AttrName, Module),
-        process_module_attributes(VerificationModules, Module, ScenarioAttributes)
+        process_module_attributes(Module, ScenarioAttributes)
     catch
         _:_ -> {error, invalid_module, Module}
     end.
@@ -50,21 +50,21 @@ get_module_attributes(AttrName, Module) ->
     RequiredVariables = proplists:get_all_values(AttrName, ModuleAttributes),
     lists:append(RequiredVariables).
 
--spec process_module_attributes([module()], module(), [maybe_module_attribute()]) ->
+-spec process_module_attributes(module(), [maybe_module_attribute()]) ->
     {ok, module_configuration()} | amoc_config_utils:error().
-process_module_attributes(VerificationModules, Module, ScenarioAttributes) ->
-    Config = [process_var_attr(VerificationModules, Module, Attr)
+process_module_attributes(Module, ScenarioAttributes) ->
+    Config = [process_var_attr(Module, Attr)
               || Attr <- ScenarioAttributes],
     amoc_config_utils:maybe_error(invalid_attribute_format, Config).
 
--spec process_var_attr([module()], module(), maybe_module_attribute()) ->
+-spec process_var_attr(module(), maybe_module_attribute()) ->
     {ok, module_parameter()} | {error, reason()}.
-process_var_attr(VerificationModules, Module, Attr) ->
+process_var_attr(Module, Attr) ->
     PipelineActions = [
         {fun check_mandatory_fields/1, []},
         {fun check_default_value/1, []},
-        {fun check_verification_method/3, [VerificationModules, Module]},
-        {fun check_update_method/3, [VerificationModules, Module]},
+        {fun check_verification_method/1, []},
+        {fun check_update_method/1, []},
         {fun make_module_parameter/2, [Module]}],
     case amoc_config_utils:pipeline(PipelineActions, {ok, Attr}) of
         {error, Reason} -> {error, add_original_attribute(Reason, Attr)};
@@ -87,33 +87,28 @@ check_default_value(Attr) ->
     DefaultValue = maps:get(default_value, Attr, undefined),
     {ok, Attr#{default_value => DefaultValue}}.
 
--spec check_verification_method(maybe_module_attribute(), [module()], module()) ->
+-spec check_verification_method(maybe_module_attribute()) ->
     {ok, maybe_module_attribute()} | {error, reason()}.
-check_verification_method(Attr, VerificationModules, Module) ->
+check_verification_method(Attr) ->
     VerificationMethod = maps:get(verification, Attr, none),
-    case verification_fn(VerificationModules, Module, VerificationMethod) of
+    case verification_fn(VerificationMethod) of
         not_exported ->
-            {error, {verification_method_not_exported,
-                     [Module | VerificationModules]}};
+            {error, verification_method_not_exported};
         invalid_method ->
             {error, invalid_verification_method};
-        {multiple_functions_found, Functions} ->
-            {error, {multiple_functions_found, Functions}};
         VerificationFn ->
             {ok, Attr#{verification => VerificationFn}}
     end.
 
--spec check_update_method(maybe_module_attribute(), [module()], module()) ->
+-spec check_update_method(maybe_module_attribute()) ->
     {ok, maybe_module_attribute()} | {error, reason()}.
-check_update_method(Attr, VerificationModules, Module) ->
+check_update_method(Attr) ->
     UpdateMethod = maps:get(update, Attr, read_only),
-    case update_fn(VerificationModules, Module, UpdateMethod) of
+    case update_fn(UpdateMethod) of
         not_exported ->
-            {error, {update_method_not_exported, [Module | VerificationModules]}};
+            {error, update_method_not_exported};
         invalid_method ->
             {error, invalid_update_method};
-        {multiple_functions_found, Functions} ->
-            {error, {multiple_functions_found, Functions}};
         UpdateFn ->
             {ok, Attr#{update => UpdateFn}}
     end.
@@ -125,80 +120,40 @@ make_module_parameter(#{name := Name, default_value := Value, update := UpdateFn
     {ok, #module_parameter{name = Name, mod = Module, value = Value,
                            verification_fn = VerificationFn, update_fn = UpdateFn}}.
 
--spec verification_fn([module()], module(), maybe_verification_method()) ->
-    maybe_verification_fun() | not_exported | invalid_method
-    | {multiple_functions_found, [maybe_verification_fun()]}.
-verification_fn(_, _, none) ->
+-spec verification_fn(maybe_verification_method()) ->
+    maybe_verification_fun() | not_exported | invalid_method.
+verification_fn(none) ->
     fun ?MODULE:none/1;
-verification_fn(_, _, [_ | _] = OneOF) ->
+verification_fn([_ | _] = OneOF) ->
     one_of_fun(OneOF);
-verification_fn(_, _, Fun) when is_function(Fun, 1) ->
-    Fun;
-verification_fn(VerificationModules, Module, Atom) when is_atom(Atom) ->
-    select_function(VerificationModules, Module, Atom, 1);
-verification_fn(_, _, _) ->
+verification_fn(Fun) when is_function(Fun, 1) ->
+    is_exported(Fun);
+verification_fn(_) ->
     invalid_method.
 
--spec update_fn([module()], module(), maybe_update_method()) ->
-    maybe_update_fun() | not_exported | invalid_method
-    | read_only | {multiple_functions_found, [maybe_update_fun()]}.
-update_fn(_, _, read_only) ->
+-spec update_fn(maybe_update_method()) ->
+    maybe_update_fun() | not_exported | invalid_method | read_only.
+update_fn(read_only) ->
     read_only;
-update_fn(_, _, none) ->
+update_fn(none) ->
     fun ?MODULE:none/2;
-update_fn(_, _, Fun) when is_function(Fun, 2) ->
-    Fun;
-update_fn(VerificationModules, Module, Atom) when is_atom(Atom) ->
-    select_function(VerificationModules, Module, Atom, 2);
-update_fn(_, _, _) ->
+update_fn(Fun) when is_function(Fun, 2) ->
+    is_exported(Fun);
+update_fn(_) ->
     invalid_method.
 
--spec select_function([module()], module(), atom(), non_neg_integer()) ->
-    function() | not_exported | {multiple_functions_found, [function()]}.
-select_function(VerificationModules, Module, FunctionName, Arity) ->
-    %% first try to find exported function in the current module, then
-    %% check config_verification_modules defined for the application of
-    %% the current module, then try config_verification_modules defined
-    %% in all other applications.
-    AppVerificationModules = get_app_verification_modules(Module),
-    OtherVerificationModules = VerificationModules -- AppVerificationModules,
-    ModuleSets = [[Module], AppVerificationModules, OtherVerificationModules],
-    select_function(ModuleSets, FunctionName, Arity).
-
--spec select_function([[module()]], atom(), non_neg_integer()) ->
-    function() | not_exported | {multiple_functions_found, [function()]}.
-select_function([], _FunctionName, _Arity) ->
-    not_exported;
-select_function([Modules | T], FunctionName, Arity) ->
-    case is_exported(Modules, [], FunctionName, Arity) of
-        not_exported -> select_function(T, FunctionName, Arity);
-        ReturnValue -> ReturnValue
-    end.
-
--spec get_app_verification_modules(module()) -> [module()].
-get_app_verification_modules(Module) ->
-    case application:get_application(Module) of
-        undefined -> [];
-        {ok, App} ->
-            Modules = application:get_env(App, config_verification_modules, []),
-            lists:usort(Modules)
-    end.
-
--spec is_exported([module()],[function()], atom(), non_neg_integer()) ->
-    function() | not_exported | {multiple_functions_found, [function()]}.
-is_exported([],[], _, _) ->
-    not_exported;
-is_exported([],[FN], _, _) ->
-    FN;
-is_exported([],Functions, _, _)when length(Functions)>1 ->
-    {multiple_functions_found, Functions};
-is_exported([Module | T], Functions, FunctionName, Arity) ->
-    case erlang:function_exported(Module, FunctionName, Arity) of
-        true ->
-            FN=fun Module:FunctionName/Arity,
-            is_exported(T,[FN|Functions],FunctionName, Arity);
-        false ->
-            is_exported(T, Functions, FunctionName, Arity)
+-spec is_exported(function()) ->
+    function() | not_exported.
+is_exported(Fn) ->
+    [{type, T}, {module, M}, {name, F}, {arity, A}] =
+        [erlang:fun_info(Fn, I) || I <- [type, module, name, arity]],
+    case {T, code:ensure_loaded(M)} of
+        {external, {module, M}} ->
+            case erlang:function_exported(M, F, A) of
+                true -> Fn;
+                false -> not_exported
+            end;
+        _ -> not_exported
     end.
 
 -spec one_of_fun(one_of()) -> verification_fun().

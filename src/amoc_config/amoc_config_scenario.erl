@@ -17,8 +17,7 @@
 -spec parse_scenario_settings(module(), settings()) -> ok | error().
 parse_scenario_settings(Module, Settings) when is_atom(Module) ->
     PipelineActions = [
-        {fun amoc_config_utils:load_verification_modules/0, []},
-        {fun get_configuration/2, [Module]},
+        {fun get_configuration/1, [Module]},
         {fun verify_settings/2, [Settings]},
         {fun amoc_config_validation:process_scenario_config/2, [Settings]},
         {fun amoc_config_utils:store_scenario_config/1, []}],
@@ -47,43 +46,42 @@ update_settings(Settings) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
--spec get_configuration([module()], module()) ->
+-spec get_configuration(module()) ->
     {ok, module_configuration()} | error().
-get_configuration(VerificationModules, Module) ->
+get_configuration(Module) ->
     ParametrisedModules = amoc_scenario:list_parametrised_modules(),
     AllParametrisedModules = [Module | ParametrisedModules],
     PipelineActions = [
-        {fun compose_configuration/2, [AllParametrisedModules, VerificationModules]},
-        {fun override_configuration/3, [Module, VerificationModules]}],
+        {fun compose_configuration/1, [AllParametrisedModules]},
+        {fun override_configuration/2, [Module]}],
     amoc_config_utils:pipeline(PipelineActions, ok).
 
--spec compose_configuration([module()], [module()]) ->
+-spec compose_configuration([module()]) ->
     {ok, module_configuration()} | error().
-compose_configuration(AllParametrisedModules, VerificationModules) ->
-    compose_configuration([], AllParametrisedModules, VerificationModules).
+compose_configuration(AllParametrisedModules) ->
+    compose_configuration([], AllParametrisedModules).
 
--spec override_configuration(module_configuration(), module(), [module()]) ->
+-spec override_configuration(module_configuration(), module()) ->
     {ok, module_configuration()} | error().
-override_configuration(OldConfig, Module, VerificationModules) ->
+override_configuration(OldConfig, Module) ->
     AttrName = override_variable,
-    case amoc_config_attributes:get_module_configuration(AttrName, Module,
-                                                         VerificationModules) of
+    case amoc_config_attributes:get_module_configuration(AttrName, Module) of
         {ok, NewConfig} ->
             amoc_config_utils:override_config(OldConfig, NewConfig);
         {error, _, _} = Error -> Error
     end.
 
--spec compose_configuration(module_configuration(), [module()], [module()]) ->
+-spec compose_configuration(module_configuration(), [module()]) ->
     {ok, module_configuration()} | error().
-compose_configuration(Config, [], _) ->
+compose_configuration(Config, []) ->
     {ok, Config};
-compose_configuration(Config, [M | L], VerificationModules) ->
+compose_configuration(Config, [M | L]) ->
     AttrName = required_variable,
-    case amoc_config_attributes:get_module_configuration(AttrName, M, VerificationModules) of
+    case amoc_config_attributes:get_module_configuration(AttrName, M) of
         {ok, NewConfig} ->
             case amoc_config_utils:merge_config(Config, NewConfig) of
                 {ok, MergedConfig} ->
-                    compose_configuration(MergedConfig, L, VerificationModules);
+                    compose_configuration(MergedConfig, L);
                 {error, _, _} = Error -> Error
             end;
         {error, _, _} = Error -> Error

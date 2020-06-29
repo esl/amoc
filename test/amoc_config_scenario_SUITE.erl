@@ -16,9 +16,9 @@
 -required_variable(#{name => var1, description => "var1"}).
 -required_variable(#{name => var2, description => "var2", default_value => def2}).
 -override_variable(#{name => var2, description => "var2", default_value => val2,
-                     verification => [def2, val2], update => update_fn}).
+                     verification => [def2, val2], update => fun ?MODULE:update_fn/2}).
 -override_variable(#{name => var3, description => "var3", default_value => def3,
-                     update => update_fn}).
+                     update => fun ?MODULE:update_fn/2}).
 
 update_fn(Name, Value) -> apply(?MOCK_MOD, update, [Name, Value]).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -27,7 +27,6 @@ update_fn(Name, Value) -> apply(?MOCK_MOD, update, [Name, Value]).
 all() ->
     [parse_scenario_settings,
      implicit_variable_redefinition,
-     invalid_verification_module,
      invalid_parametrised_module,
      invalid_module_attributes,
      invalid_settings,
@@ -153,26 +152,6 @@ invalid_value(_) ->
                     {verification_failed, {not_one_of, [def2, val2]}}}]},
                  Ret).
 
-invalid_verification_module(_) ->
-    mock_ets_tables(),
-    [{App1, _, _}, {App2, _, _} | _] = application:loaded_applications(),
-    io:format("!!! ~p~n",[application:loaded_applications()]),
-    VerificationModules1 = [invalid_module_name,
-                           ct, % just some existing module
-                           amoc,% just some existing module
-                           another_invalid_module],
-    VerificationModules2 = [invalid_module_name,
-                            yet_another_invalid_module],
-    set_app_env(App1, config_verification_modules, VerificationModules1),
-    set_app_env(App2, config_verification_modules, VerificationModules2),
-    Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, []),
-    unset_app_env(App1, config_verification_modules),
-    unset_app_env(App2, config_verification_modules),
-    ?assertEqual({error, invalid_verification_module,
-                  [{another_invalid_module, nofile},
-                   {invalid_module_name, nofile},
-                   {yet_another_invalid_module, nofile}]},
-                 Ret).
 
 invalid_parametrised_module(_) ->
     mock_ets_tables(),
@@ -182,10 +161,10 @@ invalid_parametrised_module(_) ->
 
 invalid_module_attributes(_) ->
     mock_ets_tables(),
-    meck:new(amoc_config_attributes, [non_strict, no_link]),
+    meck:new(amoc_config_attributes, []),
     ErrorValue = {error, some_error_type, some_error_reason},
     meck:expect(amoc_config_attributes, get_module_configuration,
-                fun(_, _, _) -> ErrorValue end),
+                fun(_, _) -> ErrorValue end),
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, []),
     ?assertEqual(ErrorValue, Ret),
     meck:unload().

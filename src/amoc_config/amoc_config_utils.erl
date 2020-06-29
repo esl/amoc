@@ -7,32 +7,12 @@
 -include("amoc_config.hrl").
 
 %% API
--export([load_verification_modules/0,
-         maybe_error/2,
+-export([maybe_error/2,
          pipeline/2,
          merge_config/2,
          override_config/2,
          store_scenario_config/1,
          create_amoc_config_ets/0]).
-
--spec load_verification_modules() -> {ok, [module()]} | error().
-load_verification_modules() ->
-    Modules = get_all_verification_modules(),
-    LoadingResult = [load_module(Module) || Module <- Modules],
-    maybe_error(invalid_verification_module, LoadingResult).
-
--spec get_all_verification_modules() -> [module()].
-get_all_verification_modules() ->
-    ModuleSets = amoc_config_env:find_all_vars(config_verification_modules),
-    Modules = lists:flatten(ModuleSets),
-    lists:usort(Modules).
-
--spec load_module(module()) -> {ok, module()} | {error, {module(), any()}}.
-load_module(Module) ->
-    case code:ensure_loaded(Module) of
-        {module, Module} -> {ok, Module};
-        {error, Error} -> {error, {Module, Error}}
-    end.
 
 -spec maybe_error(error_type(), [{error, reason()} | {ok, any()}]) ->
     error() | {ok, [any()]}.
