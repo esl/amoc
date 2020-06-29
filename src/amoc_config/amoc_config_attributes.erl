@@ -61,7 +61,6 @@ process_module_attributes(VerificationModules, Module, ScenarioAttributes) ->
     {ok, module_parameter()} | {error, reason()}.
 process_var_attr(VerificationModules, Module, Attr) ->
     PipelineActions = [
-        {fun maybe_convert_old_attribute_format/1, []},
         {fun check_mandatory_fields/1, []},
         {fun check_default_value/1, []},
         {fun check_verification_method/3, [VerificationModules, Module]},
@@ -71,20 +70,6 @@ process_var_attr(VerificationModules, Module, Attr) ->
         {error, Reason} -> {error, add_original_attribute(Reason, Attr)};
         {ok, Param} -> {ok, Param}
     end.
-
--spec maybe_convert_old_attribute_format(maybe_module_attribute()) ->
-    {ok, maybe_module_attribute()}.
-maybe_convert_old_attribute_format({Name, Description}) ->
-    {ok, #{name => Name, description => maybe_convert_description(Description)}};
-maybe_convert_old_attribute_format({Name, Description, DefaultValue}) ->
-    {ok, #{name => Name, description => maybe_convert_description(Description),
-           default_value => DefaultValue}};
-maybe_convert_old_attribute_format({Name, Description, DefaultValue,
-                                    VerificationMethod}) ->
-    {ok, #{name => Name, description => maybe_convert_description(Description),
-           default_value => DefaultValue, verification => VerificationMethod}};
-maybe_convert_old_attribute_format(Attr) ->
-    {ok, Attr}.
 
 -spec check_mandatory_fields(maybe_module_attribute()) ->
     {ok, maybe_module_attribute()} | {error, reason()}.
@@ -229,8 +214,3 @@ add_original_attribute(Reason, Attr) when is_tuple(Reason) ->
     list_to_tuple([Attr | tuple_to_list(Reason)]);
 add_original_attribute(Reason, Attr) ->
     {Attr, Reason}.
-
-maybe_convert_description(Binary) when is_binary(Binary) ->
-    binary_to_list(Binary);
-maybe_convert_description(Description) ->
-    Description.

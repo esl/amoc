@@ -104,7 +104,7 @@ add_code_paths() ->
         BadDirectories -> {error, {bad_directories, BadDirectories}}
     end.
 
--spec find_scenario_modules() -> any().
+-spec find_scenario_modules() -> [module()].
 find_scenario_modules() ->
     AllBeamFiles = [File || Path <- code:get_path(), File <- filelib:wildcard("*.beam", Path)],
     AllModules = [list_to_atom(filename:rootname(BeamFile)) || BeamFile <- AllBeamFiles],

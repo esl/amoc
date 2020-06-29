@@ -2,9 +2,9 @@
 %% Copyright 2020 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
-%% this module can be used directly only for the readonly env init parameters.
+%% This module can be used directly only for the readonly env init parameters.
 %% do not use it for the scenarios/helpers configuration, amoc_config module
-%% must be used instead! this allows to provide configuration via REST API in
+%% must be used instead! This allows to provide configuration via REST API in
 %% a JSON format
 %%==============================================================================
 -module(amoc_config_env).

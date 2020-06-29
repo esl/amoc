@@ -9,7 +9,6 @@
          get_module_configuration/1,
          errors_reporting/1,
          multiple_exports_error/1,
-         old_attributes_format/1,
          one_of_function/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -54,7 +53,6 @@ all() ->
      get_module_configuration,
      errors_reporting,
      multiple_exports_error,
-     old_attributes_format,
      one_of_function].
 
 get_module_attributes(_) ->
@@ -162,29 +160,6 @@ multiple_exports_error(_)->
                            verification_fn = fun amoc:add/1, update_fn = read_only}],
         Result),
     amoc_config_helper:unset_app_env(App, config_verification_modules).
-
-old_attributes_format(_) ->
-    Param0 = {var0, "var0"},
-    Param1 = {var1, <<"var1">>, "def1"},
-    Param2 = {var2, <<"var1"/utf8>>, def2, is_atom},
-    Attributes = [Param0, Param1, Param2],
-    {ok, Result} = amoc_config_attributes:process_module_attributes([], ?MODULE,
-                                                                    Attributes),
-    VerificationNone = fun amoc_config_attributes:none/1,
-    ?assertEqual(
-        [#module_parameter{name = var0, mod = ?MODULE, value = undefined,
-                           verification_fn = VerificationNone, update_fn = read_only},
-         #module_parameter{name = var1, mod = ?MODULE, value = "def1",
-                           verification_fn = VerificationNone, update_fn = read_only},
-         #module_parameter{name = var2, mod = ?MODULE, value = def2,
-                           verification_fn = fun ?MODULE:is_atom/1, update_fn = read_only}],
-        Result),
-
-    InvalidDescription = [-1],
-    InvalidParam = {invalid_param,InvalidDescription},
-    {error,invalid_attribute_format, Reason} =
-        amoc_config_attributes:process_module_attributes([], ?MODULE, [InvalidParam]),
-    ?assertEqual([{InvalidParam, invalid_attribute}], Reason).
 
 one_of_function(_) ->
     OneOf = [def3, another_atom],
