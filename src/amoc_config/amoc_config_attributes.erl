@@ -29,12 +29,8 @@
 -spec get_module_configuration(attribute_name(), module()) ->
     {ok, module_configuration()} | amoc_config_utils:error().
 get_module_configuration(AttrName, Module) ->
-    try
-        ScenarioAttributes = get_module_attributes(AttrName, Module),
-        process_module_attributes(Module, ScenarioAttributes)
-    catch
-        _:_ -> {error, invalid_module, Module}
-    end.
+    ScenarioAttributes = get_module_attributes(AttrName, Module),
+    process_module_attributes(Module, ScenarioAttributes).
 
 -spec none(any()) -> true.
 none(_) -> true.

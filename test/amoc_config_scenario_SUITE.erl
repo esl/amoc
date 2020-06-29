@@ -27,7 +27,7 @@ update_fn(Name, Value) -> apply(?MOCK_MOD, update, [Name, Value]).
 all() ->
     [parse_scenario_settings,
      implicit_variable_redefinition,
-     invalid_parametrised_module,
+     crash_during_scenario_settings_parsing,
      invalid_module_attributes,
      invalid_settings,
      invalid_value,
@@ -153,11 +153,16 @@ invalid_value(_) ->
                  Ret).
 
 
-invalid_parametrised_module(_) ->
+crash_during_scenario_settings_parsing(_) ->
     mock_ets_tables(),
-    ets:insert(amoc_scenarios, {invalid_module_name, parametrised}),
+    meck:new(amoc_config_attributes, []),
+    ExceptionValue = some_exception,
+    meck:expect(amoc_config_attributes, get_module_configuration,
+                fun(_, _) -> meck:exception(throw, ExceptionValue) end),
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, []),
-    ?assertEqual({error, invalid_module, invalid_module_name}, Ret).
+    ?assertMatch({error, pipeline_action_crashed, {throw, some_exception, _}},
+                 Ret),
+    meck:unload().
 
 invalid_module_attributes(_) ->
     mock_ets_tables(),
