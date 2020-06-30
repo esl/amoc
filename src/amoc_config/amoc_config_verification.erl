@@ -4,7 +4,7 @@
 %%==============================================================================
 %% this module is responsible for processing scenario configuration
 %%==============================================================================
--module(amoc_config_validation).
+-module(amoc_config_verification).
 
 %% API
 -export([process_scenario_config/2]).

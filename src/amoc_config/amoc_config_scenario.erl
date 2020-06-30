@@ -19,7 +19,7 @@ parse_scenario_settings(Module, Settings) when is_atom(Module) ->
     PipelineActions = [
         {fun get_configuration/1, [Module]},
         {fun verify_settings/2, [Settings]},
-        {fun amoc_config_validation:process_scenario_config/2, [Settings]},
+        {fun amoc_config_verification:process_scenario_config/2, [Settings]},
         {fun amoc_config_utils:store_scenario_config/1, []}],
     case amoc_config_utils:pipeline(PipelineActions, ok) of
         ok -> ok;
@@ -34,7 +34,7 @@ update_settings(Settings) ->
         {fun get_existing_configuration/0, []},
         {fun verify_settings/2, [Settings]},
         {fun filter_configuration/2, [Settings]},
-        {fun amoc_config_validation:process_scenario_config/2, [Settings]},
+        {fun amoc_config_verification:process_scenario_config/2, [Settings]},
         {fun store_scenario_config/1, []}],
     case amoc_config_utils:pipeline(PipelineActions, ok) of
         ok -> ok;

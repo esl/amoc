@@ -1,4 +1,4 @@
--module(amoc_config_validation_SUITE).
+-module(amoc_config_verification_SUITE).
 -include_lib("eunit/include/eunit.hrl").
 -include("../src/amoc_config/amoc_config.hrl").
 
@@ -22,7 +22,7 @@ process_scenario_config_uses_default_values(_) ->
     ScenarioConfig = correct_scenario_config(),
     given_scenario_os_parameters_not_set(ScenarioConfig),
     given_scenario_app_parameters_not_set(ScenarioConfig),
-    Result = amoc_config_validation:process_scenario_config(ScenarioConfig, []),
+    Result = amoc_config_verification:process_scenario_config(ScenarioConfig, []),
     ?assertEqual({ok, ScenarioConfig}, Result).
 
 process_scenario_config_shadows_default_values(_) ->
@@ -32,19 +32,19 @@ process_scenario_config_shadows_default_values(_) ->
     %% set app parameters
     given_scenario_os_parameters_not_set(ScenarioConfig),
     given_scenario_app_parameters_set(AnotherScenarioConfig),
-    Result1 = amoc_config_validation:process_scenario_config(ScenarioConfig, []),
+    Result1 = amoc_config_verification:process_scenario_config(ScenarioConfig, []),
     ?assertEqual({ok, AnotherScenarioConfig}, Result1),
     %% set also os parameters
     given_scenario_os_parameters_set(YetAnotherScenarioConfig),
-    Result2 = amoc_config_validation:process_scenario_config(ScenarioConfig, []),
+    Result2 = amoc_config_verification:process_scenario_config(ScenarioConfig, []),
     ?assertEqual({ok, YetAnotherScenarioConfig}, Result2),
     %% provide settings
     Settings = settings_from_scenario_config(ScenarioConfig),
-    Result3 = amoc_config_validation:process_scenario_config(ScenarioConfig, Settings),
+    Result3 = amoc_config_verification:process_scenario_config(ScenarioConfig, Settings),
     ?assertEqual({ok, ScenarioConfig}, Result3),
     %% unset os parameters
     given_scenario_os_parameters_not_set(ScenarioConfig),
-    Result4 = amoc_config_validation:process_scenario_config(ScenarioConfig, []),
+    Result4 = amoc_config_verification:process_scenario_config(ScenarioConfig, []),
     ?assertEqual({ok, AnotherScenarioConfig}, Result4),
     %%unset app parameters
     given_scenario_app_parameters_not_set(ScenarioConfig).
@@ -57,7 +57,7 @@ process_scenario_config_returns_error_for_invalid_values(_) ->
      | incorrect_scenario_config()],
     given_scenario_os_parameters_not_set(IncorrectScenarioConfig),
     given_scenario_app_parameters_not_set(IncorrectScenarioConfig),
-    Result = amoc_config_validation:process_scenario_config(IncorrectScenarioConfig, []),
+    Result = amoc_config_verification:process_scenario_config(IncorrectScenarioConfig, []),
     ?assertEqual({error, parameters_verification_failed,
                   [{wrong_param, any_value, {verification_failed, some_reason}},
                    {some_int, wrong_int, verification_failed},
@@ -66,11 +66,11 @@ process_scenario_config_returns_error_for_invalid_values(_) ->
                  Result).
 
 process_scenario_config_returns_preprocessed_value(_) ->
-    ValidationFn = fun(_) -> {true, another_atom} end,
+    VerificationFn = fun(_) -> {true, another_atom} end,
     PreprocessedParam = #module_parameter{name = preprocessed_param,
                                           mod = ?MOD, value = an_atom,
-                                          verification_fn = ValidationFn},
-    Result = amoc_config_validation:process_scenario_config([PreprocessedParam], []),
+                                          verification_fn = VerificationFn},
+    Result = amoc_config_verification:process_scenario_config([PreprocessedParam], []),
     ?assertEqual({ok, [PreprocessedParam#module_parameter{value = another_atom}]}, Result).
 
 correct_scenario_config() ->

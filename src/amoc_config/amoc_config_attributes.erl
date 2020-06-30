@@ -109,7 +109,7 @@ check_update_method(Attr) ->
             {ok, Attr#{update => UpdateFn}}
     end.
 
--spec make_module_parameter(maybe_module_attribute(), module()) ->
+-spec make_module_parameter(module_attribute(), module()) ->
     {ok, module_parameter()}.
 make_module_parameter(#{name := Name, default_value := Value, update := UpdateFn,
                         verification := VerificationFn}, Module) ->
