@@ -9,7 +9,7 @@
          does_scenario_exist/1,
          list_scenario_modules/0,
          list_uploaded_modules/0,
-         list_parametrised_modules/0]).
+         list_configurable_modules/0]).
 
 -behaviour(gen_server).
 %% gen_server callbacks
@@ -61,9 +61,9 @@ list_scenario_modules() ->
 list_uploaded_modules() ->
     ets:tab2list(uploaded_modules).
 
--spec list_parametrised_modules() -> [module()].
-list_parametrised_modules() ->
-    [S || [S] <- ets:match(amoc_scenarios, {'$1', parametrised})].
+-spec list_configurable_modules() -> [module()].
+list_configurable_modules() ->
+    [S || [S] <- ets:match(amoc_scenarios, {'$1', configurable})].
 %%-------------------------------------------------------------------------
 %% gen_server callbacks
 %%-------------------------------------------------------------------------
@@ -116,13 +116,13 @@ maybe_store_module(Module) ->
     case get_module_type(Module) of
         scenario ->
             ets:insert(amoc_scenarios, {Module, scenario});
-        parametrised ->
-            ets:insert(amoc_scenarios, {Module, parametrised});
+        configurable ->
+            ets:insert(amoc_scenarios, {Module, configurable});
         ordinary ->
             ok
     end.
 
--spec get_module_type(module()) -> scenario | parametrised | ordinary.
+-spec get_module_type(module()) -> scenario | configurable | ordinary.
 get_module_type(Module) ->
     case erlang:function_exported(Module, module_info, 1) of
         false -> ordinary;
@@ -130,7 +130,7 @@ get_module_type(Module) ->
             ModuleAttributes = apply(Module, module_info, [attributes]),
             lists:foldl(fun({behaviour, [?MODULE]}, _) -> scenario;
                            ({behavior, [?MODULE]}, _) -> scenario;
-                           ({required_variable, _}, ordinary) -> parametrised;
+                           ({required_variable, _}, ordinary) -> configurable;
                            (_, Ret) -> Ret
                         end, ordinary, ModuleAttributes)
     end.

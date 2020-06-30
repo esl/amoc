@@ -50,7 +50,7 @@ end_per_group(update_settings,Config) ->
 
 parse_scenario_settings(_) ->
     mock_ets_tables(),
-    ets:insert(amoc_scenarios, {amoc_controller, parametrised}),
+    ets:insert(amoc_scenarios, {amoc_controller, configurable}),
     ScenarioSettings = [{interarrival, 500},
                         {var1, def1}],
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, ScenarioSettings),
@@ -65,7 +65,7 @@ parse_scenario_settings(_) ->
     ?assertEqual(def1, amoc_config:get(var1, some_value)),
     %% overwritten variable
     ?assertEqual(val2, amoc_config:get(var2)),
-    %% parametrised module variable (defined in amoc_controller)
+    %% configurable module variable (defined in amoc_controller)
     ?assertEqual(500, amoc_config:get(interarrival)).
 
 update_settings(_) ->
@@ -131,7 +131,7 @@ update_settings_undef_param(_) ->
 
 implicit_variable_redefinition(_) ->
     mock_ets_tables(),
-    ets:insert(amoc_scenarios, {?MODULE, parametrised}),
+    ets:insert(amoc_scenarios, {?MODULE, configurable}),
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, []),
     ?assertEqual({error, parameter_overriding, {var0, ?MODULE, ?MODULE}}, Ret).
 

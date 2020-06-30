@@ -49,17 +49,17 @@ update_settings(Settings) ->
 -spec get_configuration(module()) ->
     {ok, module_configuration()} | error().
 get_configuration(Module) ->
-    ParametrisedModules = amoc_scenario:list_parametrised_modules(),
-    AllParametrisedModules = [Module | ParametrisedModules],
+    ConfigurableModules = amoc_scenario:list_configurable_modules(),
+    AllConfigurableModules = [Module | ConfigurableModules],
     PipelineActions = [
-        {fun compose_configuration/1, [AllParametrisedModules]},
+        {fun compose_configuration/1, [AllConfigurableModules]},
         {fun override_configuration/2, [Module]}],
     amoc_config_utils:pipeline(PipelineActions, ok).
 
 -spec compose_configuration([module()]) ->
     {ok, module_configuration()} | error().
-compose_configuration(AllParametrisedModules) ->
-    compose_configuration([], AllParametrisedModules).
+compose_configuration(AllConfigurableModules) ->
+    compose_configuration([], AllConfigurableModules).
 
 -spec override_configuration(module_configuration(), module()) ->
     {ok, module_configuration()} | error().
