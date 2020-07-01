@@ -96,7 +96,7 @@ get_scenario_status_returns_loaded_when_scenario_exists_but_not_running(_Config)
 
 patch_scenario_returns_404_when_scenario_not_exists(_Config) ->
     %% given
-    RequestBody = jiffy:encode({[{users,30}]}),
+    RequestBody = jiffy:encode({[{users, 30}]}),
     %% when
     {CodeHttp, _Body} = amoc_api_helper:patch(
                             ?SAMPLE_BAD_SCENARIO_PATH, RequestBody),
@@ -183,7 +183,7 @@ given_test_status_mocked(Value) ->
 -spec mock_amoc_dist_do() -> ok.
 mock_amoc_dist_do() ->
     ok = meck:new(amoc_dist, []),
-    Fun = fun(_,_,_) -> {ok,anything} end,
+    Fun = fun(_, _, _) -> {ok, anything} end,
     ok = meck:expect(amoc_dist, do, Fun).
 
 -spec cleanup_test_status_mock() -> ok.

@@ -26,7 +26,7 @@ parse_value_prop_test(_) ->
                                   {10, any()}]),
     ProperTest = ?FORALL(Value, RealAnyType,
                          amoc_config_env:parse_value(format_value(Value)) =:= {ok, Value}),
-    ?assertEqual(true, proper:quickcheck(ProperTest,[quiet])).
+    ?assertEqual(true, proper:quickcheck(ProperTest, [quiet])).
 
 config_os_env_test(_) ->
     ?assertEqual(undefined, get_env(?APP, some_variable)),

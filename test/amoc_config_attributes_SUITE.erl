@@ -126,8 +126,8 @@ one_of_function(_) ->
     Param = #{name => var0, description => "var0", default_value => def0,
               verification => OneOf},
     {ok, [#module_parameter{verification_fn = OneOfFN}]} =
-        amoc_config_attributes:process_module_attributes(?MODULE,[Param]),
-    assert_one_of_fn(OneOfFN,OneOf).
+        amoc_config_attributes:process_module_attributes(?MODULE, [Param]),
+    assert_one_of_fn(OneOfFN, OneOf).
 
 assert_one_of_fn(OneOfFN, OneOfValue) ->
     ?assertEqual({arity, 1}, erlang:fun_info(OneOfFN, arity)),

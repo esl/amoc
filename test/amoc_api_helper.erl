@@ -35,8 +35,8 @@ module_beam(M) ->
 -spec get(string()) -> {integer(), jiffy:jiffy_decode_result()}.
 get(Path) -> get(get_url(), Path).
 
--spec get(string(), string()) -> {integer(), jiffy:jiffy_decode_result()}. 
-get(BaseUrl, Path) -> 
+-spec get(string(), string()) -> {integer(), jiffy:jiffy_decode_result()}.
+get(BaseUrl, Path) ->
     request(BaseUrl, erlang:list_to_bitstring(Path), <<"GET">>).
 
 -spec put(string(), binary()) ->
@@ -50,14 +50,14 @@ put(BaseUrl, Path, Body) ->
 
 -spec patch(string(), binary()) ->
     {integer(), jiffy:jiffy_decode_result()}.
-patch(Path, Body) -> patch(get_url(), Path, Body). 
+patch(Path, Body) -> patch(get_url(), Path, Body).
 
 -spec patch(string(), string(), binary()) ->
     {integer(), jiffy:jiffy_decode_result()}.
 patch(BaseUrl, Path, Body) ->
     request(BaseUrl, erlang:list_to_bitstring(Path), <<"PATCH">>, Body).
 
--spec request(string(), binary(), binary()) -> 
+-spec request(string(), binary(), binary()) ->
     {integer(), jiffy:jiffy_decode_result()}.
 request(BaseUrl, Path, Method) -> request(BaseUrl, Path, Method, <<"">>).
 

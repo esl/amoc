@@ -39,12 +39,12 @@ groups() ->
                             update_settings_invalid_value,
                             update_settings_undef_param]}].
 
-init_per_group(update_settings,Config) ->
+init_per_group(update_settings, Config) ->
     meck:new(?MOCK_MOD, [non_strict, no_link]),
     meck:expect(?MOCK_MOD, update, ['_', '_'], ok),
     Config.
 
-end_per_group(update_settings,Config) ->
+end_per_group(update_settings, Config) ->
     meck:unload(),
     Config.
 
@@ -99,7 +99,7 @@ update_settings_readonly(_) ->
                   [{var0, ?MODULE},
                    {var1, ?MODULE}]},
                  ReadOnlyRet),
-    isEqualList(Table, ets:tab2list(amoc_config)),
+    is_equal_list(Table, ets:tab2list(amoc_config)),
     ?assertError(timeout, meck:wait(?MOCK_MOD, update, 2, 500)).
 
 update_settings_invalid_value(_) ->
@@ -114,7 +114,7 @@ update_settings_invalid_value(_) ->
                   [{var2, invalid_val2,
                     {verification_failed, {not_one_of, [def2, val2]}}}]},
                  InvalidValueRet),
-    isEqualList(Table, ets:tab2list(amoc_config)),
+    is_equal_list(Table, ets:tab2list(amoc_config)),
     ?assertError(timeout, meck:wait(?MOCK_MOD, update, 2, 500)).
 
 update_settings_undef_param(_) ->
@@ -126,7 +126,7 @@ update_settings_undef_param(_) ->
                          {invalid_var2, val2}],
     UndefParamRet = amoc_config_scenario:update_settings(ScenarioSettings3),
     ?assertEqual({error, undefined_parameters, [invalid_var2]}, UndefParamRet),
-    isEqualList(Table, ets:tab2list(amoc_config)),
+    is_equal_list(Table, ets:tab2list(amoc_config)),
     ?assertError(timeout, meck:wait(?MOCK_MOD, update, 2, 500)).
 
 implicit_variable_redefinition(_) ->
@@ -179,5 +179,5 @@ mock_ets_tables() ->
     amoc_scenarios = ets:new(amoc_scenarios, EtsOptions),
     amoc_config_utils:create_amoc_config_ets().
 
-isEqualList(List1, List2) ->
+is_equal_list(List1, List2) ->
     ?assertEqual(lists:sort(List1), lists:sort(List2)).

@@ -157,7 +157,7 @@ handle_call(_Request, _From, State) ->
 
 -spec handle_cast(any(), state()) -> {noreply, state()}.
 handle_cast(maybe_update_interarrival_timer, State) ->
-    {noreply,maybe_update_interarrival_timer(State)};
+    {noreply, maybe_update_interarrival_timer(State)};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 

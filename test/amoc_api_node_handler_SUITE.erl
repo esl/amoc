@@ -22,7 +22,7 @@ end_per_testcase(_, _Config) ->
 
 returns_empty_list_when_amoc_up(_Config) ->
     %% when
-    {CodeHttp,JSON} = amoc_api_helper:get(?PATH),
+    {CodeHttp, JSON} = amoc_api_helper:get(?PATH),
     %% then
     ?assertEqual(200, CodeHttp),
     ThisNode = {atom_to_binary(node(), utf8), <<"up">>},
@@ -45,7 +45,7 @@ returns_nodes_list_when_amoc_up(_Config) ->
         JSON),
     %% cleanup
     clean_nodes().
-    
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% HELPERS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
