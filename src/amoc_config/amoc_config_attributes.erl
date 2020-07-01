@@ -68,7 +68,7 @@ process_var_attr(Module, Attr) ->
     end.
 
 -spec check_mandatory_fields(maybe_module_attribute()) ->
-    {ok, maybe_module_attribute()} | {error, reason()}.
+    {ok, #{name := name(), description := string(), any() => any()}} | {error, reason()}.
 check_mandatory_fields(#{description := List, name := Atom} = Attr) when is_atom(Atom),
                                                                          is_list(List) ->
     case io_lib:char_list(List) of
@@ -78,13 +78,14 @@ check_mandatory_fields(#{description := List, name := Atom} = Attr) when is_atom
 check_mandatory_fields(_Attr) ->
     {error, invalid_attribute}.
 
--spec check_default_value(maybe_module_attribute()) -> {ok, maybe_module_attribute()}.
+-spec check_default_value(#{any() => any()}) ->
+    {ok, #{default_value := value(), any() => any()}}.
 check_default_value(Attr) ->
     DefaultValue = maps:get(default_value, Attr, undefined),
     {ok, Attr#{default_value => DefaultValue}}.
 
--spec check_verification_method(maybe_module_attribute()) ->
-    {ok, maybe_module_attribute()} | {error, reason()}.
+-spec check_verification_method(#{any() => any()}) ->
+    {ok, #{verification := maybe_verification_fun(), any() => any()}} | {error, reason()}.
 check_verification_method(Attr) ->
     VerificationMethod = maps:get(verification, Attr, none),
     case verification_fn(VerificationMethod) of
@@ -96,8 +97,8 @@ check_verification_method(Attr) ->
             {ok, Attr#{verification => VerificationFn}}
     end.
 
--spec check_update_method(maybe_module_attribute()) ->
-    {ok, maybe_module_attribute()} | {error, reason()}.
+-spec check_update_method(#{any() => any()}) ->
+    {ok, #{update := maybe_update_fun(), any() => any()}} | {error, reason()}.
 check_update_method(Attr) ->
     UpdateMethod = maps:get(update, Attr, read_only),
     case update_fn(UpdateMethod) of
@@ -109,7 +110,12 @@ check_update_method(Attr) ->
             {ok, Attr#{update => UpdateFn}}
     end.
 
--spec make_module_parameter(module_attribute(), module()) ->
+-spec make_module_parameter(#{name := name(),
+                              default_value := value(),
+                              verification := maybe_verification_fun(),
+                              update := maybe_update_fun(),
+                              any() => any()},
+                            module()) ->
     {ok, module_parameter()}.
 make_module_parameter(#{name := Name, default_value := Value, update := UpdateFn,
                         verification := VerificationFn}, Module) ->

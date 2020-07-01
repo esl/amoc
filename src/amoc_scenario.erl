@@ -125,7 +125,11 @@ maybe_store_module(Module) ->
 -spec get_module_type(module()) -> scenario | configurable | ordinary.
 get_module_type(Module) ->
     case erlang:function_exported(Module, module_info, 1) of
-        false -> ordinary;
+        false ->
+            %% This can happen with the mocked (meck:new/2) and
+            %% later unloaded (meck:unload/1) module. So this
+            %% clause is required to pass the tests.
+            ordinary;
         true ->
             ModuleAttributes = apply(Module, module_info, [attributes]),
             lists:foldl(fun({behaviour, [?MODULE]}, _) -> scenario;
