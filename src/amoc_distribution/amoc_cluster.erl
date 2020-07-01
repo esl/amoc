@@ -45,6 +45,7 @@
 
 -type new_connection_handler() :: fun((node()) -> ok).
 
+-type merge_type() :: connected | slave | failed_to_connect | connection_lost.
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
@@ -232,13 +233,13 @@ schedule_timer(#state{to_ack = []}) -> ok;
 schedule_timer(#state{to_ack = [_ | _]}) ->
     erlang:send_after(1000, self(), timeout).
 
--spec merge([{connected | slave | failed_to_connect | connection_lost, [node()]}], state()) -> state().
+-spec merge([{merge_type(), [node()]}], state()) -> state().
 merge([], State) -> State;
 merge([{Type, Nodes} | Tail], State) ->
     NewState = merge(Type, Nodes, State),
     merge(Tail, NewState).
 
--spec merge(connected | slave | failed_to_connect | connection_lost, [node()], state()) -> state().
+-spec merge(merge_type(), [node()], state()) -> state().
 merge(connected, Nodes, #state{failed_to_connect = FailedToConnect,
                                connection_lost   = ConnectionLost,
                                connected         = Connected} = State) ->
@@ -264,7 +265,7 @@ merge(failed_to_connect, Nodes, #state{failed_to_connect = FailedToConnect} = St
 merge(slave, Nodes, #state{slave = Slave} = State) ->
     State#state{slave = lists:usort(Nodes ++ Slave)}.
 
--spec state_to_map(#state{}) -> #{}.
+-spec state_to_map(state()) -> #{any() => any()}.
 state_to_map(#state{} = State) ->
     Fields = record_info(fields, state),
     [state | Values] = tuple_to_list(State),

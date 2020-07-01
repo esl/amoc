@@ -37,6 +37,7 @@
                 schedule = [] :: [pid()],
                 schedule_reversed = [] :: [pid()]}).
 
+-type state() :: #state{}.
 %%------------------------------------------------------------------------------
 %% Exported functions
 %%------------------------------------------------------------------------------
@@ -66,20 +67,20 @@ pause(Pid) ->
 resume(Pid) ->
     gen_server:cast(Pid, resume_process).
 
--spec get_state(pid()) -> #state{}.
+-spec get_state(pid()) -> state().
 get_state(Pid) ->
     gen_server:call(Pid, get_state).
 
 %%------------------------------------------------------------------------------
 %% gen_server behaviour
 %%------------------------------------------------------------------------------
--spec init(list()) -> {ok, #state{}, timeout()}.
+-spec init(list()) -> {ok, state(), timeout()}.
 init([Name, Interval, Rate]) ->
     InitialState = initial_state(Interval, Rate),
     StateWithTimer = maybe_start_timer(InitialState),
     {ok, StateWithTimer#state{name = Name}, timeout(InitialState)}.
 
--spec handle_info(term(), #state{}) -> {noreply, #state{}, {continue, maybe_run_fn}}.
+-spec handle_info(term(), state()) -> {noreply, state(), {continue, maybe_run_fn}}.
 handle_info({'DOWN', _, process, _, _}, State) ->
     {noreply, inc_n(State), {continue, maybe_run_fn}};
 handle_info(delay_between_executions, State) ->
@@ -88,8 +89,8 @@ handle_info(timeout, State) ->
     log_state("is inactive", State),
     {noreply, State, {continue, maybe_run_fn}}.
 
--spec handle_cast(term(), #state{}) ->
-    {noreply, #state{}, {continue, maybe_run_fn}} | {stop, normal, #state{}}.
+-spec handle_cast(term(), state()) ->
+    {noreply, state(), {continue, maybe_run_fn}} | {stop, normal, state()}.
 handle_cast(stop_process, State) ->
     {stop, normal, State};
 handle_cast(pause_process, State) ->
@@ -104,23 +105,23 @@ handle_cast({update, Interval, Rate}, State) ->
     log_state("state update", NewState),
     {noreply, NewState, {continue, maybe_run_fn}}.
 
--spec handle_call(term(), term(), #state{}) ->
-    {reply, {error, not_implemented} | #state{}, #state{}, {continue, maybe_run_fn}}.
+-spec handle_call(term(), term(), state()) ->
+    {reply, {error, not_implemented} | state(), state(), {continue, maybe_run_fn}}.
 handle_call(get_state, _, State) ->
     {reply, printable_state(State), State, {continue, maybe_run_fn}};
 handle_call(_, _, State) ->
     {reply, {error, not_implemented}, State, {continue, maybe_run_fn}}.
 
--spec handle_continue(maybe_run_fn, #state{}) -> {noreply, #state{}, timeout()}.
+-spec handle_continue(maybe_run_fn, state()) -> {noreply, state(), timeout()}.
 handle_continue(maybe_run_fn, State) ->
     NewState = maybe_run_fn(State),
     {noreply, NewState, timeout(NewState)}.
 
 format_status(_Opt, [_PDict, State]) ->
-    ScheduleLen=length(State#state.schedule),
-    ScheduleRevLen=length(State#state.schedule_reversed),
-    State1=setelement(#state.schedule,State,ScheduleLen),
-    setelement(#state.schedule_reversed,State1,ScheduleRevLen).
+    ScheduleLen = length(State#state.schedule),
+    ScheduleRevLen = length(State#state.schedule_reversed),
+    State1 = setelement(#state.schedule, State, ScheduleLen),
+    setelement(#state.schedule_reversed, State1, ScheduleRevLen).
 %%------------------------------------------------------------------------------
 %% internal functions
 %%------------------------------------------------------------------------------
@@ -128,9 +129,9 @@ initial_state(Interval, 0) ->
     ?LOG_ERROR("invalid rate, must be higher than zero"),
     initial_state(Interval, 1);
 initial_state(Interval, Rate) when Rate > 0 ->
-    if
-        Rate < 5 -> ?LOG_ERROR("too low rate, please reduce NoOfProcesses");
-        true -> ok
+    case Rate < 5 of
+        true -> ?LOG_ERROR("too low rate, please reduce NoOfProcesses");
+        false -> ok
     end,
     Delay = case {Interval, Interval div Rate, Interval rem Rate} of
                 {0, _, _} -> 0; %% limit only No of simultaneous executions
@@ -146,7 +147,8 @@ merge_state(#state{interval = I, delay_between_executions = D, n = N, max_n = Ma
             #state{n = OldN, max_n = OldMaxN} = OldState) ->
     maybe_stop_timer(OldState),
     NewN = N - (OldMaxN - OldN),
-    NewState = OldState#state{interval = I, delay_between_executions = D, n = NewN, max_n = MaxN, tref = undefined},
+    NewState = OldState#state{interval = I, delay_between_executions = D, n = NewN,
+                              max_n = MaxN, tref = undefined},
     maybe_start_timer(NewState).
 
 maybe_start_timer(#state{delay_between_executions = 0, tref = undefined} = State) ->
@@ -198,12 +200,12 @@ timeout(State) ->
 
 inc_n(#state{n = N, max_n = MaxN} = State) ->
     NewN = N + 1,
-    if
-        MaxN < NewN ->
+    case MaxN < NewN of
+        true ->
             PrintableState = printable_state(State),
             ?LOG_ERROR("~nthrottle process ~p: invalid N (~p)~n", [self(), PrintableState]),
             State#state{n = MaxN};
-        true ->
+        false ->
             State#state{n = NewN}
     end.
 

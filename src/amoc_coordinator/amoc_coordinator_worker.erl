@@ -26,6 +26,8 @@
                 collect_data = true :: boolean(),
                 accumulator = [] :: [data()]}).
 
+-type state() :: #state{}.
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -34,13 +36,13 @@
 start_link(CoordinationItem) -> gen_server:start_link(?MODULE, CoordinationItem, []).
 
 -spec reset(pid()) -> ok.
-reset(Pid) -> gen_server:call(Pid, {reset,reset}).
+reset(Pid) -> gen_server:call(Pid, {reset, reset}).
 
 -spec timeout(pid()) -> ok.
-timeout(Pid) -> gen_server:call(Pid, {reset,timeout}).
+timeout(Pid) -> gen_server:call(Pid, {reset, timeout}).
 
 -spec stop(pid()) -> ok.
-stop(Pid) -> gen_server:call(Pid, {reset,stop}).
+stop(Pid) -> gen_server:call(Pid, {reset, stop}).
 
 -spec add(pid(), data()) -> ok.
 add(Pid, Data) -> gen_server:cast(Pid, {add, Data}).
@@ -49,14 +51,14 @@ add(Pid, Data) -> gen_server:cast(Pid, {add, Data}).
 %%% gen_server callbacks
 %%%===================================================================
 
--spec init(amoc_coordinator:normalized_coordination_item()) -> {ok, #state{}}.
+-spec init(amoc_coordinator:normalized_coordination_item()) -> {ok, state()}.
 init({NoOfUsers, Actions}) ->
     State = #state{required_n = NoOfUsers, actions = Actions},
     {ok, State#state{collect_data = is_acc_required(Actions)}}.
 
 
--spec handle_call({reset, reset | timeout | stop}, term(), #state{}) ->
-    {reply, ok, #state{}} | {stop, normal, ok, #state{}}.
+-spec handle_call({reset, reset | timeout | stop}, term(), state()) ->
+    {reply, ok, state()} | {stop, normal, ok, state()}.
 handle_call({reset, Event}, _, State) ->
     NewState = reset_state(Event, State),
     case Event of
@@ -65,7 +67,7 @@ handle_call({reset, Event}, _, State) ->
             {reply, ok, NewState}
     end.
 
--spec handle_cast({add, data()}, #state{}) -> {noreply, #state{}}.
+-spec handle_cast({add, data()}, state()) -> {noreply, state()}.
 handle_cast({add, Data}, State) ->
     NewState = add_data(Data, State),
     {noreply, NewState}.
@@ -80,7 +82,7 @@ is_acc_required(Actions) ->
                  (_) -> true
               end, Actions).
 
--spec add_data(data(), #state{}) -> #state{}.
+-spec add_data(data(), state()) -> state().
 add_data(Data, #state{n = N, accumulator = Acc} = State) ->
     NewState = case State#state.collect_data of
                    false ->
@@ -90,13 +92,13 @@ add_data(Data, #state{n = N, accumulator = Acc} = State) ->
                end,
     maybe_reset_state(NewState).
 
--spec maybe_reset_state(#state{}) -> #state{}.
+-spec maybe_reset_state(state()) -> state().
 maybe_reset_state(#state{n = N, required_n = N} = State) ->
     reset_state(coordinate, State);
 maybe_reset_state(State) ->
     State.
 
--spec reset_state(event(), #state{}) -> #state{}.
+-spec reset_state(event(), state()) -> state().
 reset_state(Event, #state{actions = Actions, accumulator = Acc, n = N} = State) ->
     [execute_action(Action, {Event, N}, Acc) || Action <- Actions],
     State#state{accumulator = [], n = 0}.

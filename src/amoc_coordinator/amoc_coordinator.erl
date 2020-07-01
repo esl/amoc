@@ -19,9 +19,9 @@
 
 -define(DEFAULT_TIMEOUT, 30). %% 30 seconds
 
--define(is_pos_int(Integer), (is_integer(Integer) andalso Integer > 0)).
--define(is_n_of_users(N), (?is_pos_int(N) orelse N =:= all)).
--define(is_timeout(Timeout), (?is_pos_int(Timeout) orelse Timeout =:= infinity)).
+-define(IS_POS_INT(Integer), (is_integer(Integer) andalso Integer > 0)).
+-define(IS_N_OF_USERS(N), (?IS_POS_INT(N) orelse N =:= all)).
+-define(IS_TIMEOUT(Timeout), (?IS_POS_INT(Timeout) orelse Timeout =:= infinity)).
 
 -type state() :: {worker, pid()} | {timeout, pid()}.
 
@@ -61,7 +61,7 @@ start(Name, CoordinationPlan) ->
     start(Name, CoordinationPlan, ?DEFAULT_TIMEOUT).
 
 -spec start(atom(), coordination_plan(), coordination_timeout_in_sec()) -> ok | error.
-start(Name, CoordinationPlan, Timeout) when ?is_timeout(Timeout) ->
+start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
     Plan = normalize_coordination_plan(CoordinationPlan),
     case gen_event:start({local, Name}) of
         {ok, _} ->
@@ -185,7 +185,7 @@ normalize_coordination_plan(CoordinationPlan) ->
 
 normalize_coordination_item({NoOfUsers, Action}) when is_function(Action) ->
     normalize_coordination_item({NoOfUsers, [Action]});
-normalize_coordination_item({NoOfUsers, Actions}) when ?is_n_of_users(NoOfUsers),
+normalize_coordination_item({NoOfUsers, Actions}) when ?IS_N_OF_USERS(NoOfUsers),
                                                        is_list(Actions) ->
     [assert_action(NoOfUsers, A) || A <- Actions],
     {NoOfUsers, Actions}.

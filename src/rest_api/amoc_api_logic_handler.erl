@@ -44,6 +44,7 @@ handle_request('ScenariosIdGet', _Req, #{id := ScenarioName}) ->
     end;
 handle_request('ScenariosIdPatch', _Req, #{'ScenarioExecution' := Body,
                                            id := ScenarioName}) ->
+    Error = {200, #{}, [{<<"scenario">>, <<"error">>}]},
     case amoc_api_scenario_status:test_status(ScenarioName) of
         {doesnt_exist, _} ->
             {404, #{}, #{}};
@@ -57,10 +58,10 @@ handle_request('ScenariosIdPatch', _Req, #{'ScenarioExecution' := Body,
                         end || {K, V} <- maps:to_list(SettingsMap)],
             case amoc_dist:do(Scenario, Users, Settings) of
                 {ok, _} -> {200, #{}, [{<<"scenario">>, <<"started">>}]};
-                {error, _} -> {200, #{}, [{<<"scenario">>, <<"error">>}]}
+                {error, _} -> Error
             end;
         _ ->
-            {200, #{}, [{<<"scenario">>, <<"error">>}]}
+            Error
     end;
 handle_request('ScenariosUploadPut', Req, _Context) ->
     {ok, ModuleSource, _} = cowboy_req:read_body(Req),

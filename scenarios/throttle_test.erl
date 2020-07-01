@@ -14,8 +14,10 @@
 -spec init() -> ok.
 init() ->
     init_metrics(),
-    amoc_throttle:start(?RATE_CHANGE_TEST, 20000, 120000, 20), %% 20k per 2 min
-    amoc_throttle:start(?PARALLEL_EXECUTION_TEST, 20, 0, 3), %% not more than 20 simultaneous executions
+    %% 20k per 2 min
+    amoc_throttle:start(?RATE_CHANGE_TEST, 20000, 120000, 20),
+    %% not more than 20 simultaneous executions
+    amoc_throttle:start(?PARALLEL_EXECUTION_TEST, 20, 0, 3),
     spawn(
         fun() ->
             timer:sleep(200000),
