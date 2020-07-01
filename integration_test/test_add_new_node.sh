@@ -23,7 +23,7 @@ docker run --rm -t -d --name amoc-4 -h amoc-4 \
 
 docker exec -it amoc-4 ${PATH_TO_EXEC} eval "amoc_controller:get_status()" | grep dummy_scenario | grep running
 docker exec -it amoc-4 ${PATH_TO_EXEC} eval "amoc_config:get(test)" | grep '<<"test_value">>'
-docker exec -it amoc-4 ${PATH_TO_EXEC} eval "dummy_scenario:test_amoc_dist()" | tee /dev/tty | grep -q 'amoc_dist_works_as_expected'
+docker exec -it amoc-4 ${PATH_TO_EXEC} eval "dummy_helper:test_amoc_dist()" | tee /dev/tty | grep -q 'amoc_dist_works_as_expected'
 
 
 

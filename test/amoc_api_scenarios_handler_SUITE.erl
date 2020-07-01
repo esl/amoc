@@ -6,12 +6,10 @@
 
 -define(SCENARIOS_URL_S, "/scenarios").
 -define(SCENARIOS_URL_U, "/scenarios/upload").
--define(SCENARIOS_DIR_S, filename:join(code:priv_dir(amoc), "scenarios")).
--define(SCENARIOS_EBIN_DIR_S, filename:join(code:priv_dir(amoc), "scenarios_ebin")).
--define(SAMPLE_SCENARIO_DECLARATION, "-module(sample_test).").
--define(SAMPLE_SCENARIO_S, "sample_test.erl").
--define(SAMPLE_SCENARIO_BEAM_S, "sample_test.beam").
--define(SAMPLE_SCENARIO_A, sample_test).
+
+-define(SAMPLE_SCENARIO, sample_test).
+-define(SAMPLE_SCENARIO_DECLARATION,
+        "-module(" ++ atom_to_list(?SAMPLE_SCENARIO) ++ ").").
 
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
@@ -33,15 +31,14 @@ all() ->
 
 
 init_per_testcase(_, Config) ->
-    {ok, _} = application:ensure_all_started(inets),
-    {ok, _} = application:ensure_all_started(amoc),
+    amoc_api_helper:start_amoc(),
     Config.
 
 end_per_testcase(put_scenarios_returns_200_when_scenario_valid, _Config) ->
-    ok = file:delete(filename:join([?SCENARIOS_EBIN_DIR_S, ?SAMPLE_SCENARIO_BEAM_S])),
-    ok = file:delete(filename:join([?SCENARIOS_DIR_S, ?SAMPLE_SCENARIO_S]));
+    amoc_api_helper:remove_module(?SAMPLE_SCENARIO),
+    amoc_api_helper:stop_amoc();
 end_per_testcase(_, _Config) ->
-    ok.
+    amoc_api_helper:stop_amoc().
 
 get_scenarios_returns_200_and_scenarios_list_when_requested(_Config) ->
     %% when
@@ -57,7 +54,7 @@ put_scenarios_returns_400_and_error_when_scenario_is_not_valid(_Config) ->
     ScenarioContent = "invalid_source",
     %% when
     {CodeHttp, Body} = amoc_api_helper:put(?SCENARIOS_URL_U, ScenarioContent),
-    ScenarioFileSource = filename:join([?SCENARIOS_DIR_S, ?SAMPLE_SCENARIO_S]),
+    ScenarioFileSource = amoc_api_helper:module_src(?SAMPLE_SCENARIO),
     %% then
     ?assertNot(filelib:is_regular(ScenarioFileSource)),
     ?assertEqual(400, CodeHttp),
@@ -68,7 +65,7 @@ put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Conf
     ScenarioContent = ?SAMPLE_SCENARIO_DECLARATION ++ "\ninvalid_source",
     %% when
     {CodeHttp, Body} = amoc_api_helper:put(?SCENARIOS_URL_U, ScenarioContent),
-    ScenarioFileSource = filename:join([?SCENARIOS_DIR_S, ?SAMPLE_SCENARIO_S]),
+    ScenarioFileSource = amoc_api_helper:module_src(?SAMPLE_SCENARIO),
     %% then
     ?assertNot(filelib:is_regular(ScenarioFileSource)),
     ?assertEqual(200, CodeHttp),
@@ -78,11 +75,11 @@ put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Conf
 
 put_scenarios_returns_200_when_scenario_valid(_Config) ->
     %% given
-    ScenarioContent = ?DUMMY_SCENARIO_MODULE(?SAMPLE_SCENARIO_A),
+    ScenarioContent = ?DUMMY_SCENARIO_MODULE(?SAMPLE_SCENARIO),
     %% when
     {CodeHttp, Body} = amoc_api_helper:put(?SCENARIOS_URL_U, ScenarioContent),
-    ScenarioFileSource = filename:join([?SCENARIOS_DIR_S, ?SAMPLE_SCENARIO_S]),
-    ScenarioFileBeam = filename:join([?SCENARIOS_EBIN_DIR_S, ?SAMPLE_SCENARIO_BEAM_S]),
+    ScenarioFileSource = amoc_api_helper:module_src(?SAMPLE_SCENARIO),
+    ScenarioFileBeam = amoc_api_helper:module_beam(?SAMPLE_SCENARIO),
     %% then
     ?assertEqual(200, CodeHttp),
     ?assertEqual({[{<<"compile">>, <<"ok">>}]}, Body),

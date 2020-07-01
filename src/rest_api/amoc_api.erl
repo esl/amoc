@@ -9,7 +9,7 @@
 -spec start() -> {ok, pid()} | {error, any()}.
 start() ->
     LogicHandler = amoc_api_logic_handler,
-    Port = amoc_config_env:get(api_port, 4000),
+    Port = amoc_config_env:get(amoc, api_port, 4000),
     ServerParams = #{ip => {0, 0, 0, 0}, port => Port, net_opts => [],
                      logic_handler => LogicHandler},
     amoc_rest_server:start(http_server, ServerParams).

@@ -15,7 +15,7 @@
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec do(amoc:scenario(), non_neg_integer(), amoc_config_scenario:config()) ->
+-spec do(amoc:scenario(), non_neg_integer(), amoc_config:settings()) ->
     {ok, any()} | {error, any()}.
 do(Scenario, Count, Settings) ->
     case {prepare_cluster(Scenario, Settings), Count} of
@@ -83,7 +83,7 @@ check_nodes(Nodes) ->
             {error, not_a_master}
     end.
 
--spec prepare_cluster(amoc:scenario(), amoc_config_scenario:config()) -> {ok, any()} | {error, any()}.
+-spec prepare_cluster(amoc:scenario(), amoc_config:settings()) -> {ok, any()} | {error, any()}.
 prepare_cluster(Scenario, Settings) ->
     case setup_master_node() of
         ok ->
@@ -125,10 +125,13 @@ setup_slave_node(Node) ->
 
 -spec propagate_uploaded_modules(node()) -> {ok, any()} | {error, any()}.
 propagate_uploaded_modules(Node) ->
-    UploadedModules = ets:match(amoc_scenarios, {'$1', '_', {uploaded, '$2'}}),
-    Result = [{Module, rpc:call(Node, amoc_scenario, install_scenario, Args)} ||
-                 [Module, _] = Args <- UploadedModules],
+    UploadedModules = amoc_scenario:list_uploaded_modules(),
+    Result = [{Module, propagate_module(Node, Module, SourceCode)}
+              || {Module, SourceCode} <- UploadedModules],
     maybe_error(Result).
+
+propagate_module(Node, Module, SourceCode) ->
+    rpc:call(Node, amoc_scenario, install_module, [Module, SourceCode]).
 
 -spec add_users(pos_integer(), [node()]) -> {ok, any()} | {error, any()}.
 add_users(Count, Nodes) ->

@@ -5,9 +5,11 @@
 -module(amoc_scenario).
 %% API
 -export([start_link/0,
-         install_scenario/2,
+         install_module/2,
          does_scenario_exist/1,
-         list_scenario_modules/0]).
+         list_scenario_modules/0,
+         list_uploaded_modules/0,
+         list_configurable_modules/0]).
 
 -behaviour(gen_server).
 %% gen_server callbacks
@@ -23,6 +25,7 @@
 
 -type user_id() :: pos_integer().
 -type state() :: any().
+-type sourcecode() :: binary().
 
 -callback init() -> {ok, state()} | ok | {error, Reason :: term()}.
 -callback start(user_id(), state()) -> any().
@@ -40,10 +43,10 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec install_scenario(module(), binary()) ->
+-spec install_module(module(), sourcecode()) ->
     ok | {error, [Errors :: string()], [Warnings :: string()]}.
-install_scenario(Module, ModuleSource) ->
-    gen_server:call(?MODULE, {add_scenario, Module, ModuleSource}).
+install_module(Module, ModuleSource) ->
+    gen_server:call(?MODULE, {add_module, Module, ModuleSource}).
 
 -spec does_scenario_exist(module()) -> boolean().
 does_scenario_exist(Scenario) ->
@@ -52,8 +55,15 @@ does_scenario_exist(Scenario) ->
 
 -spec list_scenario_modules() -> [module()].
 list_scenario_modules() ->
-    [S || [S] <- ets:match(amoc_scenarios, {'$1',scenario,'_'})].
+    [S || [S] <- ets:match(amoc_scenarios, {'$1', scenario})].
 
+-spec list_uploaded_modules() -> [{module(), sourcecode()}].
+list_uploaded_modules() ->
+    ets:tab2list(uploaded_modules).
+
+-spec list_configurable_modules() -> [module()].
+list_configurable_modules() ->
+    [S || [S] <- ets:match(amoc_scenarios, {'$1', configurable})].
 %%-------------------------------------------------------------------------
 %% gen_server callbacks
 %%-------------------------------------------------------------------------
@@ -65,8 +75,8 @@ init([]) ->
     {ok, ok}.
 
 -spec handle_call(any(), any(), state()) -> {reply, any(), state()}.
-handle_call({add_scenario, Module, ModuleSource}, _, State) ->
-    Reply = add_scenario(Module, ModuleSource),
+handle_call({add_module, Module, ModuleSource}, _, State) ->
+    Reply = add_module(Module, ModuleSource),
     {reply, Reply, State};
 handle_call(_, _, State) ->
     {reply, {error, not_implemented}, State}.
@@ -80,14 +90,14 @@ handle_cast(_, State) ->
 %%-------------------------------------------------------------------------
 -spec start_scenarios_ets() -> amoc_scenarios.
 start_scenarios_ets() ->
-    ets:new(amoc_scenarios, [named_table,
-                             protected,
-                             {read_concurrency, true}]).
+    EtsOptions = [named_table, protected, {read_concurrency, true}],
+    ets:new(amoc_scenarios, EtsOptions),
+    ets:new(uploaded_modules, EtsOptions).
 
 -spec add_code_paths() -> ok | {error, {bad_directories, [file:filename()]}}.
 add_code_paths() ->
     true = code:add_pathz(?EBIN_DIR),
-    AdditionalCodePaths = amoc_config_env:get(extra_code_paths, []),
+    AdditionalCodePaths = amoc_config_env:get(amoc, extra_code_paths, []),
     Res = [{code:add_pathz(Path), Path} || Path <- [?EBIN_DIR | AdditionalCodePaths]],
     case [Dir || {{error, bad_directory}, Dir} <- Res] of
         [] -> ok;
@@ -99,28 +109,43 @@ find_scenario_modules() ->
     AllBeamFiles = [File || Path <- code:get_path(), File <- filelib:wildcard("*.beam", Path)],
     AllModules = [list_to_atom(filename:rootname(BeamFile)) || BeamFile <- AllBeamFiles],
     ok = code:ensure_modules_loaded(AllModules),
-    AllScenarios = [Module || Module <- erlang:loaded(), is_scenario(Module)],
-    [ets:insert(amoc_scenarios, {Scenario, scenario, preloaded}) || Scenario <- AllScenarios].
+    [maybe_store_module(Module) || Module <- erlang:loaded()].
 
--spec is_scenario(module()) -> boolean().
-is_scenario(Module) ->
-    case erlang:function_exported(Module, module_info, 1) of
-        false -> false;
-        true ->
-            ModuleAttributes = apply(Module, module_info, [attributes]),
-            lists:any(fun({behaviour, [?MODULE]}) -> true;
-                         ({behavior, [?MODULE]}) -> true;
-                         (_) -> false
-                      end, ModuleAttributes)
+-spec maybe_store_module(module()) -> any().
+maybe_store_module(Module) ->
+    case get_module_type(Module) of
+        scenario ->
+            ets:insert(amoc_scenarios, {Module, scenario});
+        configurable ->
+            ets:insert(amoc_scenarios, {Module, configurable});
+        ordinary ->
+            ok
     end.
 
--spec add_scenario(module(), binary()) ->
+-spec get_module_type(module()) -> scenario | configurable | ordinary.
+get_module_type(Module) ->
+    case erlang:function_exported(Module, module_info, 1) of
+        false ->
+            %% This can happen with the mocked (meck:new/2) and
+            %% later unloaded (meck:unload/1) module. So this
+            %% clause is required to pass the tests.
+            ordinary;
+        true ->
+            ModuleAttributes = apply(Module, module_info, [attributes]),
+            lists:foldl(fun({behaviour, [?MODULE]}, _) -> scenario;
+                           ({behavior, [?MODULE]}, _) -> scenario;
+                           ({required_variable, _}, ordinary) -> configurable;
+                           (_, Ret) -> Ret
+                        end, ordinary, ModuleAttributes)
+    end.
+
+-spec add_module(module(), sourcecode()) ->
     ok | {error, [Errors :: string()], [Warnings :: string()]}.
-add_scenario(Module, ModuleSource) ->
+add_module(Module, ModuleSource) ->
     case erlang:module_loaded(Module) of
         true ->
-            case ets:lookup(amoc_scenarios, Module) of
-                [{Module, _, {uploaded, ModuleSource}}] -> ok;
+            case ets:lookup(uploaded_modules, Module) of
+                [{Module, ModuleSource}] -> ok;
                 _ -> {error, ["module with such name already exists"], []}
             end;
         false ->
@@ -128,11 +153,8 @@ add_scenario(Module, ModuleSource) ->
             write_scenario_to_file(ModuleSource, ScenarioPath),
             case compile_and_load_scenario(ScenarioPath) of
                 {ok, Module} ->
-                    Type = case is_scenario(Module) of
-                               true -> scenario;
-                               false -> helper
-                           end,
-                    ets:insert(amoc_scenarios, {Module, Type, {uploaded, ModuleSource}}),
+                    maybe_store_module(Module),
+                    ets:insert(uploaded_modules, {Module, ModuleSource}),
                     ok;
                 Error -> Error
             end
@@ -142,7 +164,7 @@ add_scenario(Module, ModuleSource) ->
 scenario_path_name(Module) -> %% w/o ".erl" extension
     filename:join([?PRIV_DIR, "scenarios", atom_to_list(Module)]).
 
--spec write_scenario_to_file(binary(), file:filename()) -> ok.
+-spec write_scenario_to_file(sourcecode(), file:filename()) -> ok.
 write_scenario_to_file(ModuleSource, ScenarioPath) ->
     ok = file:write_file(ScenarioPath ++ ".erl", ModuleSource, [write]).
 

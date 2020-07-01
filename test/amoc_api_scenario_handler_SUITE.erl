@@ -5,10 +5,10 @@
 -include("scenario_template.hrl").
 
 
--define(SCENARIOS_DIR_S, "scenarios").
--define(SAMPLE_SCENARIO_S, "sample_test1.erl").
--define(SAMPLE_SCENARIO_A, sample_test1).
--define(SAMPLE_GOOD_SCENARIO_PATH, "/scenarios/sample_test1").
+
+-define(SAMPLE_SCENARIO, sample_test).
+
+-define(SAMPLE_GOOD_SCENARIO_PATH, "/scenarios/" ++ atom_to_list(?SAMPLE_SCENARIO)).
 -define(SAMPLE_BAD_SCENARIO_PATH, "/scenarios/non_existing_scenario").
 
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
@@ -48,12 +48,9 @@ init_per_testcase(_, Config) ->
     create_env(Config),
     Config.
 
-end_per_testcase(
-  patch_scenario_returns_200_when_request_ok_and_module_exists,
-  _Config) ->
+end_per_testcase(patch_scenario_returns_200_when_request_ok_and_module_exists, _Config) ->
     ok = meck:unload(amoc_dist),
     destroy_env();
-
 end_per_testcase(_, _Config) ->
     destroy_env().
 
@@ -66,7 +63,7 @@ get_scenario_status_returns_404_when_scenario_not_exists(_Config) ->
 
 get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
     %% given
-    given_test_status_mocked({running, ?SAMPLE_SCENARIO_A}),
+    given_test_status_mocked({running, ?SAMPLE_SCENARIO}),
     %% when
     {CodeHttp, Body} = amoc_api_helper:get(?SAMPLE_GOOD_SCENARIO_PATH),
     %% then
@@ -77,7 +74,7 @@ get_scenario_status_returns_running_when_scenario_is_running(_Config) ->
 
 get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
     %% given
-    given_test_status_mocked({finished, ?SAMPLE_SCENARIO_A}),
+    given_test_status_mocked({finished, ?SAMPLE_SCENARIO}),
     %% when
     {CodeHttp, Body} = amoc_api_helper:get(?SAMPLE_GOOD_SCENARIO_PATH),
     %% then
@@ -88,7 +85,7 @@ get_scenario_status_returns_finished_when_scenario_is_ended(_Config) ->
 
 get_scenario_status_returns_loaded_when_scenario_exists_but_not_running(_Config) ->
     %% given
-    given_test_status_mocked({loaded, ?SAMPLE_SCENARIO_A}),
+    given_test_status_mocked({loaded, ?SAMPLE_SCENARIO}),
     %% when
     {CodeHttp, Body} = amoc_api_helper:get(?SAMPLE_GOOD_SCENARIO_PATH),
     %% then
@@ -99,7 +96,7 @@ get_scenario_status_returns_loaded_when_scenario_exists_but_not_running(_Config)
 
 patch_scenario_returns_404_when_scenario_not_exists(_Config) ->
     %% given
-    RequestBody = jiffy:encode({[{users,30}]}),
+    RequestBody = jiffy:encode({[{users, 30}]}),
     %% when
     {CodeHttp, _Body} = amoc_api_helper:patch(
                             ?SAMPLE_BAD_SCENARIO_PATH, RequestBody),
@@ -150,7 +147,7 @@ patch_scenario_returns_200_when_request_ok_and_module_exists_w_settings(_Config)
     SettingsMatcher = meck_matcher:new(Predicate),
     %% then
     %% Maybe check Body, as answer format will be ready
-    meck:wait(amoc_dist, do, ['sample_test1', 10, SettingsMatcher], 2000),
+    meck:wait(amoc_dist, do, [?SAMPLE_SCENARIO, 10, SettingsMatcher], 2000),
     ?assertEqual(200, CodeHttp).
 
 patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
@@ -162,20 +159,20 @@ patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
 
     %% then
     %% Maybe check Body, as answer format will be ready
-    meck:wait(amoc_dist, do, ['sample_test1', 10, []], 2000),
+    meck:wait(amoc_dist, do, [?SAMPLE_SCENARIO, 10, []], 2000),
     ?assertEqual(200, CodeHttp).
 
 
 %% Helpers
 
 create_env(Config) ->
-    {ok, _} = application:ensure_all_started(inets),
-    {ok, _} = application:ensure_all_started(amoc),
-    ScenarioContent = ?DUMMY_SCENARIO_MODULE(?SAMPLE_SCENARIO_A),
-    ok = amoc_scenario:install_scenario(?SAMPLE_SCENARIO_A,ScenarioContent).
+    amoc_api_helper:start_amoc(),
+    ScenarioContent = ?DUMMY_SCENARIO_MODULE(?SAMPLE_SCENARIO),
+    ok = amoc_scenario:install_module(?SAMPLE_SCENARIO, ScenarioContent).
 
 destroy_env() ->
-    ok.
+    amoc_api_helper:remove_module(?SAMPLE_SCENARIO),
+    amoc_api_helper:stop_amoc().
 
 
 -spec given_test_status_mocked(atom()) -> ok.
@@ -186,7 +183,7 @@ given_test_status_mocked(Value) ->
 -spec mock_amoc_dist_do() -> ok.
 mock_amoc_dist_do() ->
     ok = meck:new(amoc_dist, []),
-    Fun = fun(_,_,_) -> {ok,anything} end,
+    Fun = fun(_, _, _) -> {ok, anything} end,
     ok = meck:expect(amoc_dist, do, Fun).
 
 -spec cleanup_test_status_mock() -> ok.

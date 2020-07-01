@@ -16,7 +16,7 @@
 %% API for the local scenario execution, use amoc_dist module to run
 %% scenarios in a distributed environment
 %% ------------------------------------------------------------------
--spec do(scenario(), non_neg_integer(), amoc_config_scenario:config()) ->
+-spec do(scenario(), non_neg_integer(), amoc_config:settings()) ->
     ok | {error, term()}.
 do(Scenario, Count, Settings) ->
     case amoc_cluster:set_master_node(node()) of

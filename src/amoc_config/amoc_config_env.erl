@@ -2,22 +2,27 @@
 %% Copyright 2020 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
+%% This module can be used directly only for the readonly env init parameters.
+%% do not use it for the scenarios/helpers configuration, amoc_config module
+%% must be used instead! This allows to provide configuration via REST API in
+%% a JSON format
+%%==============================================================================
 -module(amoc_config_env).
 
--export([get/1, get/2, parse_value/1]).
+-export([get/2, get/3, parse_value/1, find_all_vars/1]).
 
 -include_lib("kernel/include/logger.hrl").
 
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec get(amoc_config:name()) -> amoc_config:value().
-get(Name) ->
-    get(Name, undefined).
+-spec get(atom(), amoc_config:name()) -> amoc_config:value().
+get(AppName, Name) ->
+    get(AppName, Name, undefined).
 
--spec get(amoc_config:name(), amoc_config:value()) -> amoc_config:value().
-get(Name, Default) when is_atom(Name) ->
-    DefValue = application:get_env(amoc, Name, Default),
+-spec get(atom(), amoc_config:name(), amoc_config:value()) -> amoc_config:value().
+get(AppName, Name, Default) when is_atom(Name) ->
+    DefValue = application:get_env(AppName, Name, Default),
     get_os_env(Name, DefValue).
 
 -spec parse_value(string() | binary()) -> {ok, amoc_config:value()} | {error, any()}.
@@ -30,6 +35,13 @@ parse_value(String) when is_list(String) ->
     catch
         _:E -> {error, E}
     end.
+
+-spec find_all_vars(atom()) -> [any()].
+find_all_vars(Name) ->
+    AllValues = [application:get_env(App, Name)
+                 || {App, _, _} <- application:loaded_applications()],
+    [Value || {ok, Value} <- AllValues].
+
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
