@@ -1,4 +1,4 @@
-.PHONY: all rel compile clean ct test integration_test dialyzer xref console
+.PHONY: all rel compile clean ct test integration_test dialyzer xref console lint
 
 REBAR = ./rebar3
 
@@ -12,7 +12,7 @@ rel:
 	$(REBAR) as prod tar
 
 compile:
-	$(REBAR) compile
+	$(REBAR) as prod compile
 
 clean:
 	$(REBAR) clean
@@ -21,7 +21,7 @@ ct:
 	rm -rf priv/scenarios_ebin/*.beam
 	$(REBAR) ct --verbose $(SUITE_OPTS)
 
-test: compile ct
+test: compile xref lint dialyzer ct
 
 integration_test:
 	./integration_test/cleanup_containers.sh
@@ -46,3 +46,6 @@ xref:
 
 console:
 	$(REBAR) shell
+
+lint:
+	$(REBAR) as elvis lint
