@@ -46,9 +46,11 @@ change_rate(Name, Rate, Interval) ->
     amoc_throttle_controller:change_rate(Name, Rate, Interval).
 
 -spec change_rate_gradually(name(), pos_integer(), pos_integer(),
-                            non_neg_integer(), pos_integer(), pos_integer()) -> ok | {error, any()}.
+                            non_neg_integer(), pos_integer(), pos_integer()) ->
+    ok | {error, any()}.
 change_rate_gradually(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps) ->
-    amoc_throttle_controller:change_rate_gradually(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps).
+    amoc_throttle_controller:change_rate_gradually(Name, LowRate, HighRate, RateInterval,
+                                                   StepInterval, NoOfSteps).
 
 -spec run(name(), fun(()-> any())) -> ok | {error, any()}.
 run(Name, Fn) ->

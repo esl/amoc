@@ -166,18 +166,18 @@ nothing_after_tag(History, Tag) ->
     ?assertNotMatch([], CallsWithTag, {tag, Tag}),
     CallsWithTag.
 
-check_item_calls(CallsHistory, {all, Actions}, Tag, NumberOfUsers) ->
-    check_item_calls(CallsHistory, {NumberOfUsers + 1, Actions}, Tag, NumberOfUsers);
-check_item_calls(CallsHistory, {N, Action}, Tag, NumberOfUsers) when is_function(Action) ->
-    check_item_calls(CallsHistory, {N, [Action]}, Tag, NumberOfUsers);
-check_item_calls(CallsHistory, {N, Actions}, Tag, NumberOfUsers) ->
-    check_filtered_calls(filter_history(CallsHistory, Tag), {N, Actions}, NumberOfUsers, 1).
+check_item_calls(CallsHistory, {all, Actions}, Tag, NoOfUsers) ->
+    check_item_calls(CallsHistory, {NoOfUsers + 1, Actions}, Tag, NoOfUsers);
+check_item_calls(CallsHistory, {N, Action}, Tag, NoOfUsers) when is_function(Action) ->
+    check_item_calls(CallsHistory, {N, [Action]}, Tag, NoOfUsers);
+check_item_calls(CallsHistory, {N, Actions}, Tag, NoOfUsers) ->
+    check_filtered_calls(filter_history(CallsHistory, Tag), {N, Actions}, NoOfUsers, 1).
 
-check_filtered_calls(CallsHistory, {N, Actions}, NumberOfUsers, StartFrom) when N =< NumberOfUsers ->
+check_filtered_calls(CallsHistory, {N, Actions}, NoOfUsers, StartFrom) when N =< NoOfUsers ->
     {{coordinate, N}, NewCallsHistory} = check_actions(CallsHistory, Actions, N, StartFrom),
-    check_filtered_calls(NewCallsHistory, {N, Actions}, NumberOfUsers - N, StartFrom + N);
-check_filtered_calls(CallsHistory, {_, Actions}, NumberOfUsers, StartFrom) ->
-    {{E, NumberOfUsers}, []} = check_actions(CallsHistory, Actions, NumberOfUsers, StartFrom),
+    check_filtered_calls(NewCallsHistory, {N, Actions}, NoOfUsers - N, StartFrom + N);
+check_filtered_calls(CallsHistory, {_, Actions}, NoOfUsers, StartFrom) ->
+    {{E, NoOfUsers}, []} = check_actions(CallsHistory, Actions, NoOfUsers, StartFrom),
     E.
 
 filter_history(CallsHistory, Tag) ->
@@ -190,7 +190,8 @@ check_actions(Event, CallsHistory, [], _N, _StartFrom) ->
     {Event, CallsHistory};
 check_actions(Event, [{_, f_1, [Event]} | CT], [F | FT], N, StartFrom) when is_function(F, 1) ->
     check_actions(Event, CT, FT, N, StartFrom);
-check_actions(Event, [{_, f_2, [Event, Args]} | CT], [F | FT], N, StartFrom) when is_function(F, 2) ->
+check_actions(Event, [{_, f_2, [Event, Args]} | CT], [F | FT],
+              N, StartFrom) when is_function(F, 2) ->
     ?assertEqual(lists:sort(Args), seq(StartFrom, N)),
     check_actions(Event, CT, FT, N, StartFrom);
 check_actions(Event, CallsHistory, [F | FT], N, StartFrom) when is_function(F, 3) ->

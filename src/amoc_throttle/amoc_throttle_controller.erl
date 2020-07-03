@@ -52,7 +52,8 @@ start_link() ->
     pg2:start(),
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec(ensure_throttle_processes_started(name(), non_neg_integer(), non_neg_integer(), pos_integer()) ->
+-spec(ensure_throttle_processes_started(name(), non_neg_integer(),
+                                        non_neg_integer(), pos_integer()) ->
     {ok, started_throttle_processes} |
     {ok, throttle_processes_already_started} |
     {error, any()}).
@@ -91,9 +92,11 @@ change_rate(Name, Rate, Interval) ->
     gen_server:call(?MASTER_SERVER, {change_rate, Name, Rate, Interval}).
 
 -spec change_rate_gradually(name(), pos_integer(), pos_integer(),
-                            non_neg_integer(), pos_integer(), pos_integer()) -> ok | {error, any()}.
+                            non_neg_integer(), pos_integer(), pos_integer()) ->
+    ok | {error, any()}.
 change_rate_gradually(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps) ->
-    gen_server:call(?MASTER_SERVER, {change_rate_gradually, Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps}).
+    gen_server:call(?MASTER_SERVER, {change_rate_gradually, Name, LowRate, HighRate,
+                                     RateInterval, StepInterval, NoOfSteps}).
 
 -spec stop(name()) -> ok | {error, any()}.
 stop(Name) ->
@@ -124,7 +127,8 @@ init([]) ->
                   From :: {pid(), Tag :: term()}, state()) ->
                      {reply, ok, state()} |
                      {reply, {error, any()}, state()};
-                 ({change_rate_gradually, name(), pos_integer(), pos_integer(), non_neg_integer(), pos_integer(), pos_integer()},
+                 ({change_rate_gradually, name(), pos_integer(), pos_integer(), non_neg_integer(),
+                   pos_integer(), pos_integer()},
                   From :: {pid(), Tag :: term()}, state()) ->
                      {reply, ok, state()} |
                      {reply, {error, any()}, state()}.
@@ -133,7 +137,8 @@ handle_call({start_processes, Name, Rate, Interval, NoOfProcesses}, _From, State
         {error, {no_such_group, Name}} ->
             RealNoOfProcesses = start_processes(Name, Rate, Interval, NoOfProcesses),
             {reply, {ok, started},
-             State#{Name => #throttle_info{rate = Rate, interval = Interval, no_of_procs = RealNoOfProcesses, active = true}}};
+             State#{Name => #throttle_info{rate = Rate, interval = Interval, active = true,
+                                           no_of_procs = RealNoOfProcesses}}};
         Group when is_list(Group) ->
             ExpectedNoOfProcesses = min(Rate, NoOfProcesses),
             case length(Group) of
@@ -162,11 +167,14 @@ handle_call({change_rate, Name, Rate, Interval}, _From, State) ->
             {reply, ok, State#{Name => UpdatedInfo}};
         Error -> {reply, Error, State}
     end;
-handle_call({change_rate_gradually, Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps}, _From, State) ->
+handle_call({change_rate_gradually, Name, LowRate, HighRate,
+             RateInterval, StepInterval, NoOfSteps},
+            _From, State) ->
     Info = maps:get(Name, State),
     case Info#throttle_info.change_plan of
         undefined ->
-            NewInfo = start_gradual_rate_change(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps, Info),
+            NewInfo = start_gradual_rate_change(Name, LowRate, HighRate, RateInterval,
+                                                StepInterval, NoOfSteps, Info),
             {reply, ok, State#{Name => NewInfo}};
         _ -> {reply, {error, cannot_change_rate}, State}
     end;
@@ -268,7 +276,8 @@ get_throttle_process(Name) ->
             {ok, lists:nth(N, List)}
     end.
 
--spec maybe_change_rate(name(), pos_integer(), non_neg_integer(), throttle_info()) -> {ok, non_neg_integer()} | {error, any()}.
+-spec maybe_change_rate(name(), pos_integer(), non_neg_integer(), throttle_info()) ->
+    {ok, non_neg_integer()} | {error, any()}.
 maybe_change_rate(Name, Rate, Interval, Info) ->
     CurrentRatePerMin = rate_per_minute(Info#throttle_info.rate, Info#throttle_info.interval),
     ReqRatePerMin = rate_per_minute(Rate, Interval),
@@ -278,7 +287,8 @@ maybe_change_rate(Name, Rate, Interval, Info) ->
         _ -> {error, cannot_change_rate}
     end.
 
--spec do_change_rate(name(), pos_integer(), non_neg_integer()) -> {ok, non_neg_integer()} | {error, any()}.
+-spec do_change_rate(name(), pos_integer(), non_neg_integer()) ->
+    {ok, non_neg_integer()} | {error, any()}.
 do_change_rate(Name, Rate, Interval) ->
     case pg2:get_members(Name) of
         {error, Err} -> {error, Err};
@@ -289,8 +299,9 @@ do_change_rate(Name, Rate, Interval) ->
             {ok, RatePerMinute}
     end.
 
--spec start_gradual_rate_change(name(), pos_integer(), pos_integer(), non_neg_integer(), pos_integer(), pos_integer(),
-                                throttle_info()) -> throttle_info().
+-spec start_gradual_rate_change(name(), pos_integer(), pos_integer(), non_neg_integer(),
+                                pos_integer(), pos_integer(), throttle_info()) ->
+    throttle_info().
 start_gradual_rate_change(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps, Info) ->
     {ok, LowRate} = do_change_rate(Name, LowRate, RateInterval),
     {ok, Timer} = timer:send_interval(StepInterval, {change_plan, Name}),

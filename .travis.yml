@@ -1,9 +1,11 @@
 sudo: false
 
 language: erlang
+
 otp_release:
     - 22.3
     - 21.3
+
 env:
     - TEST_MODE=regular
     - TEST_MODE=integration
@@ -12,14 +14,8 @@ branches:
     only:
         - master
 
-addons:
-    apt:
-        packages:
-            - libexpat1-dev
-
-install: make compile
 script:
-    - if [ 'regular' = $TEST_MODE ]; then make test dialyzer xref; fi
+    - if [ 'regular' = $TEST_MODE ]; then make test; fi
     - if [ 'integration' = $TEST_MODE ]; then make integration_test; fi
 
 cache:
