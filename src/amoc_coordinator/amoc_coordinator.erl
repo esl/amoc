@@ -114,7 +114,14 @@ reset(Name) ->
 -spec init({timeout, atom(), coordination_timeout_in_sec()} | normalized_coordination_item()) ->
     {ok, state()}.
 init({timeout, Name, Timeout}) ->
-    Pid = spawn(fun() -> timeout_fn(Name, 1000 * Timeout, infinity) end),
+    Pid = spawn(fun() ->
+                    case Timeout of
+                        infinity ->
+                            timeout_fn(Name, infinity, infinity);
+                        Int when is_integer(Int), Int > 0 ->
+                            timeout_fn(Name, 1000 * Timeout, infinity)
+                    end
+                end),
     {ok, {timeout, Pid}};
 init(CoordinationItem) ->
     {ok, Pid} = amoc_coordinator_worker:start_link(CoordinationItem),
