@@ -5,9 +5,7 @@
 # Fails if this script runs for too long with the reason "Killed by timeout".
 #
 # Usage example:
-# ./tools/wait_for_healthcheck.sh mongooseim-riak
-# or
-# ./tools/wait_for_healthcheck.sh "$CONTAINER"
+# ./tools/wait_for_healthcheck.sh <container_name>
 #
 # TIMEOUT argument documentation
 # ------------------------------
@@ -17,7 +15,7 @@
 # number of seconds we wait.
 #
 # with 5 seconds timeout:
-# TIMEOUT=5 ./tools/wait_for_healthcheck.sh "$CONTAINER"
+# TIMEOUT=5 ./tools/wait_for_healthcheck.sh <container_name>
 #
 # If call to docker daemon gets blocked for a long time
 # (for example, if docker daemon is down),
@@ -26,32 +24,29 @@
 # If "docker inspect" takes some time to execute, than TIMEOUT does not work
 # as expected.
 #
-# This command always fails:
-# TIMEOUT=0 ./tools/wait_for_healthcheck.sh "$CONTAINER"
-#
 # This command would try to get healthcheck status once:
-# TIMEOUT=1 ./tools/wait_for_healthcheck.sh "$CONTAINER"
+# TIMEOUT=0 ./tools/wait_for_healthcheck.sh <container_name>
 
 set -e
 
 if [ "$#" -ne 1 ]; then
     exit "Illegal number of parameters"
 fi
-CONTAINER="$1"
+container="$1"
 
 # Default timeout is 1 minute
-TIMEOUT="${TIMEOUT:-60}"
+timeout="${TIMEOUT:-60}"
 
 # Gets a health check of a container
 # Usage example:
-# health_status "$CONTAINER"
+# health_status <container_name>
 function health_status
 {
     docker inspect --format '{{json .State.Health.Status }}' "$1"
 }
 
-for i in $(seq 0 ${TIMEOUT}); do
-    if [ $(health_status "$CONTAINER")"" = "\"healthy\"" ]; then
+for i in $(seq 0 "${timeout}"); do
+    if [ $(health_status "$container")"" = "\"healthy\"" ]; then
         echo -e "\nWaiting is done after $i seconds"
         exit 0
     fi
