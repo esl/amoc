@@ -1,20 +1,12 @@
 FROM phusion/baseimage as amoc-build
-MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
 ARG otp_vsn=22.3.4-1
-
-RUN useradd -ms /bin/bash amoc
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         git \
         make \
-        gcc \
-        g++ \
-        clang \
-        libexpat1-dev \
-        wget \
-        iproute2 && \
+        wget && \
     wget https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
     dpkg -i erlang-solutions_1.0_all.deb && \
     apt-get update && \
