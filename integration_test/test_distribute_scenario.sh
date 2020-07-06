@@ -4,10 +4,6 @@ source "$(dirname "$0")/helper.sh"
 enable_strict_mode
 cd "${git_root}/integration_test"
 
-# The purpose of this test is to check if scenarios installed on
-# one node of Amoc cluster are distributed to all nodes
-
-# First run test_docker_image.sh to start Amoc cluster, then run this test
 scenario_name="dummy_scenario"
 
 #############################

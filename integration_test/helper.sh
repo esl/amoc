@@ -33,6 +33,14 @@ function contain() {
 ######################
 ## docker functions ##
 ######################
+function start_graphite_container() {
+    docker network create "${docker_network}"
+    docker run --rm -d --name=graphite \
+               -p 2003:2003 -p 8080:80 \
+               --network="$docker_network" \
+               graphiteapp/graphite-statsd:1.1.7-2
+}
+
 function amoc_container_port() {
     local container="$1"
     if [[ "$container" =~ ^amoc-[0-9]$ ]]; then
@@ -47,11 +55,12 @@ function start_amoc_container() {
     shift 1
     local port="$(amoc_container_port "$name")"
     docker run --rm -t -d --name "$name" -h "$name" \
-        --network "$docker_network" \
-        --health-cmd="/home/amoc/amoc/bin/amoc status" \
-        -p "$port:4000" \
-        "$@" \
-        amoc:latest
+               --network "$docker_network" \
+               -e AMOC_GRAPHITE_HOST='"graphite"' \
+               --health-cmd="/home/amoc/amoc/bin/amoc status" \
+               -p "$port:4000" \
+               "$@" \
+               amoc:latest
 }
 
 function amoc_eval() {

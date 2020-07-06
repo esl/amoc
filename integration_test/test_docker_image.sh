@@ -7,7 +7,7 @@ cd "${git_root}/integration_test"
 create_code_path test1
 create_code_path test2
 
-docker network create "${docker_network}"
+start_graphite_container
 
 amoc_nodes="['amoc@amoc-1', 'amoc@amoc-2']"
 
@@ -28,3 +28,8 @@ amoc_eval amoc-3 "nodes()" | contain amoc-1 amoc-2
 
 amoc_eval amoc-1 "amoc_scenario:does_scenario_exist(test1)" | contain true
 amoc_eval amoc-1 "amoc_scenario:does_scenario_exist(test2)" | contain true
+
+graphite_query="target=summarize(*.amoc.users.size,'1hour','max')&from=-1h&format=json"
+result="$(curl -s "http://localhost:8080/render/?${graphite_query}")"
+
+echo "$result" | contain {"amoc-1","amoc-2","amoc-3"}".amoc.users.size"

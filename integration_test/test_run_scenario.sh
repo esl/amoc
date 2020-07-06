@@ -10,7 +10,7 @@ run_scenario() {
     local port="$(amoc_container_port "$1")"
     local json_body='{ "users": '"$3"' , "settings" : { "test" : "<<\"test_value\">>" } }'
     curl -X PATCH --header 'Content-Type: application/json' --header 'Accept: application/json' \
-         -d "$json_body" "http://localhost:${port}/scenarios/$2"
+         -s -d "$json_body" "http://localhost:${port}/scenarios/$2"
 }
 
 result="$(run_scenario amoc-1 dummy_scenario 10)"
