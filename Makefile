@@ -45,7 +45,9 @@ xref:
 	$(REBAR) as prod xref
 
 console:
-	$(REBAR) shell
+	@echo "tests can be executed manually using ct:run/1 function:\n" \
+	      '   ct:run("test").'
+	$(REBAR) as test shell
 
 lint:
 	$(REBAR) as elvis lint
