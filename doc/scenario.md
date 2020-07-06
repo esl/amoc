@@ -1,7 +1,5 @@
 ## Developing a scenario
 
-All files related to scenarios should be placed in the `scenarios` directory.
-
 A scenario specification is an [Erlang](https://www.erlang.org/) module that implements
 the `amoc_scenario` behaviour.
 It has to export two callback functions:
