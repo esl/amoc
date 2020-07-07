@@ -1,5 +1,7 @@
 ## Integration tests
 
+all shell scripts should conform to this [code style](https://google.github.io/styleguide/shellguide.html)
+
 ### 1. Build docker containers
 
 In amoc dirctory run:

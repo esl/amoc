@@ -182,7 +182,7 @@ given_test_status_mocked(Value) ->
 
 -spec mock_amoc_dist_do() -> ok.
 mock_amoc_dist_do() ->
-    ok = meck:new(amoc_dist, []),
+    ok = meck:new(amoc_dist, [no_link]),
     Fun = fun(_, _, _) -> {ok, anything} end,
     ok = meck:expect(amoc_dist, do, Fun).
 

@@ -1,55 +1,35 @@
 #!/bin/bash
 
-#the below settings are based on:
-#http://redsymbol.net/articles/unofficial-bash-strict-mode/
+source "$(dirname "$0")/helper.sh"
+enable_strict_mode
+cd "${git_root}/integration_test"
 
-cd `dirname "$0"`
+create_code_path test1
+create_code_path test2
 
-set -euo pipefail
-IFS=$'\n\t'
+start_graphite_container
 
-./create_code_path.sh test1
-./create_code_path.sh test2
+amoc_nodes="['amoc@amoc-1', 'amoc@amoc-2']"
 
-NETWORK=amoc-test-network
-PATH_TO_EXEC=/home/amoc/amoc/bin/amoc
-docker network create ${NETWORK}
+start_amoc_container amoc-1 -e AMOC_NODES="${amoc_nodes}" \
+    -e AMOC_EXTRA_CODE_PATHS='["/test/test1", "/test/test2"]'\
+    -v "${PWD}/tmp:/test:ro"
 
-AMOC_NODES="['amoc@amoc-1','amoc@amoc-2']"
+start_amoc_container amoc-2 -e AMOC_NODES="${amoc_nodes}"
+start_amoc_container amoc-3  -e AMOC_NODES="${amoc_nodes}"
 
-docker run --rm -t -d --name amoc-1 -h amoc-1 \
-    --network ${NETWORK} \
-    -v "${PWD}/tmp:/test:ro" \
-    -e AMOC_NODES=${AMOC_NODES} \
-    -e AMOC_EXTRA_CODE_PATHS='["/test/test1", "/test/test2"]' \
-    --health-cmd="/home/amoc/amoc/bin/amoc status" \
-    -p 8081:4000 \
-    amoc:latest
+wait_for_healthcheck amoc-1
+wait_for_healthcheck amoc-2
+wait_for_healthcheck amoc-3
 
-docker run --rm -t -d --name amoc-2 -h amoc-2 \
-    --network ${NETWORK} \
-    -e AMOC_NODES=${AMOC_NODES} \
-    --health-cmd="/home/amoc/amoc/bin/amoc status" \
-    -p 8082:4000 \
-    amoc:latest
+amoc_eval amoc-1 "nodes()" | contain amoc-2 amoc-3
+amoc_eval amoc-2 "nodes()" | contain amoc-1 amoc-3
+amoc_eval amoc-3 "nodes()" | contain amoc-1 amoc-2
 
-docker run --rm -t -d --name amoc-3 -h amoc-3 \
-    --network ${NETWORK} \
-    -e AMOC_NODES=${AMOC_NODES} \
-    --health-cmd="/home/amoc/amoc/bin/amoc status" \
-    -p 8083:4000 \
-    amoc:latest
+amoc_eval amoc-1 "amoc_scenario:does_scenario_exist(test1)" | contain true
+amoc_eval amoc-1 "amoc_scenario:does_scenario_exist(test2)" | contain true
 
-./wait_for_healthcheck.sh amoc-1
-./wait_for_healthcheck.sh amoc-2
-./wait_for_healthcheck.sh amoc-3
+graphite_query="target=summarize(*.amoc.users.size,'1hour','max')&from=-1h&format=json"
+result="$(curl -s "http://localhost:8080/render/?${graphite_query}")"
 
-docker exec -it amoc-1 ${PATH_TO_EXEC} eval "nodes()" | grep amoc-2 | grep amoc-3
-docker exec -it amoc-2 ${PATH_TO_EXEC} eval "nodes()" | grep amoc-1 | grep amoc-3
-docker exec -it amoc-3 ${PATH_TO_EXEC} eval "nodes()" | grep amoc-1 | grep amoc-2
-
-
-docker exec -it amoc-1 ${PATH_TO_EXEC} eval "amoc_scenario:does_scenario_exist(test1)" | grep true
-docker exec -it amoc-1 ${PATH_TO_EXEC} eval "amoc_scenario:does_scenario_exist(test2)" | grep true
-
-
+echo "$result" | contain {"amoc-1","amoc-2","amoc-3"}".amoc.users.size"

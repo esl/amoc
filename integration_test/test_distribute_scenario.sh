@@ -1,67 +1,48 @@
 #!/bin/bash
 
-#the below settings are based on:
-#http://redsymbol.net/articles/unofficial-bash-strict-mode/
-set -euo pipefail
-IFS=$'\n\t'
+source "$(dirname "$0")/helper.sh"
+enable_strict_mode
+cd "${git_root}/integration_test"
 
-cd `dirname "$0"`/../
+scenario_name="dummy_scenario"
 
-# The purpose of this test is to check if scenario installed on
-# one node of Amoc cluster will be distributed to all nodes
-
-# First run test_docker_image.sh to start two containers with Amoc, then run this test
-
-get_scenarios() {
-    curl -s -S -H "Content-Type: application/json" -H "Accept: application/json" --request GET http://localhost:${1}/scenarios
+#############################
+## amoc REST API functions ##
+#############################
+function get_scenarios() {
+    local port="$(amoc_container_port "$1")"
+    curl -s -S -H "Content-Type: application/json" -H "Accept: application/json" \
+         --request GET "http://localhost:${port}/scenarios"
 }
 
-list_scenarios_by_port () {
-    local PORT=$1
-    local RESULT=`get_scenarios "$PORT"`
-    echo "Scenarios on node with port: ${PORT}: ${RESULT}"
+function list_scenarios_by_port() {
+    local result="$(get_scenarios "$1")"
+    echo "Scenarios on the ${1} node: ${result}"
 }
 
-ensure_scenarios_installed () {
-    local PORT=$1
+function ensure_scenarios_installed() {
+    local result="$(get_scenarios "$1")"
+    echo "Scenarios on the ${1} node: ${result}"
     shift 1
-    local SCENARIO_NAME
-    local RESULT=`get_scenarios "$PORT"`
-    echo "Scenarios on node with port: ${PORT}: ${RESULT}"
-    for SCENARIO_NAME in "$@"; do
-        if echo ${RESULT} | grep -q ${SCENARIO_NAME} ; then
-            echo "Scenario '${SCENARIO_NAME}' installed"
-            continue
-        else
-            echo "Scenario '${SCENARIO_NAME}' not installed"
-            return -1
-        fi
-    done
+    echo "$result" | contain "$@"
 }
 
-PORT1=8081
-PORT2=8082
-PORT3=8083
+function upload_module() {
+    local port="$(amoc_container_port "$1")"
+    local filename="$2"
+    curl -s -H "Content-Type: text/plain" -T "$filename" \
+         "http://localhost:${port}/scenarios/upload"
+}
 
+list_scenarios_by_port amoc-1
+list_scenarios_by_port amoc-2
+list_scenarios_by_port amoc-3
 
-SCENARIO_NAME="dummy_scenario"
+echo "Installing scenario and helper module on the amoc-1 node"
+scenario_put="$(upload_module amoc-1 "${scenario_name}.erl")"
+echo "Response: ${scenario_put}"
+helper_put="$(upload_module amoc-1 "dummy_helper.erl")"
+echo "Response: ${helper_put}"
 
-list_scenarios_by_port ${PORT1}
-list_scenarios_by_port ${PORT2}
-list_scenarios_by_port ${PORT3}
-
-echo "Installing scenario: 'dummy_scenario.erl' on node amoc-1 (port ${PORT1})"
-
-SCENARIO_PUT=$(curl -s -H "Content-Type: text/plain" \
-                 -T integration_test/dummy_scenario.erl \
-                 'http://localhost:8081/scenarios/upload')
-echo "Response: ${SCENARIO_PUT}"
-
-HELPER_PUT=$(curl -s -H "Content-Type: text/plain" \
-                 -T integration_test/dummy_helper.erl \
-                 'http://localhost:8081/scenarios/upload')
-echo "Response: ${HELPER_PUT}"
-
-ensure_scenarios_installed ${PORT2} ${SCENARIO_NAME}
-ensure_scenarios_installed ${PORT3} ${SCENARIO_NAME}
-
+ensure_scenarios_installed amoc-2 ${scenario_name}
+ensure_scenarios_installed amoc-3 ${scenario_name}
