@@ -26,12 +26,6 @@ Amoc supports the following generic configuration parameters:
     * default value - empty list (`[]`)
     * os env example: `AMOC_EXTRA_CODE_PATHS='["/some/path", "/another/path"]'`
     * app.config example:  `{extra_code_paths, ["/some/path", "/another/path"]}`
-    
-* ``config_verification_modules`` - a list of modules with the configuration verification function 
-(see Scenario Configuration section):
-    * default value - empty list (`[]`)
-    * os env example: `AMOC_CONFIG_VERIFICATION_MODULES="[some_module, another_module]"`
-    * app.config example:  `{config_verification_modules, [some_module, another_module]}`
 
 In addition to that, `amoc_metrics` support the following configuration parameters:
 
@@ -39,12 +33,6 @@ In addition to that, `amoc_metrics` support the following configuration paramete
     * default value - `exometer_report_graphite`
     * os env example: `AMOC_METRICS_REPORTER="exometer_report_graphite"`
     * app.config example:  `{metrics_reporter, exometer_report_graphite}`
-    
-* ``metrics_preconfigured`` - preconfigured amoc metrics, list of {Type, Name} tuples, 
-where parameters passed to `amoc_metrics:init/2` are:
-    * default value - empty list (`[]`)
-    * os env example: `AMOC_METRICS_PRECONFIGURED="[{gauge, some_metric}, {times, another_metric}]"`
-    * app.config example:  `{metrics_preconfigured, [{gauge, some_metric}, {times, another_metric}]}`
 
 If the ``metrics_reporter`` is not initialised, it's possible to configure a Graphite reporter
 using the following environment variables:
@@ -63,7 +51,12 @@ using the following environment variables:
     * default value - `net_adm:localhost()`
     * os env example: `AMOC_GRAPHITE_PREFIX='"amoc"'`
     * app.config example:  `{graphite_prefix, "amoc"}`    
-       
+
+In order to initialise some preconfigured metrics, other applications can declare
+the `predefined_metrics` environment variable (in their own `*.app.src` file):  
+```
+{predefined_metrics, [{gauge, some_metric}, {times, another_metric}]}
+```
 
 In the same manner you can also define your own entries to configure the scenario.
 
