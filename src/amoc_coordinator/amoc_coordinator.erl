@@ -119,7 +119,7 @@ init({timeout, Name, Timeout}) ->
                         infinity ->
                             timeout_fn(Name, infinity, infinity);
                         Int when is_integer(Int), Int > 0 ->
-                            timeout_fn(Name, 1000 * Timeout, infinity)
+                            timeout_fn(Name, timer:seconds(Timeout), infinity)
                     end
                 end),
     {ok, {timeout, Pid}};

@@ -38,7 +38,7 @@ list_scenarios_by_port amoc-1
 list_scenarios_by_port amoc-2
 list_scenarios_by_port amoc-3
 
-echo "Installing scenario and heper module on the amoc-1 node"
+echo "Installing scenario and helper module on the amoc-1 node"
 scenario_put="$(upload_module amoc-1 "${scenario_name}.erl")"
 echo "Response: ${scenario_put}"
 helper_put="$(upload_module amoc-1 "dummy_helper.erl")"
