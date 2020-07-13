@@ -16,7 +16,7 @@ start_amoc_container amoc-1 -e AMOC_NODES="${amoc_nodes}" \
     -v "${PWD}/tmp:/test:ro"
 
 start_amoc_container amoc-2 -e AMOC_NODES="${amoc_nodes}"
-start_amoc_container amoc-3  -e AMOC_NODES="${amoc_nodes}"
+start_amoc_container amoc-3 -e AMOC_NODES="${amoc_nodes}"
 
 wait_for_healthcheck amoc-1
 wait_for_healthcheck amoc-2
