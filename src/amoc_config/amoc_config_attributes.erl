@@ -111,15 +111,16 @@ check_update_method(Attr) ->
     end.
 
 -spec make_module_parameter(#{name := name(),
+                              description := string(),
                               default_value := value(),
                               verification := maybe_verification_fun(),
                               update := maybe_update_fun(),
                               any() => any()},
                             module()) ->
     {ok, module_parameter()}.
-make_module_parameter(#{name := Name, default_value := Value, update := UpdateFn,
-                        verification := VerificationFn}, Module) ->
-    {ok, #module_parameter{name = Name, mod = Module, value = Value,
+make_module_parameter(#{name := Name, description := Description, default_value := Value,
+                        verification := VerificationFn, update := UpdateFn}, Module) ->
+    {ok, #module_parameter{name = Name, mod = Module, description = Description, value = Value,
                            verification_fn = VerificationFn, update_fn = UpdateFn}}.
 
 -spec verification_fn(maybe_verification_method()) ->
