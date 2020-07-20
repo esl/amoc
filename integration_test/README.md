@@ -21,9 +21,9 @@ will wait until healthcheck is successful.
 
 `./integration_test/test_distribute_scenario.sh`
  
-This will install a sample `dummy_scenario.erl` on node `amoc-1`
-using curl and then verify that it was propagated to the other
-node in the cluster `amoc-2`.
+This will install a sample `dummy_scenario.erl` on the `amoc-1` node
+using curl and then it will verify that it is propagated to the other
+node in the cluster, `amoc-2`.
 
 ### 4. Run the scenario and verify that it finishes without errors
 
@@ -37,7 +37,7 @@ To stop containers and remove Amoc image run:
 
 ## Demo cluster
 
-To start the demo cluster you can run the next commands:
+To start the demo cluster you can run these commands:
 
 ```
 ./integration_test/build_docker_image.sh
@@ -45,7 +45,7 @@ To start the demo cluster you can run the next commands:
 ```
 
 When the demo cluster is up and running you can access its
-different components using the next addresses:
+different components using the following addresses:
  * Amoc Swagger UI:
     * [amoc-1](http://localhost:8081/api-docs/)
     * [amoc-2](http://localhost:8082/api-docs/)
@@ -53,10 +53,10 @@ different components using the next addresses:
  * [graphite](http://localhost:8080/) web interface
  * [grafana](http://localhost:3000/) - default username and password is `admin`/`admin`
 
-To check the last `amoc-1` logs you can run the next command:
+To check the most recent `amoc-1` logs you can run this command:
 
 `docker exec amoc-1 tail /home/amoc/amoc/log/erlang.log`
 
-To attach to `amoc-1` node use the next command:
+To attach to `amoc-1` node use the following command:
 
 `docker exec -it amoc-1 /home/amoc/amoc/bin/amoc remote_console`
