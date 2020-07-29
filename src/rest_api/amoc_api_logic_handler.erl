@@ -44,6 +44,16 @@ handle_request('ScenariosIdGet', _Req, #{id := ScenarioName}) ->
                 amoc_api_scenario_status:maybe_scenario_settings(Status, Scenario),
             {200, #{}, [{<<"scenario_status">>, BinStatus} | MaybeSettings]}
     end;
+handle_request('ScenariosIdInfoGet', _Req, #{id := ScenarioName}) ->
+    case amoc_api_scenario_status:test_status(ScenarioName) of
+        {doesnt_exist, _} ->
+            {404, #{}, #{}};
+        {_Status, Scenario} ->
+            EDoc = amoc_api_scenario_status:get_edoc(Scenario),
+            MaybeParams =
+                amoc_api_scenario_status:maybe_scenario_params(Scenario),
+            {200, #{}, [{<<"doc">>, EDoc} | MaybeParams]}
+    end;
 handle_request('ScenariosIdPatch', _Req, #{'ScenarioExecution' := Body,
                                            id := ScenarioName}) ->
     Error = {200, #{}, [{<<"scenario">>, <<"error">>}]},

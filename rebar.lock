@@ -5,6 +5,7 @@
   0},
  {<<"cowboy">>,{pkg,<<"cowboy">>,<<"2.8.0">>},1},
  {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.9.1">>},2},
+ {<<"docsh">>,{pkg,<<"docsh">>,<<"0.7.2">>},0},
  {<<"exometer_core">>,
   {git,"https://github.com/esl/exometer_core.git",
        {ref,"979ff04bcabc276c122b47fb7e6b54fbded62576"}},
@@ -13,10 +14,12 @@
   {git,"https://github.com/esl/exometer_report_graphite.git",
        {ref,"264dd7bcbadbd7febcd43917302251286c88b681"}},
   0},
+ {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},2},
  {<<"hut">>,{pkg,<<"hut">>,<<"1.2.1">>},1},
  {<<"jesse">>,{pkg,<<"jesse">>,<<"1.5.5">>},1},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"2.11.0">>},1},
  {<<"parse_trans">>,{pkg,<<"parse_trans">>,<<"3.3.0">>},1},
+ {<<"providers">>,{pkg,<<"providers">>,<<"1.8.1">>},1},
  {<<"ranch">>,{pkg,<<"ranch">>,<<"1.7.1">>},2},
  {<<"rfc3339">>,
   {git,"https://github.com/talentdeficit/rfc3339.git",
@@ -26,9 +29,12 @@
 {pkg_hash,[
  {<<"cowboy">>, <<"F3DC62E35797ECD9AC1B50DB74611193C29815401E53BAC9A5C0577BD7BC667D">>},
  {<<"cowlib">>, <<"61A6C7C50CF07FDD24B2F45B89500BB93B6686579B069A89F88CB211E1125C78">>},
+ {<<"docsh">>, <<"F893D5317A0E14269DD7FE79CF95FB6B9BA23513DA0480EC6E77C73221CAE4F2">>},
+ {<<"getopt">>, <<"C73A9FA687B217F2FF79F68A3B637711BB1936E712B521D8CE466B29CBF7808A">>},
  {<<"hut">>, <<"08D46679523043424870723923971889E8A34D63B2F946A35B46CF921D1236E7">>},
  {<<"jesse">>, <<"ECFD2C1634C49052CA907B4DFDE1D1F44B7FD7862D933F4590807E42759B8072">>},
  {<<"jsx">>, <<"08154624050333919B4AC1B789667D5F4DB166DC50E190C4D778D1587F102EE0">>},
  {<<"parse_trans">>, <<"09765507A3C7590A784615CFD421D101AEC25098D50B89D7AA1D66646BC571C1">>},
+ {<<"providers">>, <<"70B4197869514344A8A60E2B2A4EF41CA03DEF43CFB1712ECF076A0F3C62F083">>},
  {<<"ranch">>, <<"6B1FAB51B49196860B733A49C07604465A47BDB78AA10C1C16A3D199F7F8C881">>}]}
 ].
