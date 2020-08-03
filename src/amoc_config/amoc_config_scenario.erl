@@ -13,7 +13,8 @@
 -include_lib("kernel/include/logger.hrl").
 -include("amoc_config.hrl").
 
--type module_configuration_map() :: #{name() => #{any() => any()}}.
+-type module_configuration_map() :: #{name() => #{value := any(),
+                                                  any() => any()}}.
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
@@ -142,7 +143,7 @@ store_scenario_config(Config) ->
 convert_to_config_map(Config) ->
     PropList = [{Name, parameter_to_map(P)}
                 || #module_parameter{name = Name} = P <- Config],
-    maps:from_list(PropList).
+    {ok, maps:from_list(PropList)}.
 
 parameter_to_map(#module_parameter{} = Param) ->
     RecordFields = record_info(fields, module_parameter),

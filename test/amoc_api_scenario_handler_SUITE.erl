@@ -37,9 +37,9 @@ all() ->
      patch_scenario_returns_200_when_request_ok_and_module_exists_w_settings
     ].
 
-init_per_testcase(Mod, Config)
-    when Mod =:= patch_scenario_returns_200_when_request_ok_and_module_exists;
-         Mod =:= patch_scenario_returns_200_when_request_ok_and_module_exists_w_settings ->
+init_per_testcase(TC, Config)
+    when TC =:= patch_scenario_returns_200_when_request_ok_and_module_exists;
+         TC =:= patch_scenario_returns_200_when_request_ok_and_module_exists_w_settings ->
     mock_amoc_dist_do(),
     create_env(Config),
     Config;
@@ -48,7 +48,9 @@ init_per_testcase(_, Config) ->
     create_env(Config),
     Config.
 
-end_per_testcase(patch_scenario_returns_200_when_request_ok_and_module_exists, _Config) ->
+end_per_testcase(TC, _Config)
+    when TC =:= patch_scenario_returns_200_when_request_ok_and_module_exists;
+         TC =:= patch_scenario_returns_200_when_request_ok_and_module_exists_w_settings ->
     ok = meck:unload(amoc_dist),
     destroy_env();
 end_per_testcase(_, _Config) ->
@@ -178,7 +180,9 @@ destroy_env() ->
 -spec given_test_status_mocked(atom()) -> ok.
 given_test_status_mocked(Value) ->
     meck:new(amoc_api_scenario_status, []),
-    meck:expect(amoc_api_scenario_status, test_status, fun(_) -> Value end).
+    meck:expect(amoc_api_scenario_status, test_status, fun(_) -> Value end),
+    meck:expect(amoc_api_scenario_status, maybe_scenario_settings,
+                fun(_, _) -> [] end).
 
 -spec mock_amoc_dist_do() -> ok.
 mock_amoc_dist_do() ->

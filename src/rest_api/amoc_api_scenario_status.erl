@@ -69,15 +69,15 @@ format(Value) ->
 
 -spec scenario_settings(status(), amoc:scenario()) -> amoc_config:settings().
 scenario_settings(loaded, Scenario) ->
-    ConfigMap = amoc_config_scenario:get_default_configuration(Scenario),
+    {ok, ConfigMap} = amoc_config_scenario:get_default_configuration(Scenario),
     [{Name, Value} || {Name, #{value := Value}} <- maps:to_list(ConfigMap)];
 scenario_settings(running, _Scenario) ->
-    ConfigMap = amoc_config_scenario:get_current_configuration(),
+    {ok, ConfigMap} = amoc_config_scenario:get_current_configuration(),
     [{Name, Value} || {Name, #{value := Value}} <- maps:to_list(ConfigMap)];
 scenario_settings(_, _Scenario) -> [].
 
 scenario_parameters(Scenario) ->
-    ConfigMap = amoc_config_scenario:get_default_configuration(Scenario),
+    {ok, ConfigMap} = amoc_config_scenario:get_default_configuration(Scenario),
     [{Name, maps:to_list(Info)} || {Name, Info} <- maps:to_list(ConfigMap)].
 
     -spec get_scenario(binary()) -> {ok, amoc:scenario()} | doesnt_exist.
