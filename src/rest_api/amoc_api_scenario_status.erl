@@ -42,7 +42,7 @@ test_status(ScenarioName) ->
 
 maybe_scenario_settings(Status, Scenario)->
     case scenario_settings(Status, Scenario) of
-        []->[];
+        [] -> [];
         Settings ->
             FormattedSettings = [{format(K), format(V)} || {K, V} <- Settings],
             [{<<"settings">>, FormattedSettings}]
@@ -50,7 +50,7 @@ maybe_scenario_settings(Status, Scenario)->
 
 maybe_scenario_params(Scenario)->
     case scenario_parameters(Scenario) of
-        []->[];
+        [] -> [];
         Parameters ->
             FormattedParameters = [{format(K), format_kv_list(V)}
                                    || {K, V} <- Parameters],
@@ -80,7 +80,7 @@ scenario_parameters(Scenario) ->
     {ok, ConfigMap} = amoc_config_scenario:get_default_configuration(Scenario),
     [{Name, maps:to_list(Info)} || {Name, Info} <- maps:to_list(ConfigMap)].
 
-    -spec get_scenario(binary()) -> {ok, amoc:scenario()} | doesnt_exist.
+-spec get_scenario(binary()) -> {ok, amoc:scenario()} | doesnt_exist.
 get_scenario(ScenarioName) ->
     try
         {ok, binary_to_existing_atom(ScenarioName, utf8)}
