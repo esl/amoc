@@ -6,11 +6,15 @@
 
 %% API
 -export([parse_scenario_settings/2,
-         update_settings/1]).
+         update_settings/1,
+         get_default_configuration/1,
+         get_current_configuration/0]).
 
 -include_lib("kernel/include/logger.hrl").
 -include("amoc_config.hrl").
 
+-type module_configuration_map() :: #{name() => #{value := any(),
+                                                  any() => any()}}.
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
@@ -42,6 +46,20 @@ update_settings(Settings) ->
         UnexpectedReturnValue ->
             {error, invalid_return_value, UnexpectedReturnValue}
     end.
+
+-spec get_default_configuration(module()) -> {ok, module_configuration_map()} | error().
+get_default_configuration(Module) ->
+    PipelineActions = [
+        {fun get_configuration/1, []},
+        {fun convert_to_config_map/1, []}],
+    amoc_config_utils:pipeline(PipelineActions, {ok, Module}).
+
+-spec get_current_configuration() -> {ok, module_configuration_map()}.
+get_current_configuration() ->
+    PipelineActions = [
+        {fun get_existing_configuration/0, []},
+        {fun convert_to_config_map/1, []}],
+    amoc_config_utils:pipeline(PipelineActions, ok).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -121,3 +139,19 @@ store_scenario_config(Config) ->
     [spawn(fun() -> apply(Fn, [Name, Value]) end)
      || #module_parameter{name = Name, value = Value, update_fn = Fn} <- Config],
     ok.
+
+convert_to_config_map(Config) ->
+    PropList = [{Name, parameter_to_map(P)}
+                || #module_parameter{name = Name} = P <- Config],
+    {ok, maps:from_list(PropList)}.
+
+parameter_to_map(#module_parameter{} = Param) ->
+    RecordFields = record_info(fields, module_parameter),
+    RecordSize = record_info(size, module_parameter),
+    FieldsWithPosition = lists:zip(lists:seq(2, RecordSize), RecordFields),
+    PropList = [{Field, element(Pos, Param)} || {Pos, Field} <- FieldsWithPosition,
+                                                filter_parameter_fields(Field)],
+    maps:from_list(PropList).
+
+filter_parameter_fields(name) -> false;
+filter_parameter_fields(_)    -> true.

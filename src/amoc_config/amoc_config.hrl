@@ -37,6 +37,7 @@
 -record(module_parameter, {name :: name(),
                            mod :: module(),
                            value :: value(),
+                           description :: string(),
                            verification_fn :: maybe_verification_fun(),
                            update_fn = read_only :: maybe_update_fun() | read_only}).
 

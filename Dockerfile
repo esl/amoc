@@ -1,14 +1,12 @@
-FROM phusion/baseimage as amoc-build
+FROM phusion/baseimage:18.04-1.0.0 as amoc-build
 
 ARG otp_vsn=22.3.4-1
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        git \
-        make \
-        wget && \
-    wget https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
-    dpkg -i erlang-solutions_1.0_all.deb && \
+                    git make wget gnupg && \
+    wget https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb && \
+    dpkg -i erlang-solutions_2.0_all.deb && \
     apt-get update && \
     apt-get install -y esl-erlang=1:${otp_vsn}
 
@@ -18,7 +16,7 @@ RUN cd amoc_build && \
     git clean -ffxd && \
     make rel
 
-FROM phusion/baseimage
+FROM phusion/baseimage:18.04-1.0.0
 MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
 RUN useradd -ms /bin/bash amoc
