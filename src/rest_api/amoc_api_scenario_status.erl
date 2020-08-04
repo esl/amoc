@@ -10,7 +10,7 @@
          get_edoc/1]).
 
 -type status() :: error | running | finished | loaded | doesnt_exist.
--type scenario_status() :: {status(), amoc:scenario()}.
+-type scenario_status() :: {status(), amoc:scenario() | invalid_scenario_name}.
 
 get_edoc(Scenario) ->
     case docsh_lib:get_docs(Scenario) of
