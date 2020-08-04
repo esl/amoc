@@ -17,11 +17,7 @@
          get_scenario_status_returns_404_when_scenario_not_exists/1,
          get_scenario_status_returns_running_when_scenario_is_running/1,
          get_scenario_status_returns_finished_when_scenario_is_ended/1,
-         get_scenario_status_returns_loaded_when_scenario_exists_but_not_running/1,
-         patch_scenario_returns_404_when_scenario_not_exists/1,
-         patch_scenario_returns_400_when_malformed_request/1,
-         patch_scenario_returns_200_when_request_ok_and_module_exists/1,
-         patch_scenario_returns_200_when_request_ok_and_module_exists_w_settings/1
+         get_scenario_status_returns_loaded_when_scenario_exists_but_not_running/1
         ]).
 
 
@@ -30,11 +26,7 @@ all() ->
      get_scenario_status_returns_404_when_scenario_not_exists,
      get_scenario_status_returns_running_when_scenario_is_running,
      get_scenario_status_returns_finished_when_scenario_is_ended,
-     get_scenario_status_returns_loaded_when_scenario_exists_but_not_running,
-     patch_scenario_returns_404_when_scenario_not_exists,
-     patch_scenario_returns_400_when_malformed_request,
-     patch_scenario_returns_200_when_request_ok_and_module_exists,
-     patch_scenario_returns_200_when_request_ok_and_module_exists_w_settings
+     get_scenario_status_returns_loaded_when_scenario_exists_but_not_running
     ].
 
 init_per_testcase(TC, Config)
@@ -95,75 +87,6 @@ get_scenario_status_returns_loaded_when_scenario_exists_but_not_running(_Config)
     ?assertMatch({[{<<"scenario_status">>, <<"loaded">>}]}, Body),
     %% cleanup
     cleanup_test_status_mock().
-
-patch_scenario_returns_404_when_scenario_not_exists(_Config) ->
-    %% given
-    RequestBody = jiffy:encode({[{users, 30}]}),
-    %% when
-    {CodeHttp, _Body} = amoc_api_helper:patch(
-                            ?SAMPLE_BAD_SCENARIO_PATH, RequestBody),
-    %% then
-    %% Maybe check Body, as answer format will be ready
-    ?assertEqual(404, CodeHttp).
-
-patch_scenario_returns_400_when_malformed_request(_Config) ->
-    %% given
-    RequestBody = jiffy:encode({[{bad_key, bad_value}]}),
-    %% when
-    {CodeHttp, _Body} = amoc_api_helper:patch(
-                            ?SAMPLE_GOOD_SCENARIO_PATH, RequestBody),
-    %% then
-    %% Maybe check Body, as answer format will be ready
-    ?assertEqual(400, CodeHttp).
-
-
-patch_scenario_returns_200_when_request_ok_and_module_exists_w_settings(_Config) ->
-    %% given
-    RequestBody = jiffy:encode({[{users, 10},
-                                 {settings, {[
-                                                 {some_map, <<"#{a=>b}">>},
-                                                 {some_list, <<"[a, b, c]">>},
-                                                 {some_tuple, <<"{a, b, c}">>},
-                                                 {some_string, <<"\"aaa\"">>},
-                                                 {some_binary, <<"<<\"bbb\">>">>},
-                                                 {some_atom, <<"'ATOM'">>},
-                                                 {some_int, <<"4">>},
-                                                 {some_float, <<"4.6">>}
-                                             ]}}]}),
-    %% when
-    {CodeHttp, _Body} = amoc_api_helper:patch(
-        ?SAMPLE_GOOD_SCENARIO_PATH, RequestBody),
-
-    Predicate = fun(S) ->
-                    Settings = [{some_map, #{a => b}},
-                                {some_list, [a, b, c]},
-                                {some_tuple, {a, b, c}},
-                                {some_string, "aaa"},
-                                {some_binary, <<"bbb">>},
-                                {some_atom, 'ATOM'},
-                                {some_int, 4},
-                                {some_float, 4.6}],
-                    ?assertEqual(lists:sort(S), lists:sort(Settings)),
-                    true
-                end,
-    SettingsMatcher = meck_matcher:new(Predicate),
-    %% then
-    %% Maybe check Body, as answer format will be ready
-    meck:wait(amoc_dist, do, [?SAMPLE_SCENARIO, 10, SettingsMatcher], 2000),
-    ?assertEqual(200, CodeHttp).
-
-patch_scenario_returns_200_when_request_ok_and_module_exists(_Config) ->
-    %% given
-    RequestBody = jiffy:encode({[{users, 10}]}),
-    %% when
-    {CodeHttp, _Body} = amoc_api_helper:patch(
-        ?SAMPLE_GOOD_SCENARIO_PATH, RequestBody),
-
-    %% then
-    %% Maybe check Body, as answer format will be ready
-    meck:wait(amoc_dist, do, [?SAMPLE_SCENARIO, 10, []], 2000),
-    ?assertEqual(200, CodeHttp).
-
 
 %% Helpers
 
