@@ -54,27 +54,6 @@ handle_request('ScenariosIdInfoGet', _Req, #{id := ScenarioName}) ->
                 amoc_api_scenario_status:maybe_scenario_params(Scenario),
             {200, #{}, [{<<"doc">>, EDoc} | MaybeParams]}
     end;
-handle_request('ScenariosIdPatch', _Req, #{'ScenarioExecution' := Body,
-                                           id := ScenarioName}) ->
-    Error = {200, #{}, [{<<"scenario">>, <<"error">>}]},
-    case amoc_api_scenario_status:test_status(ScenarioName) of
-        {doesnt_exist, _} ->
-            {404, #{}, #{}};
-        {loaded, Scenario} ->
-            Users = maps:get(<<"users">>, Body),
-            SettingsMap = maps:get(<<"settings">>, Body, #{}),
-            Settings = [begin
-                            Key = binary_to_atom(K, utf8),
-                            {ok, Value} = amoc_config_env:parse_value(V),
-                            {Key, Value}
-                        end || {K, V} <- maps:to_list(SettingsMap)],
-            case amoc_dist:do(Scenario, Users, Settings) of
-                {ok, _} -> {200, #{}, [{<<"scenario">>, <<"started">>}]};
-                {error, _} -> Error
-            end;
-        _ ->
-            Error
-    end;
 handle_request('ScenariosUploadPut', Req, _Context) ->
     {ok, ModuleSource, _} = cowboy_req:read_body(Req),
     case amoc_api_upload_scenario:upload(ModuleSource) of
@@ -85,7 +64,76 @@ handle_request('ScenariosUploadPut', Req, _Context) ->
         {error, Error} ->
             {200, #{}, [{<<"compile">>, Error}]}
     end;
+handle_request('ExecutionStartPatch', _Req,
+               #{'ExecutionStart' := Body = #{<<"scenario">> := ScenarioName}}) ->
+    case amoc_api_scenario_status:test_status(ScenarioName) of
+        {loaded, Scenario} ->
+            Users = maps:get(<<"users">>, Body, 0),
+            SettingsMap = maps:get(<<"settings">>, Body, #{}),
+            Settings = read_settings(SettingsMap),
+            case amoc_dist:do(Scenario, Users, Settings) of
+                {ok, _} -> {200, #{}, #{}};
+                {error, _} -> {409, #{}, #{}}
+            end;
+        {_Status, _} ->
+            {409, #{}, #{}}
+    end;
+handle_request('ExecutionStopPatch', _Req, #{}) ->
+    case amoc_dist:stop() of
+        {ok, _} ->
+            {200, #{}, #{}};
+        {error, _} ->
+            {409, #{}, #{}}
+    end;
+handle_request('ExecutionAddUsersPatch', _Req,
+               #{'ExecutionChangeUsers' := Body = #{<<"users">> := Users}}) ->
+    Result = case Body of
+                 #{<<"nodes">> := Nodes} -> amoc_dist:add(Users, read_nodes(Nodes));
+                 _ -> amoc_dist:add(Users)
+             end,
+    case Result of
+        {ok, _} ->
+            {200, #{}, #{}};
+        {error, _} ->
+            {409, #{}, #{}}
+    end;
+handle_request('ExecutionRemoveUsersPatch', _Req,
+               #{'ExecutionChangeUsers' := Body = #{<<"users">> := Users}}) ->
+    Result = case Body of
+                 #{<<"nodes">> := Nodes} -> amoc_dist:remove(Users, false, read_nodes(Nodes));
+                 _ -> amoc_dist:remove(Users, false)
+             end,
+    case Result of
+        {ok, _} ->
+            {200, #{}, #{}};
+        {error, _} ->
+            {409, #{}, #{}}
+    end;
+handle_request('ExecutionUpdateSettingsPatch', _Req,
+               #{'ExecutionUpdateSettings' := Body = #{<<"settings">> := SettingsMap}}) ->
+    Settings = read_settings(SettingsMap),
+    Result = case Body of
+                 #{<<"nodes">> := Nodes} -> amoc_dist:update_settings(Settings, read_nodes(Nodes));
+                 _ -> amoc_dist:update_settings(Settings)
+             end,
+    case Result of
+        {ok, _} ->
+            {200, #{}, #{}};
+        {error, _} ->
+            {409, #{}, #{}}
+    end;
 handle_request(OperationID, Req, Context) ->
     ?LOG_ERROR("Got not implemented request to process: ~p~n",
                [{OperationID, Req, Context}]),
     {501, #{}, #{}}.
+
+read_settings(SettingsMap) ->
+    [read_kv(K, V) || {K, V} <- maps:to_list(SettingsMap)].
+
+read_kv(K, V) ->
+    Key = binary_to_atom(K, utf8),
+    {ok, Value} = amoc_config_env:parse_value(V),
+    {Key, Value}.
+
+read_nodes(NodeList) ->
+    [binary_to_atom(Node, utf8) || Node <- NodeList].
