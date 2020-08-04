@@ -9,6 +9,8 @@
          add/2,
          remove/2,
          remove/3,
+         update_settings/1,
+         update_settings/2,
          stop/0]).
 
 -compile({no_auto_import, [ceil/1]}).
@@ -24,7 +26,7 @@ do(Scenario, Count, Settings) ->
         {Error, _} -> Error
     end.
 
--spec add(pos_integer()) -> {ok, any()}| {error, any()}.
+-spec add(pos_integer()) -> {ok, any()} | {error, any()}.
 add(Count) ->
     add(Count, amoc_cluster:slave_nodes()).
 
@@ -46,7 +48,18 @@ remove(Count, ForceRemove, Nodes) when is_integer(Count), Count > 0 ->
         Error -> Error
     end.
 
--spec stop() -> ok | {error, any()}.
+-spec update_settings(amoc_config:settings()) -> {ok, any()} | {error, any()}.
+update_settings(Settings) ->
+    update_settings(Settings, amoc_cluster:slave_nodes()).
+
+-spec update_settings(amoc_config:settings(), [node()]) -> {ok, any()} | {error, any()}.
+update_settings(Settings, Nodes) ->
+    case check_nodes(Nodes) of
+        ok -> update_settings_on_nodes(Settings, Nodes);
+        Error -> Error
+    end.
+
+-spec stop() -> {ok, any()} | {error, any()}.
 stop() ->
     stop_cluster().
 
@@ -168,6 +181,16 @@ remove_users(Result, Count, ForceRemove, [Node | T] = Nodes) ->
             Ret = rpc:call(Node, amoc_controller, remove_users, [N, ForceRemove]),
             remove_users([{Node, Ret} | Result], Count - N, ForceRemove, T)
     end.
+
+-spec update_settings_on_nodes(amoc_config:settings(), [node()]) -> {ok, any()} | {error, any()}.
+update_settings_on_nodes(Settings, Nodes) ->
+    Result = [{Node, update_settings_on_node(Settings, Node)} || Node <- Nodes],
+    maybe_error(Result).
+
+-spec update_settings_on_node(amoc_config:settings(), node()) ->
+          ok | {badrpc, any()} | {error, any()}.
+update_settings_on_node(Settings, Node) ->
+    rpc:call(Node, amoc_controller, update_settings, [Settings]).
 
 -spec stop_cluster() -> {ok, any()} | {error, any()}.
 stop_cluster() ->

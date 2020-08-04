@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"amoc_rest">>,
   {git,"https://github.com/esl/amoc_rest.git",
-       {ref,"7a46d9f083692427fcbd2e4a83a01f6ca2d735da"}},
+       {ref,"1d6159242ff2247fc98332bf91cc208f832dc1d7"}},
   0},
  {<<"cowboy">>,{pkg,<<"cowboy">>,<<"2.8.0">>},1},
  {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.9.1">>},2},
