@@ -20,8 +20,7 @@ all() ->
 
 process_scenario_config_uses_default_values(_) ->
     ScenarioConfig = correct_scenario_config(),
-    given_scenario_os_parameters_not_set(ScenarioConfig),
-    given_scenario_app_parameters_not_set(ScenarioConfig),
+    given_scenario_parameters_not_set(ScenarioConfig),
     Result = amoc_config_verification:process_scenario_config(ScenarioConfig, []),
     ?assertEqual({ok, ScenarioConfig}, Result).
 
@@ -29,25 +28,18 @@ process_scenario_config_shadows_default_values(_) ->
     ScenarioConfig = correct_scenario_config(),
     AnotherScenarioConfig = another_correct_scenario_config(),
     YetAnotherScenarioConfig = yet_another_correct_scenario_config(),
-    %% set app parameters
-    given_scenario_os_parameters_not_set(ScenarioConfig),
-    given_scenario_app_parameters_set(AnotherScenarioConfig),
-    Result1 = amoc_config_verification:process_scenario_config(ScenarioConfig, []),
-    ?assertEqual({ok, AnotherScenarioConfig}, Result1),
     %% set also os parameters
-    given_scenario_os_parameters_set(YetAnotherScenarioConfig),
+    given_scenario_parameters_set(AnotherScenarioConfig),
     Result2 = amoc_config_verification:process_scenario_config(ScenarioConfig, []),
-    ?assertEqual({ok, YetAnotherScenarioConfig}, Result2),
+    ?assertEqual({ok, AnotherScenarioConfig}, Result2),
     %% provide settings
-    Settings = settings_from_scenario_config(ScenarioConfig),
+    Settings = settings_from_scenario_config(YetAnotherScenarioConfig),
     Result3 = amoc_config_verification:process_scenario_config(ScenarioConfig, Settings),
-    ?assertEqual({ok, ScenarioConfig}, Result3),
+    ?assertEqual({ok, YetAnotherScenarioConfig}, Result3),
     %% unset os parameters
-    given_scenario_os_parameters_not_set(ScenarioConfig),
+    given_scenario_parameters_not_set(ScenarioConfig),
     Result4 = amoc_config_verification:process_scenario_config(ScenarioConfig, []),
-    ?assertEqual({ok, AnotherScenarioConfig}, Result4),
-    %%unset app parameters
-    given_scenario_app_parameters_not_set(ScenarioConfig).
+    ?assertEqual({ok, ScenarioConfig}, Result4).
 
 process_scenario_config_returns_error_for_invalid_values(_) ->
     VerificationFN = fun(_) -> {false, some_reason} end,
@@ -55,8 +47,7 @@ process_scenario_config_returns_error_for_invalid_values(_) ->
     [#module_parameter{name = wrong_param, mod = ?MOD, value = any_value,
                        verification_fn = VerificationFN}
      | incorrect_scenario_config()],
-    given_scenario_os_parameters_not_set(IncorrectScenarioConfig),
-    given_scenario_app_parameters_not_set(IncorrectScenarioConfig),
+    given_scenario_parameters_not_set(IncorrectScenarioConfig),
     Result = amoc_config_verification:process_scenario_config(IncorrectScenarioConfig, []),
     ?assertEqual({error, parameters_verification_failed,
                   [{wrong_param, any_value, {verification_failed, some_reason}},
@@ -98,16 +89,9 @@ scenario_configuration(Int, Atom, Binary) ->
 settings_from_scenario_config(ScenarioConfig) ->
     [{Name, Value} || #module_parameter{name = Name, value = Value} <- ScenarioConfig].
 
-given_scenario_os_parameters_not_set(ScenarioConfig) ->
+given_scenario_parameters_not_set(ScenarioConfig) ->
     [unset_os_env(Name) || #module_parameter{name = Name} <- ScenarioConfig].
 
-given_scenario_os_parameters_set(ScenarioConfig) ->
+given_scenario_parameters_set(ScenarioConfig) ->
     [set_os_env(Name, Value)
-     || #module_parameter{name = Name, value = Value} <- ScenarioConfig].
-
-given_scenario_app_parameters_not_set(ScenarioConfig) ->
-    [unset_app_env(?APP, Name) || #module_parameter{name = Name} <- ScenarioConfig].
-
-given_scenario_app_parameters_set(ScenarioConfig) ->
-    [set_app_env(?APP, Name, Value)
      || #module_parameter{name = Name, value = Value} <- ScenarioConfig].

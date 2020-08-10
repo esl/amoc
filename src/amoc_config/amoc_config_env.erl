@@ -9,21 +9,20 @@
 %%==============================================================================
 -module(amoc_config_env).
 
--export([get/2, get/3, parse_value/1, find_all_vars/1]).
+-export([get/1, get/2, parse_value/1, find_all_vars/1]).
 
 -include_lib("kernel/include/logger.hrl").
 
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec get(atom(), amoc_config:name()) -> amoc_config:value().
-get(AppName, Name) ->
-    get(AppName, Name, undefined).
+-spec get(amoc_config:name()) -> amoc_config:value().
+get(Name) ->
+    get(Name, undefined).
 
--spec get(atom(), amoc_config:name(), amoc_config:value()) -> amoc_config:value().
-get(AppName, Name, Default) when is_atom(Name) ->
-    DefValue = application:get_env(AppName, Name, Default),
-    get_os_env(Name, DefValue).
+-spec get(amoc_config:name(), amoc_config:value()) -> amoc_config:value().
+get(Name, Default) when is_atom(Name) ->
+    get_os_env(Name, Default).
 
 -spec parse_value(string() | binary()) -> {ok, amoc_config:value()} | {error, any()}.
 parse_value(Binary) when is_binary(Binary) ->
