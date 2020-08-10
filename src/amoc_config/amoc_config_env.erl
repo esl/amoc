@@ -9,7 +9,7 @@
 %%==============================================================================
 -module(amoc_config_env).
 
--export([get/1, get/2, parse_value/1, find_all_vars/1]).
+-export([get/1, get/2, parse_value/1]).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -34,12 +34,6 @@ parse_value(String) when is_list(String) ->
     catch
         _:E -> {error, E}
     end.
-
--spec find_all_vars(atom()) -> [any()].
-find_all_vars(Name) ->
-    AllValues = [application:get_env(App, Name)
-                 || {App, _, _} <- application:loaded_applications()],
-    [Value || {ok, Value} <- AllValues].
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

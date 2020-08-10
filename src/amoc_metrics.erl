@@ -118,5 +118,5 @@ maybe_subscribe(ExName, Datapoints) ->
     end.
 
 maybe_init_predefined_metrics() ->
-    Preconfigured = amoc_config_env:find_all_vars(predefined_metrics),
+    Preconfigured = amoc_config_utils:find_all_vars(predefined_metrics),
     [init(Type, Name) || {Type, Name} <- lists:flatten(Preconfigured)].
