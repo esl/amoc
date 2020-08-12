@@ -1,6 +1,6 @@
 ## Configuration
 
-Amoc is configured through the environment variables (uppercase with prefix ``AMOC_``).
+Amoc is configured through environment variables (uppercase with prefix ``AMOC_``).
 Note that the environment variables are evaluated as erlang code
 
 Amoc supports the following generic configuration parameters:
@@ -17,23 +17,17 @@ Amoc supports the following generic configuration parameters:
   for two consecutive users:
     * default value - 50 ms.
     * example: `AMOC_INTERARRIVAL="50"`
-    * this parameter can be updated runtime (in the same way as scenario configuration).
+    * this parameter can be updated at runtime (in the same way as scenario configuration).
 
 * ``extra_code_paths`` - a list of paths that should be included using `code:add_pathsz/1` interface
     * default value - empty list (`[]`)
     * example: `AMOC_EXTRA_CODE_PATHS='["/some/path", "/another/path"]'`
 
-In addition to that, `amoc_metrics` support the following configuration parameters:
-
-* ``metrics_reporter`` - exometer reporter name (atom).
-    * default value - `exometer_report_graphite`
-    * example: `AMOC_METRICS_REPORTER="exometer_report_graphite"`
-
-If the ``metrics_reporter`` is not initialised, it's possible to configure a Graphite reporter
+In addition to that, `amoc_metrics` allow to configure a Graphite reporter
 using the following environment variables:
 
 * ``graphite_host`` - a graphite host address (string or `undefined`):
-    * default value - `undefined` (amoc_metrics do not try to initialise a ``metrics_reporter``)
+    * default value - `undefined` (amoc_metrics do not try to initialise a metrics reporter)
     * example: `AMOC_GRAPHITE_HOST='"graphite"'`
 
 * ``graphite_port`` - graphite port:
@@ -57,7 +51,7 @@ parameters required for your scenario, however every scenario must declare (usin
 `-required_variable(...)` attributes) all the required parameters in advance. For more
 information, see the example [scenario module](../integration_test/dummy_scenario.erl)
 
-Scenario configuration also can be set/updated runtime using REST API.
+Scenario configuration also can be set/updated at runtime using REST API.
 
 NB: the reason why the `-required_variable(...)` is preferred over the usual behaviour
 callback is because the orchestration tools can easily extract the attributes even
