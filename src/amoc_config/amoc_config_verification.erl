@@ -24,8 +24,7 @@ process_scenario_config(Config, Settings) ->
 get_value_and_verify(#module_parameter{name = Name, mod = Module, value = Default,
                                        verification_fn = VerificationFn} = Param,
                      Settings) ->
-    App = get_application(Module),
-    DefaultValue = amoc_config_env:get(App, Name, Default),
+    DefaultValue = amoc_config_env:get(Name, Default),
     Value = proplists:get_value(Name, Settings, DefaultValue),
     case verify(VerificationFn, Value) of
         {true, NewValue} ->
@@ -50,11 +49,4 @@ verify(Fun, Value) ->
             ?LOG_ERROR("invalid verification method ~p(~p), exception: ~p ~p ~p",
                        [Fun, Value, C, E, S]),
             {false, {exception_during_verification, {C, E, S}}}
-    end.
-
--spec get_application(module()) -> atom().
-get_application(Module) ->
-    case application:get_application(Module) of
-        undefined -> amoc;
-        {ok, App} -> App
     end.

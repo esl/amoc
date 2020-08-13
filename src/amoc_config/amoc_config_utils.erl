@@ -12,7 +12,8 @@
          merge_config/2,
          override_config/2,
          store_scenario_config/1,
-         create_amoc_config_ets/0]).
+         create_amoc_config_ets/0,
+         find_all_vars/1]).
 
 -spec maybe_error(error_type(), [{error, reason()} | {ok, any()}]) ->
     error() | {ok, [any()]}.
@@ -71,3 +72,9 @@ create_amoc_config_ets() ->
                                         protected,
                                         {keypos, #module_parameter.name},
                                         {read_concurrency, true}]).
+
+-spec find_all_vars(atom()) -> [any()].
+find_all_vars(Name) ->
+    AllValues = [application:get_env(App, Name)
+                 || {App, _, _} <- application:loaded_applications()],
+    [Value || {ok, Value} <- AllValues].

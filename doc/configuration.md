@@ -1,56 +1,42 @@
 ## Configuration
 
-Amoc is configured through the OTP application environment variables that
-can be set in the `app.config` configuration file (see [rebar3 documentation](https://www.rebar3.org/docs/releases#section-overlays))
-or using the operating system environment variables (uppercase with prefix ``AMOC_``). Note that the operating system environment variables are evaluated as erlang code
+Amoc is configured through environment variables (uppercase with prefix ``AMOC_``).
+Note that the environment variables are evaluated as erlang code
 
 Amoc supports the following generic configuration parameters:
 
 * ``nodes`` - required for the distributed scenario execution, a list of nodes that should be clustered together:
     * default value - empty list (`[]`)
-    * os env example: `AMOC_NODES="['amoc@amoc-1', 'amoc@amoc-2']"`
-    * app.config example:  `{nodes,  ['amoc@amoc-1', 'amoc@amoc-2]}`                                  
+    * example: `AMOC_NODES="['amoc@amoc-1', 'amoc@amoc-2']"`
 
 * ``api_port`` - a port for the amoc REST interfaces:
     * default value - 4000
-    * os env example: `AMOC_API_PORT="4000"`
-    * app.config example:  `{api_port, 4000}`
+    * example: `AMOC_API_PORT="4000"`
                                       
 * ``interarrival`` - a delay (in ms, for each node in the cluster independently) between creating the processes
   for two consecutive users:
     * default value - 50 ms.
-    * os env example: `AMOC_INTERARRIVAL="50"`
-    * app.config example:  `{interarrival, 50}`
+    * example: `AMOC_INTERARRIVAL="50"`
+    * this parameter can be updated at runtime (in the same way as scenario configuration).
 
 * ``extra_code_paths`` - a list of paths that should be included using `code:add_pathsz/1` interface
     * default value - empty list (`[]`)
-    * os env example: `AMOC_EXTRA_CODE_PATHS='["/some/path", "/another/path"]'`
-    * app.config example:  `{extra_code_paths, ["/some/path", "/another/path"]}`
+    * example: `AMOC_EXTRA_CODE_PATHS='["/some/path", "/another/path"]'`
 
-In addition to that, `amoc_metrics` support the following configuration parameters:
-
-* ``metrics_reporter`` - exometer reporter name (atom).
-    * default value - `exometer_report_graphite`
-    * os env example: `AMOC_METRICS_REPORTER="exometer_report_graphite"`
-    * app.config example:  `{metrics_reporter, exometer_report_graphite}`
-
-If the ``metrics_reporter`` is not initialised, it's possible to configure a Graphite reporter
+In addition to that, `amoc_metrics` allow to configure a Graphite reporter
 using the following environment variables:
 
 * ``graphite_host`` - a graphite host address (string or `undefined`):
-    * default value - `undefined` (amoc_metrics do not try to initialise a ``metrics_reporter``)
-    * os env example: `AMOC_GRAPHITE_HOST='"graphite"'`
-    * app.config example:  `{graphite_host, "graphite"}`
+    * default value - `undefined` (amoc_metrics do not try to initialise a metrics reporter)
+    * example: `AMOC_GRAPHITE_HOST='"graphite"'`
 
 * ``graphite_port`` - graphite port:
     * default value - `2003`
-    * os env example: `AMOC_GRAPHITE_PORT='2003'`
-    * app.config example:  `{graphite_port, 2003}`    
+    * example: `AMOC_GRAPHITE_PORT='2003'`
     
 * ``graphite_prefix`` - graphite prefix:
     * default value - `net_adm:localhost()`
-    * os env example: `AMOC_GRAPHITE_PREFIX='"amoc"'`
-    * app.config example:  `{graphite_prefix, "amoc"}`    
+    * example: `AMOC_GRAPHITE_PREFIX='"amoc"'`
 
 In order to initialise some preconfigured metrics, other applications can declare
 the `predefined_metrics` environment variable (in their own `*.app.src` file):  
@@ -65,6 +51,7 @@ parameters required for your scenario, however every scenario must declare (usin
 `-required_variable(...)` attributes) all the required parameters in advance. For more
 information, see the example [scenario module](../integration_test/dummy_scenario.erl)
 
+Scenario configuration also can be set/updated at runtime using REST API.
 
 NB: the reason why the `-required_variable(...)` is preferred over the usual behaviour
 callback is because the orchestration tools can easily extract the attributes even
