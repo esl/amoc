@@ -6,9 +6,7 @@
 
 -define(SCENARIOS_URL_S, "/scenarios").
 -define(SCENARIOS_URL_U, "/scenarios/upload").
-
--define(SCENARIOS_URL_I(Module), ?SCENARIOS_URL_S ++ "/" ++
-                                 atom_to_list(Module) ++ "/info").
+-define(SCENARIOS_URL_I(Module), "/scenarios/info/" ++ atom_to_list(Module)).
 
 -define(SAMPLE_SCENARIO, sample_test).
 -define(SAMPLE_SCENARIO_DECLARATION,

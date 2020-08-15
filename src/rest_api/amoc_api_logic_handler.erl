@@ -44,7 +44,7 @@ handle_request('ScenariosIdGet', _Req, #{id := ScenarioName}) ->
                 amoc_api_scenario_status:maybe_scenario_settings(Status, Scenario),
             {200, #{}, [{<<"scenario_status">>, BinStatus} | MaybeSettings]}
     end;
-handle_request('ScenariosIdInfoGet', _Req, #{id := ScenarioName}) ->
+handle_request('ScenariosInfoIdGet', _Req, #{id := ScenarioName}) ->
     case amoc_api_scenario_status:test_status(ScenarioName) of
         {doesnt_exist, _} ->
             {404, #{}, #{}};
