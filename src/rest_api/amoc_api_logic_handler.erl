@@ -22,51 +22,49 @@ handle_request('NodesGet', _Req, _Context) ->
     DownNodes = lists:usort(FailedToConnect ++ ConnectionLost),
     Down = [{Node, <<"down">>} || Node <- DownNodes],
     ResponseList = Up ++ Down,
-    {200, #{}, [{<<"nodes">>, ResponseList}]};
+    {200, #{}, #{<<"nodes">> => ResponseList}};
 handle_request('ScenariosGet', _Req, _Context) ->
     Scenarios = amoc_scenario:list_scenario_modules(),
     BinaryScenarios = [atom_to_binary(S, utf8) || S <- Scenarios],
-    {200, #{}, [{<<"scenarios">>, BinaryScenarios}]};
+    {200, #{}, #{<<"scenarios">> => BinaryScenarios}};
 handle_request('StatusGet', _Req, _Context) ->
     Apps = application:which_applications(),
     Status = case lists:keyfind(amoc, 1, Apps) of
                  {amoc, _Desc, _Vsn} -> <<"up">>;
                  false -> <<"down">>
              end,
-    {200, #{}, [{<<"node_status">>, Status}]};
+    {200, #{}, #{<<"amoc_status">> => Status, <<"env">> => #{}}};
 handle_request('ScenariosDefaultsIdGet', _Req, #{id := ScenarioName}) ->
-    case amoc_api_scenario_status:test_status(ScenarioName) of
-        {doesnt_exist, _} ->
+    case amoc_api_scenario_status:is_loaded(ScenarioName) of
+        false ->
             {404, #{}, #{}};
-        {Status, Scenario} ->
-            Settings =
-                amoc_api_scenario_status:maybe_scenario_settings(Status, Scenario),
-            {200, #{}, Settings}
+        {true, Scenario} ->
+            Settings = amoc_api_scenario_status:scenario_settings(Scenario),
+            {200, #{}, #{<<"settings">> =>Settings}}
     end;
 handle_request('ScenariosInfoIdGet', _Req, #{id := ScenarioName}) ->
-    case amoc_api_scenario_status:test_status(ScenarioName) of
-        {doesnt_exist, _} ->
+    case amoc_api_scenario_status:is_loaded(ScenarioName) of
+        false ->
             {404, #{}, #{}};
-        {_Status, Scenario} ->
+        {true, Scenario} ->
             EDoc = amoc_api_scenario_status:get_edoc(Scenario),
-            MaybeParams =
-                amoc_api_scenario_status:maybe_scenario_params(Scenario),
-            {200, #{}, [{<<"doc">>, EDoc} | MaybeParams]}
+            Params = amoc_api_scenario_status:scenario_params(Scenario),
+            {200, #{}, #{<<"doc">> => EDoc, <<"parameters">> => Params}}
     end;
 handle_request('ScenariosUploadPut', Req, _Context) ->
     {ok, ModuleSource, _} = cowboy_req:read_body(Req),
     case amoc_api_upload_scenario:upload(ModuleSource) of
         ok ->
-            {200, #{}, [{<<"compile">>, <<"ok">>}]};
+            {200, #{}, #{<<"compile">> => <<"ok">>}};
         {error, invalid_module} ->
-            {400, #{}, [{<<"error">>, <<"invalid module">>}]};
+            {400, #{}, #{<<"error">> => <<"invalid module">>}};
         {error, Error} ->
-            {200, #{}, [{<<"compile">>, Error}]}
+            {200, #{}, #{<<"compile">> => Error}}
     end;
 handle_request('ExecutionStartPatch', _Req,
                #{'ExecutionStart' := Body = #{<<"scenario">> := ScenarioName}}) ->
-    case amoc_api_scenario_status:test_status(ScenarioName) of
-        {loaded, Scenario} ->
+    case amoc_api_scenario_status:is_loaded(ScenarioName) of
+        {true, Scenario} ->
             Users = maps:get(<<"users">>, Body, 0),
             SettingsMap = maps:get(<<"settings">>, Body, #{}),
             Settings = read_settings(SettingsMap),
@@ -74,7 +72,7 @@ handle_request('ExecutionStartPatch', _Req,
                 {ok, _} -> {200, #{}, #{}};
                 {error, _} -> {409, #{}, #{}}
             end;
-        {_Status, _} ->
+        false ->
             {409, #{}, #{}}
     end;
 handle_request('ExecutionStopPatch', _Req, #{}) ->

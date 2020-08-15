@@ -25,7 +25,7 @@
 
 -type state() :: #state{}.
 -type handle_call_res() :: ok | {ok, term()} | {error, term()}.
--type amoc_status() :: {idle, [LoadedScenario :: amoc:scenario()]} |
+-type amoc_status() :: idle |
                        {running, amoc:scenario(), user_count(), last_user_id()} |
                        {terminating, amoc:scenario()} |
                        {finished, amoc:scenario()} |
@@ -233,8 +233,6 @@ handle_remove(_Count, _ForceRemove, #state{status = Status}) ->
     {error, {invalid_status, Status}}.
 
 -spec handle_status(state()) -> amoc_status().
-handle_status(#state{status = idle}) ->
-    {idle, amoc_scenario:list_scenario_modules()};
 handle_status(#state{status = running, scenario = Scenario,
                      no_of_users = N, last_user_id = LastId}) ->
     {running, Scenario, N, LastId};
@@ -243,7 +241,7 @@ handle_status(#state{status = terminating, scenario = Scenario}) ->
 handle_status(#state{status = finished, scenario = Scenario}) ->
     {finished, Scenario};
 handle_status(#state{status = Status}) ->
-    Status. %% {error, Reason} or disabled.
+    Status. %% idle, disabled or {error, Reason}.
 
 -spec handle_disable(state()) -> {handle_call_res(), state()}.
 handle_disable(#state{status = idle} = State) ->

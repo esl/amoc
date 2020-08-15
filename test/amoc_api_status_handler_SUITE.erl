@@ -25,7 +25,7 @@ returns_up_when_amoc_up_online(_Config) ->
     {CodeHttp, Body} = amoc_api_helper:get(?PATH),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch({[{<<"node_status">>, <<"up">>}]}, Body).
+    ?assertMatch(#{<<"amoc_status">> := <<"up">>}, Body).
 
 returns_down_when_api_up_and_amoc_down_online(_Config) ->
     %% given
@@ -34,7 +34,7 @@ returns_down_when_api_up_and_amoc_down_online(_Config) ->
     {CodeHttp, Body} = amoc_api_helper:get(?PATH),
     %% then
     ?assertEqual(200, CodeHttp),
-    ?assertMatch({[{<<"node_status">>, <<"down">>}]}, Body).
+    ?assertMatch(#{<<"amoc_status">> := <<"down">>}, Body).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% HELPERS

@@ -59,7 +59,7 @@ result_to_binary(Result) ->
     ErrorsMsg = case Result of
                     ok -> [];
                     {badrpc, BadRPC} ->
-                        io_lib:format("compilation errors: ~p~n", [BadRPC]);
+                        io_lib:format("badrpc: ~p~n", [BadRPC]);
                     {error, Errors, _Warnings} ->
                         io_lib:format("compilation errors: ~p~n", [Errors])
                 end,
