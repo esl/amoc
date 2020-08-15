@@ -7,6 +7,7 @@
 -define(SCENARIOS_URL_S, "/scenarios").
 -define(SCENARIOS_URL_U, "/scenarios/upload").
 -define(SCENARIOS_URL_I(Module), "/scenarios/info/" ++ atom_to_list(Module)).
+-define(SCENARIOS_URL_D(Module), "/scenarios/defaults/" ++ atom_to_list(Module)).
 
 -define(SAMPLE_SCENARIO, sample_test).
 -define(SAMPLE_SCENARIO_DECLARATION,
@@ -20,7 +21,9 @@
          put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid/1,
          put_scenarios_returns_200_when_scenario_valid/1,
          get_scenario_info_returns_404_when_scenario_does_not_exist/1,
-         get_scenario_info_returns_200_when_scenario_exists/1
+         get_scenario_info_returns_200_when_scenario_exists/1,
+         get_scenario_defaults_returns_404_when_scenario_does_not_exist/1,
+         get_scenario_defaults_returns_200_when_scenario_exists/1
         ]).
 
 
@@ -31,7 +34,9 @@ all() ->
      put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid,
      put_scenarios_returns_200_when_scenario_valid,
      get_scenario_info_returns_404_when_scenario_does_not_exist,
-     get_scenario_info_returns_200_when_scenario_exists
+     get_scenario_info_returns_200_when_scenario_exists,
+     get_scenario_defaults_returns_404_when_scenario_does_not_exist,
+     get_scenario_defaults_returns_200_when_scenario_exists
     ].
 
 
@@ -130,6 +135,25 @@ get_scenario_info_returns_200_when_scenario_exists(Config) ->
                                  <<"update_fn">> => <<"read_only">>,
                                  <<"verification_fn">> =>
                                  <<"fun amoc_config_attributes:none/1">>}}},
+    ?assertEqual(ExpectedInfo, BodyMap),
+    meck:unload(amoc_scenario).
+
+get_scenario_defaults_returns_404_when_scenario_does_not_exist(_Config) ->
+    %% when
+    {CodeHttp, _Body} = amoc_api_helper:get(?SCENARIOS_URL_D(?SAMPLE_SCENARIO)),
+    %% then
+    ?assertEqual(404, CodeHttp).
+
+get_scenario_defaults_returns_200_when_scenario_exists(Config) ->
+    %% given scenario exists
+    put_scenarios_returns_200_when_scenario_valid(Config),
+    mock_amoc_amoc_scenario(),
+    %% when
+    {CodeHttp, Body} = amoc_api_helper:get(?SCENARIOS_URL_D(?SAMPLE_SCENARIO)),
+    ?assertEqual(200, CodeHttp),
+    BodyMap = json_to_map(Body),
+    ExpectedInfo = #{<<"settings">> => #{<<"interarrival">> => <<"50">>,
+                                         <<"some_parameter">> => <<"undefined">>}},
     ?assertEqual(ExpectedInfo, BodyMap),
     meck:unload(amoc_scenario).
 

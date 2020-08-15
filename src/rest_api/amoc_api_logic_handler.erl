@@ -34,15 +34,14 @@ handle_request('StatusGet', _Req, _Context) ->
                  false -> <<"down">>
              end,
     {200, #{}, [{<<"node_status">>, Status}]};
-handle_request('ScenariosIdGet', _Req, #{id := ScenarioName}) ->
+handle_request('ScenariosDefaultsIdGet', _Req, #{id := ScenarioName}) ->
     case amoc_api_scenario_status:test_status(ScenarioName) of
         {doesnt_exist, _} ->
             {404, #{}, #{}};
         {Status, Scenario} ->
-            BinStatus = atom_to_binary(Status, utf8),
-            MaybeSettings =
+            Settings =
                 amoc_api_scenario_status:maybe_scenario_settings(Status, Scenario),
-            {200, #{}, [{<<"scenario_status">>, BinStatus} | MaybeSettings]}
+            {200, #{}, Settings}
     end;
 handle_request('ScenariosInfoIdGet', _Req, #{id := ScenarioName}) ->
     case amoc_api_scenario_status:test_status(ScenarioName) of
