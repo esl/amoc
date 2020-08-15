@@ -1,8 +1,11 @@
 -module(amoc_api_helper).
 
--export([get/1, get/2, put/2, put/3, patch/2, patch/3,
+-export([get/1, put/2, patch/1, patch/2,
          remove_module/1, module_src/1, module_beam/1,
          start_amoc/0, stop_amoc/0]).
+
+-type json() :: jsx:json_term().
+
 
 -spec start_amoc() -> any().
 start_amoc() ->
@@ -32,37 +35,41 @@ module_beam(M) ->
     filename:join([BeamDir, atom_to_list(M) ++ ".beam"]).
 
 
--spec get(string()) -> {integer(), jiffy:jiffy_decode_result()}.
+-spec get(string()) -> {integer(), json()}.
 get(Path) -> get(get_url(), Path).
 
--spec get(string(), string()) -> {integer(), jiffy:jiffy_decode_result()}.
+-spec get(string(), string()) -> {integer(), json()}.
 get(BaseUrl, Path) ->
     request(BaseUrl, erlang:list_to_bitstring(Path), <<"GET">>).
 
 -spec put(string(), binary()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
+    {integer(), json()}.
 put(Path, Body) -> put(get_url(), Path, Body).
 
 -spec put(string(), string(), binary()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
+    {integer(), json()}.
 put(BaseUrl, Path, Body) ->
     request(BaseUrl, erlang:list_to_bitstring(Path), <<"PUT">>, Body, <<"text/plain">>).
 
--spec patch(string(), binary()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
-patch(Path, Body) -> patch(get_url(), Path, Body).
+-spec patch(string()) ->
+    {integer(), json()}.
+patch(Path) -> patch(get_url(), Path, <<"">>).
+
+-spec patch(string(), json()) ->
+    {integer(), json()}.
+patch(Path, JSON) -> patch(get_url(), Path, jsx:encode(JSON)).
 
 -spec patch(string(), string(), binary()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
+    {integer(), json()}.
 patch(BaseUrl, Path, Body) ->
     request(BaseUrl, erlang:list_to_bitstring(Path), <<"PATCH">>, Body).
 
 -spec request(string(), binary(), binary()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
+    {integer(), json()}.
 request(BaseUrl, Path, Method) -> request(BaseUrl, Path, Method, <<"">>).
 
 -spec request(string(), binary(), binary(), binary()) ->
-    {integer(), jiffy:jiffy_decode_result()}.
+    {integer(), json()}.
 request(BaseUrl, Path, Method, RequestBody) ->
     request(BaseUrl, Path, Method, RequestBody, <<"application/json">>).
 
@@ -74,8 +81,8 @@ request(BaseUrl, Path, Method, RequestBody, ContentType) ->
                     RequestBody, 5000),
     {{CodeHttpBin, _}, _Headers, Body, _, _} = Result,
     BodyErl = case Body of
-                <<"">> -> [];
-                _ -> jiffy:decode(Body)
+                  <<"">> -> [];
+                  _ -> jsx:decode(Body, [return_maps])
               end,
     fusco:disconnect(Client),
     {erlang:binary_to_integer(CodeHttpBin), BodyErl}.

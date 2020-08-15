@@ -77,79 +77,76 @@ setup_meck(_TC) ->
 %% Test cases
 
 start_scenario(_Config) ->
-    RequestBody = jiffy:encode({[{scenario, sample_test}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", RequestBody),
+    JsonBody = #{scenario => sample_test},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", JsonBody),
     ?assertEqual(200, HttpCode).
 
 start_scenario_with_users_and_settings(_Config) ->
-    RequestBody = jiffy:encode({[{scenario, sample_test},
-                                 {users, 10},
-                                 {settings, settings_for_json()}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", RequestBody),
+    JsonBody = #{scenario => sample_test, users => 10, settings => settings_for_json()},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", JsonBody),
     ?assertEqual(200, HttpCode).
 
 fail_to_start_non_existing_scenario(_Config) ->
-    RequestBody = jiffy:encode({[{scenario, bad_scenario}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", RequestBody),
+    JsonBody = #{scenario => bad_scenario},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", JsonBody),
     ?assertEqual(409, HttpCode).
 
 fail_to_start_scenario_without_name(_Config) ->
-    RequestBody = jiffy:encode({[{users, 10}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", RequestBody),
+    JsonBody = #{users=> 10},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", JsonBody),
     ?assertEqual(400, HttpCode).
 
 stop_scenario(_Config) ->
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/stop", <<>>),
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/stop"),
     ?assertEqual(200, HttpCode).
 
 fail_to_stop_scenario_when_not_running(_Config) ->
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/stop", <<>>),
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/stop"),
     ?assertEqual(409, HttpCode).
 
 add_users(_Config) ->
-    RequestBody = jiffy:encode({[{users, 10}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/add_users", RequestBody),
+    JsonBody = #{users=> 10},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/add_users", JsonBody),
     ?assertEqual(200, HttpCode).
 
 add_users_on_nodes(_Config) ->
-    RequestBody = jiffy:encode({[{users, 10}, {nodes, [node1@host1, node2@host2]}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/add_users", RequestBody),
+    JsonBody = #{users=> 10, nodes=> [node1@host1, node2@host2]},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/add_users", JsonBody),
     ?assertEqual(200, HttpCode).
 
 fail_to_add_users_when_not_running(_Config) ->
-    RequestBody = jiffy:encode({[{users, 10}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/add_users", RequestBody),
+    JsonBody = #{users=> 10},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/add_users", JsonBody),
     ?assertEqual(409, HttpCode).
 
 remove_users(_Config) ->
-    RequestBody = jiffy:encode({[{users, 10}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/remove_users", RequestBody),
+    JsonBody = #{users=> 10},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/remove_users", JsonBody),
     ?assertEqual(200, HttpCode).
 
 remove_users_on_nodes(_Config) ->
-    RequestBody = jiffy:encode({[{users, 10}, {nodes, [node1@host1, node2@host2]}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/remove_users", RequestBody),
+    JsonBody = #{users=> 10, nodes=> [node1@host1, node2@host2]},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/remove_users", JsonBody),
     ?assertEqual(200, HttpCode).
 
 fail_to_remove_users_when_not_running(_Config) ->
-    RequestBody = jiffy:encode({[{users, 10}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/remove_users", RequestBody),
+    JsonBody = #{users=> 10},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/remove_users", JsonBody),
     ?assertEqual(409, HttpCode).
 
 update_settings(_Config) ->
-    RequestBody = jiffy:encode({[{settings, settings_for_json()}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/update_settings", RequestBody),
+    JsonBody = #{settings=> settings_for_json()},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
     ?assertEqual(200, HttpCode).
 
 update_settings_on_nodes(_Config) ->
-    RequestBody = jiffy:encode({[{settings, settings_for_json()},
-                                 {nodes, [node1@host1, node2@host2]}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/update_settings", RequestBody),
+    JsonBody = #{settings=> settings_for_json(), nodes=>[node1@host1, node2@host2]},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
     ?assertEqual(200, HttpCode).
 
 fail_to_update_settings_when_not_running(_Config) ->
-    RequestBody = jiffy:encode({[{settings, settings_for_json()}]}),
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/update_settings", RequestBody),
+    JsonBody = #{settings=> settings_for_json()},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
     ?assertEqual(409, HttpCode).
 
 %% Test helpers
@@ -161,14 +158,14 @@ dummy_scenario_module() ->
     ?DUMMY_SCENARIO_MODULE(sample_test).
 
 settings_for_json() ->
-    {[{some_map, <<"#{a=>b}">>},
-      {some_list, <<"[a, b, c]">>},
-      {some_tuple, <<"{a, b, c}">>},
-      {some_string, <<"\"aaa\"">>},
-      {some_binary, <<"<<\"bbb\">>">>},
-      {some_atom, <<"'ATOM'">>},
-      {some_int, <<"4">>},
-      {some_float, <<"4.6">>}]}.
+    #{some_map => <<"#{a=>b}">>,
+      some_list => <<"[a, b, c]">>,
+      some_tuple => <<"{a, b, c}">>,
+      some_string => <<"\"aaa\"">>,
+      some_binary => <<"<<\"bbb\">>">>,
+      some_atom => <<"'ATOM'">>,
+      some_int => <<"4">>,
+      some_float => <<"4.6">>}.
 
 settings() ->
     [{some_map, #{a => b}},

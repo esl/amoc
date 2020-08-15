@@ -4,14 +4,12 @@
 -include_lib("eunit/include/eunit.hrl").
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
--export([returns_empty_list_when_amoc_up/1,
-         returns_nodes_list_when_amoc_up/1]).
+-export([returns_nodes_list_when_amoc_up/1]).
 
 -define(PATH, "/nodes").
 
 all() ->
-    [returns_empty_list_when_amoc_up,
-     returns_nodes_list_when_amoc_up].
+    [returns_nodes_list_when_amoc_up].
 
 init_per_testcase(_, Config) ->
     amoc_api_helper:start_amoc(),
@@ -20,14 +18,6 @@ init_per_testcase(_, Config) ->
 end_per_testcase(_, _Config) ->
     amoc_api_helper:stop_amoc().
 
-returns_empty_list_when_amoc_up(_Config) ->
-    %% when
-    {CodeHttp, JSON} = amoc_api_helper:get(?PATH),
-    %% then
-    ?assertEqual(200, CodeHttp),
-    ThisNode = {atom_to_binary(node(), utf8), <<"up">>},
-    ?assertMatch({[{<<"nodes">>, {[ThisNode]}}]}, JSON).
-
 returns_nodes_list_when_amoc_up(_Config) ->
     %% given
     given_prepared_nodes(),
@@ -35,13 +25,12 @@ returns_nodes_list_when_amoc_up(_Config) ->
     {CodeHttp, JSON} = amoc_api_helper:get(?PATH),
     %% then
     ?assertEqual(200, CodeHttp),
-    ThisNode = {atom_to_binary(node(), utf8), <<"up">>},
-    ?assertMatch(
-        {[{<<"nodes">>,
-           {[ThisNode,
-             {<<"test1">>, <<"up">>},
-             {<<"test2">>, <<"down">>},
-             {<<"test3">>, <<"down">>}]}}]},
+    ?assertEqual(
+        #{<<"nodes">> =>
+          #{atom_to_binary(node(), utf8) => <<"up">>,
+            <<"test1">> => <<"up">>,
+            <<"test2">> => <<"down">>,
+            <<"test3">> => <<"down">>}},
         JSON),
     %% cleanup
     clean_nodes().
