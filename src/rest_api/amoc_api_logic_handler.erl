@@ -63,30 +63,44 @@ handle_request('ScenariosUploadPut', Req, _Context) ->
     end;
 handle_request('ExecutionStartPatch', _Req, #{'ExecutionStart' := Body}) ->
     case amoc_dist:get_state() of
-        idle -> amoc_api_execution_helpers:start(Body);
+        idle ->
+            Ret = amoc_api_execution_helpers:start(Body),
+            process_ret_value(Ret);
         _ -> {409, #{}, #{}}
     end;
 handle_request('ExecutionStopPatch', _Req, #{}) ->
     case amoc_dist:get_state() of
-        running -> amoc_api_execution_helpers:stop();
+        running ->
+            Ret = amoc_api_execution_helpers:stop(),
+            process_ret_value(Ret);
         _ -> {409, #{}, #{}}
     end;
 handle_request('ExecutionAddUsersPatch', _Req, #{'ExecutionChangeUsers' := Body}) ->
     case amoc_dist:get_state() of
-        running -> amoc_api_execution_helpers:add_users(Body);
+        running ->
+            Ret = amoc_api_execution_helpers:add_users(Body),
+            process_ret_value(Ret);
         _ -> {409, #{}, #{}}
     end;
 handle_request('ExecutionRemoveUsersPatch', _Req, #{'ExecutionChangeUsers' := Body}) ->
     case amoc_dist:get_state() of
-        running -> amoc_api_execution_helpers:remove_users(Body);
+        running ->
+            Ret = amoc_api_execution_helpers:remove_users(Body),
+            process_ret_value(Ret);
         _ -> {409, #{}, #{}}
     end;
 handle_request('ExecutionUpdateSettingsPatch', _Req, #{'ExecutionUpdateSettings' := Body}) ->
     case amoc_dist:get_state() of
-        running -> amoc_api_execution_helpers:update_settings(Body);
+        running ->
+            Ret = amoc_api_execution_helpers:update_settings(Body),
+            process_ret_value(Ret);
         _ -> {409, #{}, #{}}
     end;
 handle_request(OperationID, Req, Context) ->
     ?LOG_ERROR("Got not implemented request to process: ~p~n",
                [{OperationID, Req, Context}]),
     {501, #{}, #{}}.
+
+process_ret_value({ok, _}) -> {200, #{}, #{}};
+process_ret_value({error, Error}) ->
+    {500, #{}, #{<<"error">> => amoc_api_scenario_status:format(Error)}}.

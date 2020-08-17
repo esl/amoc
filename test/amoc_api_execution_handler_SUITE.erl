@@ -107,17 +107,19 @@ start_scenario_with_users_and_settings(_Config) ->
 
 fail_to_start_non_existing_scenario(_Config) ->
     JsonBody = #{scenario => bad_scenario},
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", JsonBody),
-    ?assertEqual(409, HttpCode).
+    {HttpCode, Body} = amoc_api_helper:patch("/execution/start", JsonBody),
+    ?assertEqual(500, HttpCode),
+    ?assertEqual(#{<<"error">> => <<"no_such_scenario">>}, Body).
 
 fail_to_start_scenario_without_name(_Config) ->
     %% JSON body doesn't correspond to the expected schema, amoc_rest
-    %% framework fails to verify it and returns 400 code.
+    %% framework fails to verify it and returns 400 code & an empty body.
     JsonBody = #{users=> 10},
-    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", JsonBody),
-    ?assertEqual(400, HttpCode).
+    {HttpCode, Body} = amoc_api_helper:patch("/execution/start", JsonBody),
+    ?assertEqual(400, HttpCode),
+    ?assertEqual(empty_body, Body).
 
-fail_to_start_when_not_idle(_config) ->
+fail_to_start_when_not_idle(_Config) ->
     JsonBody = #{scenario => bad_scenario},
     {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", JsonBody),
     ?assertEqual(409, HttpCode).

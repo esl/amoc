@@ -81,7 +81,7 @@ request(BaseUrl, Path, Method, RequestBody, ContentType) ->
                     RequestBody, 5000),
     {{CodeHttpBin, _}, _Headers, Body, _, _} = Result,
     BodyErl = case Body of
-                  <<"">> -> [];
+                  <<"">> -> empty_body;
                   _ -> jsx:decode(Body, [return_maps])
               end,
     fusco:disconnect(Client),

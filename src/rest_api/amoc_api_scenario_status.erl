@@ -7,7 +7,8 @@
 -export([is_loaded/1,
          scenario_settings/1,
          scenario_params/1,
-         get_edoc/1]).
+         get_edoc/1,
+         format/1]).
 
 get_edoc(Scenario) ->
     case docsh_lib:get_docs(Scenario) of
@@ -56,6 +57,7 @@ add_item(I) ->
         true -> {true, format(I)}
     end.
 
+-spec format(any()) -> binary().
 format(Value) ->
     list_to_binary(lists:flatten(io_lib:format("~tp", [Value]))).
 
