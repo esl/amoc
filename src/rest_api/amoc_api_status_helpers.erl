@@ -48,4 +48,16 @@ get_controller_status() ->
              end,
     maybe_add_settings(Status).
 
+maybe_add_settings(#{status := S} = Status) when S =:= <<"running">>;
+                                                 S =:= <<"terminating">>;
+                                                 S =:= <<"finished">> ->
+    Settings = get_current_settings(),
+    Status#{settings => Settings};
 maybe_add_settings(Status) -> Status.
+
+get_current_settings() ->
+    {ok, ConfigMap} = amoc_config_scenario:get_current_configuration(),
+    F = fun(_Name, #{value := Value}) ->
+            amoc_config_env:format(Value, binary)
+        end,
+    maps:map(F, ConfigMap).

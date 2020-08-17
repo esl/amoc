@@ -161,7 +161,7 @@ fail_to_start_scenario_without_name(_Config) ->
     ?assertEqual(400, HttpCode),
     ?assertEqual(empty_body, Body).
 
-fail_to_start_with_invalid_settings(_config) ->
+fail_to_start_with_invalid_settings(_Config) ->
     {InvalidJsonSettings, Error} = invalid_json_settings_and_error(),
     JsonBody = #{scenario => sample_test, settings => InvalidJsonSettings},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/start", JsonBody),
@@ -261,7 +261,7 @@ fail_to_update_settings_when_not_running(_Config) ->
     ?assertEqual(409, HttpCode),
     ?assertEqual(#{}, Body).
 
-fail_to_update_with_invalid_settings(_config) ->
+fail_to_update_with_invalid_settings(_Config) ->
     {InvalidJsonSettings, Error} = invalid_json_settings_and_error(),
     JsonBody = #{settings => InvalidJsonSettings},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
