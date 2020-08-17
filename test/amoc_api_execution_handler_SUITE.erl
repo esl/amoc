@@ -11,6 +11,7 @@ all() ->
      start_scenario_with_users_and_settings,
      fail_to_start_non_existing_scenario,
      fail_to_start_scenario_without_name,
+     fail_to_start_when_not_idle,
      stop_scenario,
      fail_to_stop_scenario_when_not_running,
      add_users,
@@ -35,7 +36,7 @@ end_per_suite(_Config) ->
     amoc_api_helper:stop_amoc().
 
 init_per_testcase(TC, Config) ->
-    meck:new(amoc_dist, [passthrough]),
+    meck:new(amoc_dist, []),
     setup_meck(TC),
     Config.
 
@@ -43,34 +44,52 @@ end_per_testcase(_TC, _Config) ->
     meck:unload(amoc_dist).
 
 setup_meck(start_scenario) ->
+    meck:expect(amoc_dist, get_state, fun() -> idle end),
     meck:expect(amoc_dist, do, fun(sample_test, 0, []) -> {ok, mocked} end);
 setup_meck(start_scenario_with_users_and_settings) ->
+    meck:expect(amoc_dist, get_state, fun() -> idle end),
     meck:expect(amoc_dist, do, fun(sample_test, 10, Settings) ->
                                        ?assertEqual(lists:sort(Settings), lists:sort(settings())),
                                        {ok, mocked}
                                end);
 setup_meck(stop_scenario) ->
+    meck:expect(amoc_dist, get_state, fun() -> running end),
     meck:expect(amoc_dist, stop, fun() -> {ok, mocked} end);
 setup_meck(add_users) ->
+    meck:expect(amoc_dist, get_state, fun() -> running end),
     meck:expect(amoc_dist, add, fun(10) -> {ok, mocked} end);
 setup_meck(add_users_on_nodes) ->
+    meck:expect(amoc_dist, get_state, fun() -> running end),
     meck:expect(amoc_dist, add, fun(10, [node1@host1, node2@host2]) -> {ok, mocked} end);
 setup_meck(remove_users) ->
+    meck:expect(amoc_dist, get_state, fun() -> running end),
     meck:expect(amoc_dist, remove, fun(10, false) -> {ok, mocked} end);
 setup_meck(remove_users_on_nodes) ->
+    meck:expect(amoc_dist, get_state, fun() -> running end),
     meck:expect(amoc_dist, remove, fun(10, false, [node1@host1, node2@host2]) -> {ok, mocked} end);
 setup_meck(update_settings) ->
+    meck:expect(amoc_dist, get_state, fun() -> running end),
     meck:expect(amoc_dist, update_settings,
                 fun(Settings) ->
                         ?assertEqual(lists:sort(Settings), lists:sort(settings())),
                         {ok, mocked}
                 end);
 setup_meck(update_settings_on_nodes) ->
+    meck:expect(amoc_dist, get_state, fun() -> running end),
     meck:expect(amoc_dist, update_settings,
                 fun(Settings, [node1@host1, node2@host2]) ->
                         ?assertEqual(lists:sort(Settings), lists:sort(settings())),
                         {ok, mocked}
                 end);
+setup_meck(TC) when TC =:= fail_to_stop_scenario_when_not_running;
+                    TC =:= fail_to_add_users_when_not_running;
+                    TC =:= fail_to_remove_users_when_not_running;
+                    TC =:= fail_to_remove_users_when_not_running;
+                    TC =:= fail_to_update_settings_when_not_running;
+                    TC =:= fail_to_start_when_not_idle->
+    meck:expect(amoc_dist, get_state, fun() -> stopped end);
+setup_meck(fail_to_start_non_existing_scenario) ->
+    meck:expect(amoc_dist, get_state, fun() -> idle end);
 setup_meck(_TC) ->
     ok.
 
@@ -92,9 +111,16 @@ fail_to_start_non_existing_scenario(_Config) ->
     ?assertEqual(409, HttpCode).
 
 fail_to_start_scenario_without_name(_Config) ->
+    %% JSON body doesn't correspond to the expected schema, amoc_rest
+    %% framework fails to verify it and returns 400 code.
     JsonBody = #{users=> 10},
     {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", JsonBody),
     ?assertEqual(400, HttpCode).
+
+fail_to_start_when_not_idle(_config) ->
+    JsonBody = #{scenario => bad_scenario},
+    {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", JsonBody),
+    ?assertEqual(409, HttpCode).
 
 stop_scenario(_Config) ->
     {HttpCode, _Body} = amoc_api_helper:patch("/execution/stop"),

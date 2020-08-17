@@ -103,7 +103,7 @@ slave_nodes() ->
             maps:get(slave, Status, [])
     end.
 
--spec master_node() -> node().
+-spec master_node() -> node() | undefined.
 master_node() ->
     Status = get_status(),
     maps:get(master, Status, undefined).

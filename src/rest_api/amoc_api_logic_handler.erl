@@ -61,76 +61,32 @@ handle_request('ScenariosUploadPut', Req, _Context) ->
         {error, Error} ->
             {200, #{}, #{<<"compile">> => Error}}
     end;
-handle_request('ExecutionStartPatch', _Req,
-               #{'ExecutionStart' := Body = #{<<"scenario">> := ScenarioName}}) ->
-    case amoc_api_scenario_status:is_loaded(ScenarioName) of
-        {true, Scenario} ->
-            Users = maps:get(<<"users">>, Body, 0),
-            SettingsMap = maps:get(<<"settings">>, Body, #{}),
-            Settings = read_settings(SettingsMap),
-            case amoc_dist:do(Scenario, Users, Settings) of
-                {ok, _} -> {200, #{}, #{}};
-                {error, _} -> {409, #{}, #{}}
-            end;
-        false ->
-            {409, #{}, #{}}
+handle_request('ExecutionStartPatch', _Req, #{'ExecutionStart' := Body}) ->
+    case amoc_dist:get_state() of
+        idle -> amoc_api_execution_helpers:start(Body);
+        _ -> {409, #{}, #{}}
     end;
 handle_request('ExecutionStopPatch', _Req, #{}) ->
-    case amoc_dist:stop() of
-        {ok, _} ->
-            {200, #{}, #{}};
-        {error, _} ->
-            {409, #{}, #{}}
+    case amoc_dist:get_state() of
+        running -> amoc_api_execution_helpers:stop();
+        _ -> {409, #{}, #{}}
     end;
-handle_request('ExecutionAddUsersPatch', _Req,
-               #{'ExecutionChangeUsers' := Body = #{<<"users">> := Users}}) ->
-    Result = case Body of
-                 #{<<"nodes">> := Nodes} -> amoc_dist:add(Users, read_nodes(Nodes));
-                 _ -> amoc_dist:add(Users)
-             end,
-    case Result of
-        {ok, _} ->
-            {200, #{}, #{}};
-        {error, _} ->
-            {409, #{}, #{}}
+handle_request('ExecutionAddUsersPatch', _Req, #{'ExecutionChangeUsers' := Body}) ->
+    case amoc_dist:get_state() of
+        running -> amoc_api_execution_helpers:add_users(Body);
+        _ -> {409, #{}, #{}}
     end;
-handle_request('ExecutionRemoveUsersPatch', _Req,
-               #{'ExecutionChangeUsers' := Body = #{<<"users">> := Users}}) ->
-    Result = case Body of
-                 #{<<"nodes">> := Nodes} -> amoc_dist:remove(Users, false, read_nodes(Nodes));
-                 _ -> amoc_dist:remove(Users, false)
-             end,
-    case Result of
-        {ok, _} ->
-            {200, #{}, #{}};
-        {error, _} ->
-            {409, #{}, #{}}
+handle_request('ExecutionRemoveUsersPatch', _Req, #{'ExecutionChangeUsers' := Body}) ->
+    case amoc_dist:get_state() of
+        running -> amoc_api_execution_helpers:remove_users(Body);
+        _ -> {409, #{}, #{}}
     end;
-handle_request('ExecutionUpdateSettingsPatch', _Req,
-               #{'ExecutionUpdateSettings' := Body = #{<<"settings">> := SettingsMap}}) ->
-    Settings = read_settings(SettingsMap),
-    Result = case Body of
-                 #{<<"nodes">> := Nodes} -> amoc_dist:update_settings(Settings, read_nodes(Nodes));
-                 _ -> amoc_dist:update_settings(Settings)
-             end,
-    case Result of
-        {ok, _} ->
-            {200, #{}, #{}};
-        {error, _} ->
-            {409, #{}, #{}}
+handle_request('ExecutionUpdateSettingsPatch', _Req, #{'ExecutionUpdateSettings' := Body}) ->
+    case amoc_dist:get_state() of
+        running -> amoc_api_execution_helpers:update_settings(Body);
+        _ -> {409, #{}, #{}}
     end;
 handle_request(OperationID, Req, Context) ->
     ?LOG_ERROR("Got not implemented request to process: ~p~n",
                [{OperationID, Req, Context}]),
     {501, #{}, #{}}.
-
-read_settings(SettingsMap) ->
-    [read_kv(K, V) || {K, V} <- maps:to_list(SettingsMap)].
-
-read_kv(K, V) ->
-    Key = binary_to_atom(K, utf8),
-    {ok, Value} = amoc_config_env:parse_value(V),
-    {Key, Value}.
-
-read_nodes(NodeList) ->
-    [binary_to_atom(Node, utf8) || Node <- NodeList].

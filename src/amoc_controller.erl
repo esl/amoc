@@ -138,7 +138,7 @@ handle_call(stop_scenario, _From, State) ->
     {RetValue, NewState} = handle_stop_scenario(State),
     {reply, RetValue, NewState};
 handle_call({update_settings, Settings}, _From, State) ->
-    RetValue = handle_update_settings(Settings),
+    RetValue = handle_update_settings(Settings, State),
     {reply, RetValue, State};
 handle_call({add, StartId, EndID}, _From, State) ->
     {RetValue, NewState} = handle_add(StartId, EndID, State),
@@ -197,12 +197,14 @@ handle_stop_scenario(#state{status = running} = State) ->
 handle_stop_scenario(#state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
--spec handle_update_settings(amoc_config:settings()) -> handle_call_res().
-handle_update_settings(Settings) ->
+-spec handle_update_settings(amoc_config:settings(), state()) -> handle_call_res().
+handle_update_settings(Settings, #state{status = running}) ->
     case amoc_config_scenario:update_settings(Settings) of
         ok -> ok;
         {error, Type, Reason} -> {error, {Type, Reason}}
-    end.
+    end;
+handle_update_settings(_Settings, #state{status = Status}) ->
+    {error, {invalid_status, Status}}.
 
 -spec handle_add(amoc_scenario:user_id(), amoc_scenario:user_id(), state()) ->
     {handle_call_res(), state()}.
@@ -218,7 +220,7 @@ handle_add(StartId, EndId, #state{last_user_id = LastId,
                      last_user_id = EndId}};
 handle_add(_StartId, _EndId, #state{status = running} = State) ->
     {{error, invalid_range}, State};
-handle_add(_Scenario, _Settings, #state{status = Status} = State) ->
+handle_add(_StartId, _EndId, #state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
 -spec handle_remove(user_count(), boolean(), state()) -> handle_call_res().
