@@ -28,12 +28,8 @@ handle_request('ScenariosGet', _Req, _Context) ->
     BinaryScenarios = [atom_to_binary(S, utf8) || S <- Scenarios],
     {200, #{}, #{scenarios => BinaryScenarios}};
 handle_request('StatusGet', _Req, _Context) ->
-    Apps = application:which_applications(),
-    Status = case lists:keyfind(amoc, 1, Apps) of
-                 {amoc, _Desc, _Vsn} -> <<"up">>;
-                 false -> <<"down">>
-             end,
-    {200, #{}, #{amoc_status => Status, env => #{}}};
+    Status = amoc_api_status_helpers:get_status(),
+    {200, #{}, Status};
 handle_request('ScenariosDefaultsIdGet', _Req, #{id := ScenarioName}) ->
     case amoc_api_scenario_status:is_loaded(ScenarioName) of
         false ->
