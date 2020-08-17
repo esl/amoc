@@ -10,9 +10,11 @@
          returns_up_when_amoc_up_and_running/1,
          returns_up_when_amoc_up_and_terminating/1,
          returns_up_when_amoc_up_and_finished/1,
-         returns_down_when_api_up_and_amoc_down/1]).
+         returns_down_when_api_up_and_amoc_down/1,
+         returns_nodes_list_when_amoc_up/1]).
 
--define(PATH, "/status").
+-define(STATUS_PATH, "/status").
+-define(NODES_PATH, "/nodes").
 
 all() ->
     [returns_up_when_amoc_up_and_idle,
@@ -21,12 +23,14 @@ all() ->
      returns_up_when_amoc_up_and_running,
      returns_up_when_amoc_up_and_terminating,
      returns_up_when_amoc_up_and_finished,
-     returns_down_when_api_up_and_amoc_down].
+     returns_down_when_api_up_and_amoc_down,
+     returns_nodes_list_when_amoc_up].
 
 init_per_testcase(TC, Config) ->
     amoc_api_helper:start_amoc(),
     meck:new(amoc_controller, []),
     meck:new(amoc_config_scenario, []),
+    meck:new(amoc_cluster, []),
     Config.
 
 end_per_testcase(_, _Config) ->
@@ -38,7 +42,7 @@ returns_up_when_amoc_up_and_idle(_Config) ->
     EnvMap = given_amoc_envs_are_set(),
     ControllerMap = given_amoc_controller_is_mocked(idle),
     %% when
-    {CodeHttp, Body} = amoc_api_helper:get(?PATH),
+    {CodeHttp, Body} = amoc_api_helper:get(?STATUS_PATH),
     %% then
     ExpectedBody = #{<<"amoc_status">> => <<"up">>,
                      <<"controller">> => ControllerMap,
@@ -51,7 +55,7 @@ returns_up_when_amoc_up_and_disabled(_Config) ->
     EnvMap = given_amoc_envs_are_set(),
     ControllerMap = given_amoc_controller_is_mocked(disabled),
     %% when
-    {CodeHttp, Body} = amoc_api_helper:get(?PATH),
+    {CodeHttp, Body} = amoc_api_helper:get(?STATUS_PATH),
     %% then
     ExpectedBody = #{<<"amoc_status">> => <<"up">>,
                      <<"controller">> => ControllerMap,
@@ -64,7 +68,7 @@ returns_up_when_amoc_up_and_in_error(_Config) ->
     EnvMap = given_amoc_envs_are_set(),
     ControllerMap = given_amoc_controller_is_mocked(error),
     %% when
-    {CodeHttp, Body} = amoc_api_helper:get(?PATH),
+    {CodeHttp, Body} = amoc_api_helper:get(?STATUS_PATH),
     %% then
     ExpectedBody = #{<<"amoc_status">> => <<"up">>,
                      <<"controller">> => ControllerMap,
@@ -78,7 +82,7 @@ returns_up_when_amoc_up_and_running(_Config) ->
     ControllerMap = given_amoc_controller_is_mocked(running),
     SettingsMap = given_amoc_config_scenario_is_mocked(),
     %% when
-    {CodeHttp, Body} = amoc_api_helper:get(?PATH),
+    {CodeHttp, Body} = amoc_api_helper:get(?STATUS_PATH),
     %% then
     ControllerStatus = ControllerMap#{<<"settings">> => SettingsMap},
     ExpectedBody = #{<<"amoc_status">> => <<"up">>,
@@ -93,7 +97,7 @@ returns_up_when_amoc_up_and_terminating(_Config) ->
     ControllerMap = given_amoc_controller_is_mocked(terminating),
     SettingsMap = given_amoc_config_scenario_is_mocked(),
     %% when
-    {CodeHttp, Body} = amoc_api_helper:get(?PATH),
+    {CodeHttp, Body} = amoc_api_helper:get(?STATUS_PATH),
     %% then
     ControllerStatus = ControllerMap#{<<"settings">> => SettingsMap},
     ExpectedBody = #{<<"amoc_status">> => <<"up">>,
@@ -108,7 +112,7 @@ returns_up_when_amoc_up_and_finished(_Config) ->
     ControllerMap = given_amoc_controller_is_mocked(finished),
     SettingsMap = given_amoc_config_scenario_is_mocked(),
     %% when
-    {CodeHttp, Body} = amoc_api_helper:get(?PATH),
+    {CodeHttp, Body} = amoc_api_helper:get(?STATUS_PATH),
     %% then
     ControllerStatus = ControllerMap#{<<"settings">> => SettingsMap},
     ExpectedBody = #{<<"amoc_status">> => <<"up">>,
@@ -122,12 +126,21 @@ returns_down_when_api_up_and_amoc_down(_Config) ->
     given_amoc_app_is_down(),
     EnvMap = given_amoc_envs_are_set(),
     %% when
-    {CodeHttp, Body} = amoc_api_helper:get(?PATH),
+    {CodeHttp, Body} = amoc_api_helper:get(?STATUS_PATH),
     %% then
     ExpectedBody = #{<<"amoc_status">> => <<"down">>,
                      <<"env">> => EnvMap},
     ?assertEqual(200, CodeHttp),
     ?assertEqual(ExpectedBody, Body).
+
+returns_nodes_list_when_amoc_up(_Config) ->
+    %% given
+    NodesMap = given_prepared_nodes(),
+    %% when
+    {CodeHttp, JSON} = amoc_api_helper:get(?NODES_PATH),
+    %% then
+    ?assertEqual(200, CodeHttp),
+    ?assertEqual( #{<<"nodes">> =>NodesMap}, JSON).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% HELPERS
@@ -144,6 +157,14 @@ given_amoc_envs_are_set() ->
                     {list_to_binary(EnvName), list_to_binary(EnvValue)}
                 end || {K, V} <- settings()],
     maps:from_list(AmocEnvs).
+
+given_prepared_nodes() ->
+    ConnectionStatus = #{connected => [test1],
+                         failed_to_connect => [test2],
+                         connection_lost => [test3, test2]},
+    meck:expect(amoc_cluster, get_status, fun() -> ConnectionStatus end),
+    #{atom_to_binary(node(), utf8) => <<"up">>, <<"test1">> => <<"up">>,
+      <<"test2">> => <<"down">>, <<"test3">> => <<"down">>}.
 
 settings() ->
     [{some_map, #{a => b}},
