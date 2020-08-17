@@ -2,13 +2,14 @@
 %% Copyright 2020 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
--module(amoc_api_scenario_status).
+-module(amoc_api_helpers_scenario_info).
 %% API
 -export([is_loaded/1,
          scenario_settings/1,
          scenario_params/1,
          get_edoc/1]).
 
+-spec get_edoc(module()) -> binary().
 get_edoc(Scenario) ->
     case docsh_lib:get_docs(Scenario) of
         {error, _} ->
@@ -16,7 +17,7 @@ get_edoc(Scenario) ->
             <<"cannot extract documentation for ", ScenarioName/binary>>;
         {ok, Docs} ->
             case docsh_format:lookup(Docs, Scenario, [moduledoc]) of
-                {not_found, Message} ->
+                {not_found, _} ->
                     <<"no documentation found">>;
                 {ok, [DocItem]} ->
                     Doc = maps:get(<<"en">>, DocItem),
@@ -24,19 +25,21 @@ get_edoc(Scenario) ->
             end
     end.
 
+-spec scenario_settings(module()) -> #{atom() => binary()}.
 scenario_settings(Scenario) ->
     {ok, ConfigMap} = amoc_config_scenario:get_default_configuration(Scenario),
-    F = fun(Name, #{value := Value}, NewMap) ->
-            NewMap#{Name => format(Value)}
+    F = fun(_Name, #{value := Value}) ->
+            format(Value)
         end,
-    maps:fold(F, #{}, ConfigMap).
+    maps:map(F, ConfigMap).
 
+-spec scenario_params(module()) -> #{atom() => map()}.
 scenario_params(Scenario) ->
     {ok, ConfigMap} = amoc_config_scenario:get_default_configuration(Scenario),
-    F = fun(Name, Param, NewMap) ->
-            NewMap#{Name => format_param(Param)}
+    F = fun(_Name, Param) ->
+            format_param(Param)
         end,
-    maps:fold(F, #{}, ConfigMap).
+    maps:map(F, ConfigMap).
 
 format_param(ParamMap) ->
     F = fun(Item, Value, NewMap) ->

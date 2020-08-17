@@ -2,7 +2,7 @@
 %% Copyright 2020 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
--module(amoc_api_execution_helpers).
+-module(amoc_api_helpers_execution).
 
 %% API
 -export([start/1, stop/0, add_users/1, remove_users/1, update_settings/1]).
@@ -13,7 +13,7 @@
 -spec start(body()) -> ret_value().
 start(#{<<"scenario">> := ScenarioName} = Body) ->
     case
-        amoc_api_scenario_status:is_loaded(ScenarioName) of
+        amoc_api_helpers_scenario_info:is_loaded(ScenarioName) of
         {true, Scenario} ->
             Users = maps:get(<<"users">>, Body, 0),
             SettingsMap = maps:get(<<"settings">>, Body, #{}),

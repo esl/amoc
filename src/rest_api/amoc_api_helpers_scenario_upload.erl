@@ -2,7 +2,7 @@
 %% Copyright 2020 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
--module(amoc_api_upload_scenario).
+-module(amoc_api_helpers_scenario_upload).
 %% API
 -export([upload/1]).
 

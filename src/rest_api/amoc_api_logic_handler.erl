@@ -28,28 +28,28 @@ handle_request('ScenariosGet', _Req, _Context) ->
     BinaryScenarios = [atom_to_binary(S, utf8) || S <- Scenarios],
     {200, #{}, #{scenarios => BinaryScenarios}};
 handle_request('StatusGet', _Req, _Context) ->
-    Status = amoc_api_status_helpers:get_status(),
+    Status = amoc_api_helpers_status:get_status(),
     {200, #{}, Status};
 handle_request('ScenariosDefaultsIdGet', _Req, #{id := ScenarioName}) ->
-    case amoc_api_scenario_status:is_loaded(ScenarioName) of
+    case amoc_api_helpers_scenario_info:is_loaded(ScenarioName) of
         false ->
             {404, #{}, #{}};
         {true, Scenario} ->
-            Settings = amoc_api_scenario_status:scenario_settings(Scenario),
+            Settings = amoc_api_helpers_scenario_info:scenario_settings(Scenario),
             {200, #{}, #{settings =>Settings}}
     end;
 handle_request('ScenariosInfoIdGet', _Req, #{id := ScenarioName}) ->
-    case amoc_api_scenario_status:is_loaded(ScenarioName) of
+    case amoc_api_helpers_scenario_info:is_loaded(ScenarioName) of
         false ->
             {404, #{}, #{}};
         {true, Scenario} ->
-            EDoc = amoc_api_scenario_status:get_edoc(Scenario),
-            Params = amoc_api_scenario_status:scenario_params(Scenario),
+            EDoc = amoc_api_helpers_scenario_info:get_edoc(Scenario),
+            Params = amoc_api_helpers_scenario_info:scenario_params(Scenario),
             {200, #{}, #{doc => EDoc, parameters => Params}}
     end;
 handle_request('ScenariosUploadPut', Req, _Context) ->
     {ok, ModuleSource, _} = cowboy_req:read_body(Req),
-    case amoc_api_upload_scenario:upload(ModuleSource) of
+    case amoc_api_helpers_scenario_upload:upload(ModuleSource) of
         ok ->
             {200, #{}, #{compile => <<"ok">>}};
         {error, invalid_module} ->
@@ -60,35 +60,35 @@ handle_request('ScenariosUploadPut', Req, _Context) ->
 handle_request('ExecutionStartPatch', _Req, #{'ExecutionStart' := Body}) ->
     case amoc_dist:get_state() of
         idle ->
-            Ret = amoc_api_execution_helpers:start(Body),
+            Ret = amoc_api_helpers_execution:start(Body),
             process_ret_value(Ret);
         _ -> {409, #{}, #{}}
     end;
 handle_request('ExecutionStopPatch', _Req, #{}) ->
     case amoc_dist:get_state() of
         running ->
-            Ret = amoc_api_execution_helpers:stop(),
+            Ret = amoc_api_helpers_execution:stop(),
             process_ret_value(Ret);
         _ -> {409, #{}, #{}}
     end;
 handle_request('ExecutionAddUsersPatch', _Req, #{'ExecutionChangeUsers' := Body}) ->
     case amoc_dist:get_state() of
         running ->
-            Ret = amoc_api_execution_helpers:add_users(Body),
+            Ret = amoc_api_helpers_execution:add_users(Body),
             process_ret_value(Ret);
         _ -> {409, #{}, #{}}
     end;
 handle_request('ExecutionRemoveUsersPatch', _Req, #{'ExecutionChangeUsers' := Body}) ->
     case amoc_dist:get_state() of
         running ->
-            Ret = amoc_api_execution_helpers:remove_users(Body),
+            Ret = amoc_api_helpers_execution:remove_users(Body),
             process_ret_value(Ret);
         _ -> {409, #{}, #{}}
     end;
 handle_request('ExecutionUpdateSettingsPatch', _Req, #{'ExecutionUpdateSettings' := Body}) ->
     case amoc_dist:get_state() of
         running ->
-            Ret = amoc_api_execution_helpers:update_settings(Body),
+            Ret = amoc_api_helpers_execution:update_settings(Body),
             process_ret_value(Ret);
         _ -> {409, #{}, #{}}
     end;

@@ -2,7 +2,7 @@
 %% Copyright 2020 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
--module(amoc_api_status_helpers).
+-module(amoc_api_helpers_status).
 -author("denysgonchar").
 
 %% API

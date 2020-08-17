@@ -35,7 +35,7 @@ parse_value(String) when is_list(String) ->
         _:E -> {error, E}
     end.
 
--spec format(any(), string | binary) -> binary().
+-spec format(any(), string | binary) -> string() | binary().
 format(Value, binary) ->
     list_to_binary(format(Value, string));
 format(Value, string) ->
