@@ -22,25 +22,25 @@ handle_request('NodesGet', _Req, _Context) ->
     DownNodes = lists:usort(FailedToConnect ++ ConnectionLost),
     Down = [{Node, <<"down">>} || Node <- DownNodes],
     ResponseList = Up ++ Down,
-    {200, #{}, #{<<"nodes">> => ResponseList}};
+    {200, #{}, #{nodes => ResponseList}};
 handle_request('ScenariosGet', _Req, _Context) ->
     Scenarios = amoc_scenario:list_scenario_modules(),
     BinaryScenarios = [atom_to_binary(S, utf8) || S <- Scenarios],
-    {200, #{}, #{<<"scenarios">> => BinaryScenarios}};
+    {200, #{}, #{scenarios => BinaryScenarios}};
 handle_request('StatusGet', _Req, _Context) ->
     Apps = application:which_applications(),
     Status = case lists:keyfind(amoc, 1, Apps) of
                  {amoc, _Desc, _Vsn} -> <<"up">>;
                  false -> <<"down">>
              end,
-    {200, #{}, #{<<"amoc_status">> => Status, <<"env">> => #{}}};
+    {200, #{}, #{amoc_status => Status, env => #{}}};
 handle_request('ScenariosDefaultsIdGet', _Req, #{id := ScenarioName}) ->
     case amoc_api_scenario_status:is_loaded(ScenarioName) of
         false ->
             {404, #{}, #{}};
         {true, Scenario} ->
             Settings = amoc_api_scenario_status:scenario_settings(Scenario),
-            {200, #{}, #{<<"settings">> =>Settings}}
+            {200, #{}, #{settings =>Settings}}
     end;
 handle_request('ScenariosInfoIdGet', _Req, #{id := ScenarioName}) ->
     case amoc_api_scenario_status:is_loaded(ScenarioName) of
@@ -49,17 +49,17 @@ handle_request('ScenariosInfoIdGet', _Req, #{id := ScenarioName}) ->
         {true, Scenario} ->
             EDoc = amoc_api_scenario_status:get_edoc(Scenario),
             Params = amoc_api_scenario_status:scenario_params(Scenario),
-            {200, #{}, #{<<"doc">> => EDoc, <<"parameters">> => Params}}
+            {200, #{}, #{doc => EDoc, parameters => Params}}
     end;
 handle_request('ScenariosUploadPut', Req, _Context) ->
     {ok, ModuleSource, _} = cowboy_req:read_body(Req),
     case amoc_api_upload_scenario:upload(ModuleSource) of
         ok ->
-            {200, #{}, #{<<"compile">> => <<"ok">>}};
+            {200, #{}, #{compile => <<"ok">>}};
         {error, invalid_module} ->
-            {400, #{}, #{<<"error">> => <<"invalid module">>}};
+            {400, #{}, #{error => <<"invalid module">>}};
         {error, Error} ->
-            {200, #{}, #{<<"compile">> => Error}}
+            {200, #{}, #{compile => Error}}
     end;
 handle_request('ExecutionStartPatch', _Req, #{'ExecutionStart' := Body}) ->
     case amoc_dist:get_state() of
@@ -103,4 +103,4 @@ handle_request(OperationID, Req, Context) ->
 
 process_ret_value({ok, _}) -> {200, #{}, #{}};
 process_ret_value({error, Error}) ->
-    {500, #{}, #{<<"error">> => amoc_config_env:format(Error, binary)}}.
+    {500, #{}, #{error => amoc_config_env:format(Error, binary)}}.

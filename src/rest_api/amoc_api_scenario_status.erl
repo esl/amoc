@@ -27,14 +27,14 @@ get_edoc(Scenario) ->
 scenario_settings(Scenario) ->
     {ok, ConfigMap} = amoc_config_scenario:get_default_configuration(Scenario),
     F = fun(Name, #{value := Value}, NewMap) ->
-            NewMap#{format(Name) => format(Value)}
+            NewMap#{Name => format(Value)}
         end,
     maps:fold(F, #{}, ConfigMap).
 
 scenario_params(Scenario) ->
     {ok, ConfigMap} = amoc_config_scenario:get_default_configuration(Scenario),
     F = fun(Name, Param, NewMap) ->
-            NewMap#{format(Name) => format_param(Param)}
+            NewMap#{Name => format_param(Param)}
         end,
     maps:fold(F, #{}, ConfigMap).
 
@@ -47,13 +47,13 @@ format_param(ParamMap) ->
         end,
     maps:fold(F, #{}, ParamMap).
 
-add_item(mod)   -> {true, format(module)};
-add_item(value) -> {true, format(default_value)};
+add_item(mod)   -> {true, module};
+add_item(value) -> {true, default_value};
 add_item(I) ->
     RequiredItems = [description, verification_fn, update_fn],
     case lists:member(I, RequiredItems) of
         false -> false;
-        true -> {true, format(I)}
+        true -> {true, I}
     end.
 
 -spec format(any()) -> binary().
