@@ -13,6 +13,15 @@
 -spec handle_request(OperationID :: amoc_rest_api:operation_id(),
                      Req :: cowboy_req:req(), Context :: #{}) ->
     {Status :: cowboy:http_status(), Headers :: cowboy:http_headers(), Body :: jsx:json_term()}.
+handle_request('StatusGet', _Req, _Context) ->
+    Status = amoc_api_helpers_status:get_status(),
+    {200, #{}, Status};
+handle_request('StatusNodeGet', _Req, #{node := BinNode}) ->
+    Node = binary_to_atom(BinNode, utf8),
+    case rpc:call(Node, amoc_api_helpers_status, get_status, []) of
+        {badrpc, _} -> {404, #{}, #{}};
+        Status -> {200, #{}, Status}
+    end;
 handle_request('NodesGet', _Req, _Context) ->
     Status = amoc_cluster:get_status(),
     Connected = maps:get(connected, Status, []),
@@ -27,9 +36,6 @@ handle_request('ScenariosGet', _Req, _Context) ->
     Scenarios = amoc_scenario:list_scenario_modules(),
     BinaryScenarios = [atom_to_binary(S, utf8) || S <- Scenarios],
     {200, #{}, #{scenarios => BinaryScenarios}};
-handle_request('StatusGet', _Req, _Context) ->
-    Status = amoc_api_helpers_status:get_status(),
-    {200, #{}, Status};
 handle_request('ScenariosDefaultsIdGet', _Req, #{id := ScenarioName}) ->
     case amoc_api_helpers_scenario_info:is_loaded(ScenarioName) of
         false ->
