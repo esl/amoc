@@ -11,6 +11,7 @@ all() ->
      start_scenario_with_users_and_settings,
      fail_to_start_non_existing_scenario,
      fail_to_start_scenario_without_name,
+     fail_to_start_with_invalid_settings,
      fail_to_start_when_not_idle,
      stop_scenario,
      fail_to_stop_scenario_when_not_running,
@@ -22,7 +23,8 @@ all() ->
      fail_to_remove_users_when_not_running,
      update_settings,
      update_settings_on_nodes,
-     fail_to_update_settings_when_not_running].
+     fail_to_update_settings_when_not_running,
+     fail_to_update_with_invalid_settings].
 
 %% Setup and teardown
 
@@ -88,8 +90,11 @@ setup_meck(TC) when TC =:= fail_to_stop_scenario_when_not_running;
                     TC =:= fail_to_update_settings_when_not_running;
                     TC =:= fail_to_start_when_not_idle->
     meck:expect(amoc_dist, get_state, fun() -> stopped end);
-setup_meck(fail_to_start_non_existing_scenario) ->
+setup_meck(TC) when TC =:= fail_to_start_non_existing_scenario;
+                    TC =:= fail_to_start_with_invalid_settings ->
     meck:expect(amoc_dist, get_state, fun() -> idle end);
+setup_meck(fail_to_update_with_invalid_settings)->
+    meck:expect(amoc_dist, get_state, fun() -> running end);
 setup_meck(_TC) ->
     ok.
 
@@ -101,7 +106,7 @@ start_scenario(_Config) ->
     ?assertEqual(200, HttpCode).
 
 start_scenario_with_users_and_settings(_Config) ->
-    JsonBody = #{scenario => sample_test, users => 10, settings => settings_for_json()},
+    JsonBody = #{scenario => sample_test, users => 10, settings => json_settings()},
     {HttpCode, _Body} = amoc_api_helper:patch("/execution/start", JsonBody),
     ?assertEqual(200, HttpCode).
 
@@ -118,6 +123,13 @@ fail_to_start_scenario_without_name(_Config) ->
     {HttpCode, Body} = amoc_api_helper:patch("/execution/start", JsonBody),
     ?assertEqual(400, HttpCode),
     ?assertEqual(empty_body, Body).
+
+fail_to_start_with_invalid_settings(_config) ->
+    {InvalidJsonSettings, Error} = invalid_json_settings_and_error(),
+    JsonBody = #{scenario => sample_test, settings => InvalidJsonSettings},
+    {HttpCode, Body} = amoc_api_helper:patch("/execution/start", JsonBody),
+    ?assertEqual(500, HttpCode),
+    ?assertEqual(#{<<"error">> => Error}, Body).
 
 fail_to_start_when_not_idle(_Config) ->
     JsonBody = #{scenario => bad_scenario},
@@ -163,19 +175,26 @@ fail_to_remove_users_when_not_running(_Config) ->
     ?assertEqual(409, HttpCode).
 
 update_settings(_Config) ->
-    JsonBody = #{settings=> settings_for_json()},
+    JsonBody = #{settings=> json_settings()},
     {HttpCode, _Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
     ?assertEqual(200, HttpCode).
 
 update_settings_on_nodes(_Config) ->
-    JsonBody = #{settings=> settings_for_json(), nodes=>[node1@host1, node2@host2]},
+    JsonBody = #{settings=> json_settings(), nodes=>[node1@host1, node2@host2]},
     {HttpCode, _Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
     ?assertEqual(200, HttpCode).
 
 fail_to_update_settings_when_not_running(_Config) ->
-    JsonBody = #{settings=> settings_for_json()},
+    JsonBody = #{settings=> json_settings()},
     {HttpCode, _Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
     ?assertEqual(409, HttpCode).
+
+fail_to_update_with_invalid_settings(_config) ->
+    {InvalidJsonSettings, Error} = invalid_json_settings_and_error(),
+    JsonBody = #{settings => InvalidJsonSettings},
+    {HttpCode, Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
+    ?assertEqual(500, HttpCode),
+    ?assertEqual(#{<<"error">> => Error}, Body).
 
 %% Test helpers
 
@@ -185,15 +204,16 @@ sample_scenario_path() ->
 dummy_scenario_module() ->
     ?DUMMY_SCENARIO_MODULE(sample_test).
 
-settings_for_json() ->
-    #{some_map => <<"#{a=>b}">>,
-      some_list => <<"[a, b, c]">>,
-      some_tuple => <<"{a, b, c}">>,
-      some_string => <<"\"aaa\"">>,
-      some_binary => <<"<<\"bbb\">>">>,
-      some_atom => <<"'ATOM'">>,
-      some_int => <<"4">>,
-      some_float => <<"4.6">>}.
+invalid_json_settings_and_error() ->
+    InvalidJsonSettings = #{invalid_tuple => <<"{a,b,c,}">>},
+    Error = <<"{invalid_value,<<\"invalid_tuple\">>,<<\"{a,b,c,}\">>,"
+              "\n               {badmatch,{error,{1,erl_parse,"
+              "\n                                 [\"syntax error before: \",\"'}'\"]}}}}">>,
+    {InvalidJsonSettings, Error}.
+
+json_settings() ->
+    Settings = [{K, amoc_config_env:format(V, binary)} || {K, V} <- settings()],
+    maps:from_list(Settings).
 
 settings() ->
     [{some_map, #{a => b}},

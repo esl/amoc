@@ -103,4 +103,4 @@ handle_request(OperationID, Req, Context) ->
 
 process_ret_value({ok, _}) -> {200, #{}, #{}};
 process_ret_value({error, Error}) ->
-    {500, #{}, #{<<"error">> => amoc_api_scenario_status:format(Error)}}.
+    {500, #{}, #{<<"error">> => amoc_config_env:format(Error, binary)}}.

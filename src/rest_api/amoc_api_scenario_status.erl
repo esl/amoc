@@ -7,8 +7,7 @@
 -export([is_loaded/1,
          scenario_settings/1,
          scenario_params/1,
-         get_edoc/1,
-         format/1]).
+         get_edoc/1]).
 
 get_edoc(Scenario) ->
     case docsh_lib:get_docs(Scenario) of
@@ -59,7 +58,7 @@ add_item(I) ->
 
 -spec format(any()) -> binary().
 format(Value) ->
-    list_to_binary(lists:flatten(io_lib:format("~tp", [Value]))).
+    amoc_config_env:format(Value, binary).
 
 -spec is_loaded(binary()) -> {true, amoc:scenario()} | false.
 is_loaded(ScenarioName) ->
