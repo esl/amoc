@@ -74,11 +74,33 @@ function get_health_status() {
     docker inspect --format '{{json .State.Health.Status }}' "$1"
 }
 
+function container_is_healthy() {
+  [ "$(get_health_status "$1")" = "\"healthy\"" ]
+}
+
 function wait_for_healthcheck() {
     local container=$1
-    local timeout="${2:-60}"
+    wait_for_cmd 60 container_is_healthy "$container"
+}
+
+function metrics_reported() {
+    local graphite_query="target=summarize(*.amoc.users.size,'1hour','max')&from=-1h&format=json"
+    local result="$(curl -s "http://localhost:8080/render/?${graphite_query}")"
+    echo "$result" | contain "$@"
+}
+
+function wait_for_metrics() {
+     wait_for_cmd 60 metrics_reported "$@"
+}
+
+function wait_for_cmd() {
+    local timeout="${1:-0}"
+    local cmd="${2:-true}"
+    shift 2
+    local full_cmd=("$cmd" "$@")
+    echo "Waiting for '${full_cmd[@]}'"
     for i in $(seq 0 "${timeout}"); do
-        if [ "$(get_health_status "$container")" = "\"healthy\"" ]; then
+        if "${full_cmd[@]}"; then
             echo -e "\nWaiting is done after $i seconds"
             return 0
         fi
