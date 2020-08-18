@@ -76,7 +76,7 @@ get_state() ->
     case {amoc_cluster:master_node(), get_param(state)} of
         {undefined, undefined} -> idle;
         {_, {ok, State}} -> State;
-        {Node, undefined} -> rpc:call(Node, ?MODULE, cluster_state, [])
+        {Node, undefined} -> rpc:call(Node, ?MODULE, ?FUNCTION_NAME, [])
     end.
 %% ------------------------------------------------------------------
 %% Local functions

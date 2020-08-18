@@ -8,7 +8,7 @@
 -export([start/1, stop/0, add_users/1, remove_users/1, update_settings/1]).
 
 -type body() :: #{binary() => any()}.
--type ret_value() :: {ok, any} | {error, any()}.
+-type ret_value() :: {ok, any()} | {error, any()}.
 
 -spec start(body()) -> ret_value().
 start(#{<<"scenario">> := ScenarioName} = Body) ->

@@ -95,10 +95,10 @@ setup_meck(update_settings) ->
     meck:expect(amoc_dist, get_state, fun() -> running end),
     meck:expect(amoc_dist, update_settings,
                 fun(Settings) ->
-                        ?assertEqual(lists:sort(Settings), lists:sort(settings())),
-                        {ok, mocked}
+                    ?assertEqual(lists:sort(Settings), lists:sort(settings())),
+                    {ok, mocked}
                 end);
-setup_meck(fail_to_update_settings_when_amoc_dist_fails)->
+setup_meck(fail_to_update_settings_when_amoc_dist_fails) ->
     meck:expect(amoc_dist, get_state, fun() -> running end),
     meck:expect(amoc_dist, update_settings,
                 fun(Settings) ->
@@ -109,20 +109,20 @@ setup_meck(update_settings_on_nodes) ->
     meck:expect(amoc_dist, get_state, fun() -> running end),
     meck:expect(amoc_dist, update_settings,
                 fun(Settings, [node1@host1, node2@host2]) ->
-                        ?assertEqual(lists:sort(Settings), lists:sort(settings())),
-                        {ok, mocked}
+                    ?assertEqual(lists:sort(Settings), lists:sort(settings())),
+                    {ok, mocked}
                 end);
 setup_meck(TC) when TC =:= fail_to_stop_scenario_when_not_running;
                     TC =:= fail_to_add_users_when_not_running;
                     TC =:= fail_to_remove_users_when_not_running;
                     TC =:= fail_to_remove_users_when_not_running;
                     TC =:= fail_to_update_settings_when_not_running;
-                    TC =:= fail_to_start_when_not_idle->
+                    TC =:= fail_to_start_when_not_idle ->
     meck:expect(amoc_dist, get_state, fun() -> stopped end);
 setup_meck(TC) when TC =:= fail_to_start_non_existing_scenario;
                     TC =:= fail_to_start_with_invalid_settings ->
     meck:expect(amoc_dist, get_state, fun() -> idle end);
-setup_meck(fail_to_update_with_invalid_settings)->
+setup_meck(fail_to_update_with_invalid_settings) ->
     meck:expect(amoc_dist, get_state, fun() -> running end);
 setup_meck(_TC) ->
     ok.
@@ -156,7 +156,7 @@ fail_to_start_non_existing_scenario(_Config) ->
 fail_to_start_scenario_without_name(_Config) ->
     %% JSON body doesn't correspond to the expected schema, amoc_rest
     %% framework fails to verify it and returns 400 code & an empty body.
-    JsonBody = #{users=> 10},
+    JsonBody = #{users => 10},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/start", JsonBody),
     ?assertEqual(400, HttpCode),
     ?assertEqual(empty_body, Body).
@@ -190,73 +190,73 @@ fail_to_stop_scenario_when_not_running(_Config) ->
     ?assertEqual(#{}, Body).
 
 add_users(_Config) ->
-    JsonBody = #{users=> 10},
+    JsonBody = #{users => 10},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/add_users", JsonBody),
     ?assertEqual(200, HttpCode),
     ?assertEqual(#{}, Body).
 
 add_users_on_nodes(_Config) ->
-    JsonBody = #{users=> 10, nodes=> [node1@host1, node2@host2]},
+    JsonBody = #{users => 10, nodes => [node1@host1, node2@host2]},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/add_users", JsonBody),
     ?assertEqual(200, HttpCode),
     ?assertEqual(#{}, Body).
 
 fail_to_add_users_when_amoc_dist_fails(_Config) ->
-    JsonBody = #{users=> 10},
+    JsonBody = #{users => 10},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/add_users", JsonBody),
     ?assertEqual(500, HttpCode),
     ?assertEqual(#{<<"error">> => <<"mocked">>}, Body).
 
 fail_to_add_users_when_not_running(_Config) ->
-    JsonBody = #{users=> 10},
+    JsonBody = #{users => 10},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/add_users", JsonBody),
     ?assertEqual(409, HttpCode),
     ?assertEqual(#{}, Body).
 
 remove_users(_Config) ->
-    JsonBody = #{users=> 10},
+    JsonBody = #{users => 10},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/remove_users", JsonBody),
     ?assertEqual(200, HttpCode),
     ?assertEqual(#{}, Body).
 
 remove_users_on_nodes(_Config) ->
-    JsonBody = #{users=> 10, nodes=> [node1@host1, node2@host2]},
+    JsonBody = #{users => 10, nodes => [node1@host1, node2@host2]},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/remove_users", JsonBody),
     ?assertEqual(200, HttpCode),
     ?assertEqual(#{}, Body).
 
 fail_to_remove_users_when_amoc_dist_fails(_Config) ->
-    JsonBody = #{users=> 10},
+    JsonBody = #{users => 10},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/remove_users", JsonBody),
     ?assertEqual(500, HttpCode),
     ?assertEqual(#{<<"error">> => <<"mocked">>}, Body).
 
 fail_to_remove_users_when_not_running(_Config) ->
-    JsonBody = #{users=> 10},
+    JsonBody = #{users => 10},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/remove_users", JsonBody),
     ?assertEqual(409, HttpCode),
     ?assertEqual(#{}, Body).
 
 update_settings(_Config) ->
-    JsonBody = #{settings=> json_settings()},
+    JsonBody = #{settings => json_settings()},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
     ?assertEqual(200, HttpCode),
     ?assertEqual(#{}, Body).
 
 fail_to_update_settings_when_amoc_dist_fails(_Config) ->
-    JsonBody = #{settings=> json_settings()},
+    JsonBody = #{settings => json_settings()},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
     ?assertEqual(500, HttpCode),
     ?assertEqual(#{<<"error">> => <<"mocked">>}, Body).
 
 update_settings_on_nodes(_Config) ->
-    JsonBody = #{settings=> json_settings(), nodes=>[node1@host1, node2@host2]},
+    JsonBody = #{settings => json_settings(), nodes => [node1@host1, node2@host2]},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
     ?assertEqual(200, HttpCode),
     ?assertEqual(#{}, Body).
 
 fail_to_update_settings_when_not_running(_Config) ->
-    JsonBody = #{settings=> json_settings()},
+    JsonBody = #{settings => json_settings()},
     {HttpCode, Body} = amoc_api_helper:patch("/execution/update_settings", JsonBody),
     ?assertEqual(409, HttpCode),
     ?assertEqual(#{}, Body).
