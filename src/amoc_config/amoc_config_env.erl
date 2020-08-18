@@ -9,7 +9,7 @@
 %%==============================================================================
 -module(amoc_config_env).
 
--export([get/1, get/2, parse_value/1]).
+-export([get/1, get/2, parse_value/1, format/2]).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -34,6 +34,13 @@ parse_value(String) when is_list(String) ->
     catch
         _:E -> {error, E}
     end.
+
+-spec format(any(), binary) -> binary();
+            (any(), string)  -> string().
+format(Value, binary) ->
+    list_to_binary(format(Value, string));
+format(Value, string) ->
+    lists:flatten(io_lib:format("~tp", [Value])).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

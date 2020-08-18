@@ -18,4 +18,4 @@ get_env(Name, Default) ->
     amoc_config_env:get(Name, Default).
 
 format_value(Value) ->
-    lists:flatten(io_lib:format("~tp", [Value])).
+    amoc_config_env:format(Value, string).

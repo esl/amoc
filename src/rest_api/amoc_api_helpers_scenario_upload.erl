@@ -2,7 +2,7 @@
 %% Copyright 2020 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
--module(amoc_api_upload_scenario).
+-module(amoc_api_helpers_scenario_upload).
 %% API
 -export([upload/1]).
 
@@ -59,7 +59,7 @@ result_to_binary(Result) ->
     ErrorsMsg = case Result of
                     ok -> [];
                     {badrpc, BadRPC} ->
-                        io_lib:format("compilation errors: ~p~n", [BadRPC]);
+                        io_lib:format("badrpc: ~p~n", [BadRPC]);
                     {error, Errors, _Warnings} ->
                         io_lib:format("compilation errors: ~p~n", [Errors])
                 end,
