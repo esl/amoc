@@ -44,7 +44,7 @@ function start_graphite_container() {
 function amoc_container_port() {
     local container="$1"
     if [[ "$container" =~ ^amoc-[0-9]$ ]]; then
-        echo "808${container#amoc-}"
+        echo "888${container#amoc-}"
     else
         return 1
     fi
@@ -54,7 +54,7 @@ function start_amoc_container() {
     local name="$1"
     shift 1
     local port="$(amoc_container_port "$name")"
-    docker run --rm -t -d --name "$name" -h "$name" \
+    docker run --rm -d --name "$name" -h "$name" \
                --network "$docker_network" \
                -e AMOC_GRAPHITE_HOST='"graphite"' \
                --health-cmd="/home/amoc/amoc/bin/amoc status" \
@@ -67,7 +67,7 @@ function amoc_eval() {
     local exec_path="/home/amoc/amoc/bin/amoc"
     local container="$1"
     shift 1
-    docker exec -it "$container" "$exec_path" eval "$@"
+    docker exec "$container" "$exec_path" eval "$@"
 }
 
 function get_health_status() {
@@ -75,7 +75,9 @@ function get_health_status() {
 }
 
 function container_is_healthy() {
-  [ "$(get_health_status "$1")" = "\"healthy\"" ]
+  local health_status="$(get_health_status "$1")"
+  #echo "$1 container health status == '${health_status}'"
+  [ "$health_status" = "\"healthy\"" ]
 }
 
 function wait_for_healthcheck() {
@@ -109,6 +111,12 @@ function wait_for_cmd() {
     done
     echo -e "\nKilled by timeout"
     return 1
+}
+
+function get_amoc_logs() {
+    local logs_path="/home/amoc/amoc/log/erlang.log"
+    local container="$1"
+    docker exec "$container" cat "$logs_path"
 }
 
 ######################

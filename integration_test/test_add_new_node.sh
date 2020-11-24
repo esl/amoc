@@ -9,4 +9,4 @@ wait_for_healthcheck amoc-4
 
 amoc_eval amoc-4 "amoc_controller:get_status()" | contain dummy_scenario running
 amoc_eval amoc-4 "amoc_config:get(test)" | contain "test_value"
-amoc_eval amoc-4 "dummy_helper:test_amoc_dist()" | tee /dev/tty | contain 'amoc_dist_works_as_expected'
+amoc_eval amoc-4 "dummy_helper:test_amoc_dist()" | contain 'amoc_dist_works_as_expected'
