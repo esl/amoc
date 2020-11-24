@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         otp: ['22.3', '21.3']
-        test-type: [ 'regular' , 'integration' ]
+        test-type: [ 'regular' ]
     runs-on: 'ubuntu-20.04'
     steps:
       - uses: actions/checkout@v2
