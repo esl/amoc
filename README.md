@@ -1,4 +1,4 @@
-# A Murder of Crows [![Build Status](https://travis-ci.org/esl/amoc.svg?branch=master)](https://travis-ci.org/esl/amoc)
+# A Murder of Crows [![](https://github.com/esl/amoc/workflows/CI/badge.svg)](https://github.com/esl/amoc/actions?query=workflow%3ACI)
 
 ----------------------------------------------------------------------------------------------
 A Murder of Crows, aka amoc, is a simple framework for running massively parallel tests in a distributed environment.
