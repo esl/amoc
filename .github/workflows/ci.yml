@@ -12,10 +12,12 @@ jobs:
     strategy:
       matrix:
         otp: ['22.3', '21.3']
-        test-type: [ 'regular' , 'integration' ]
+        test-type: [ 'regular', 'integration' ]
     runs-on: 'ubuntu-20.04'
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - uses: ErlGang/setup-erlang@v1.0.0
         with:
           otp-version: ${{ matrix.otp }}
@@ -23,3 +25,5 @@ jobs:
         run: make test
       - if: matrix.test-type == 'integration' 
         run: make integration_test
+        env:
+          TRAVIS_OTP_RELEASE: ${{ matrix.otp }}
