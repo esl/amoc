@@ -22,11 +22,11 @@ wait_for_healthcheck amoc-1
 wait_for_healthcheck amoc-2
 wait_for_healthcheck amoc-3
 
-amoc_eval amoc-1 "nodes()" | contain amoc-2 amoc-3
-amoc_eval amoc-2 "nodes()" | contain amoc-1 amoc-3
-amoc_eval amoc-3 "nodes()" | contain amoc-1 amoc-2
+amoc_eval amoc-1 "nodes()." | contain amoc-2 amoc-3
+amoc_eval amoc-2 "nodes()." | contain amoc-1 amoc-3
+amoc_eval amoc-3 "nodes()." | contain amoc-1 amoc-2
 
-amoc_eval amoc-1 "amoc_scenario:does_scenario_exist(test1)" | contain true
-amoc_eval amoc-1 "amoc_scenario:does_scenario_exist(test2)" | contain true
+amoc_eval amoc-1 "amoc_scenario:does_scenario_exist(test1)." | contain true
+amoc_eval amoc-1 "amoc_scenario:does_scenario_exist(test2)." | contain true
 
 wait_for_metrics {"amoc-1","amoc-2","amoc-3"}".amoc.users.size"
