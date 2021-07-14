@@ -15,5 +15,5 @@ With default options API will be running on port 4000. You can set other port by
 In Amoc we use Swagger UI so if you want the current documentation in a nice format you can find it under `/api-docs/` path.
 Just open it in your browser (e.g. http://localhost:4000/api-docs/)
 
-You can also find the current documentation [here](https://esl.github.io/amoc_rest/?v=1.1.0)
+You can also find the current documentation [here](https://esl.github.io/amoc_rest/?v=1.1.1)
 (without possibility to execute requests)
