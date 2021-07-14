@@ -11,19 +11,18 @@ jobs:
     name: ${{ matrix.test-type }} test on OTP ${{matrix.otp}}
     strategy:
       matrix:
-        otp: ['22.3', '21.3']
-        test-type: [ 'regular', 'integration' ]
+        otp: ['24.0', '23.3.1']
+        test-type: ['regular', 'integration']
     runs-on: 'ubuntu-20.04'
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - uses: ErlGang/setup-erlang@v1.0.0
+      - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ matrix.otp }}
+          rebar3-version: '3.16.1'
       - if: matrix.test-type == 'regular'
         run: make test
-      - if: matrix.test-type == 'integration' 
+      - if: matrix.test-type == 'integration'
         run: make integration_test
         env:
-          TRAVIS_OTP_RELEASE: ${{ matrix.otp }}
+          OTP_RELEASE: ${{ matrix.otp }}
