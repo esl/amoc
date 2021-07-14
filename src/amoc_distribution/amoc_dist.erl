@@ -222,7 +222,7 @@ stop_cluster() ->
             Result = [{Node, rpc:call(Node, amoc_controller, stop_scenario, [])} ||
                          Node <- Slaves],
             maybe_error(Result);
-        {_, Slaves} -> {error, not_a_master}
+        {_, _} -> {error, not_a_master}
     end.
 
 -spec maybe_error([{any(), any()}]) -> {ok, any()} | {error, any()}.
