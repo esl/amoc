@@ -71,12 +71,12 @@ put_scenarios_returns_400_and_error_when_scenario_is_not_valid(_Config) ->
     ?assertEqual(400, CodeHttp),
     ?assertEqual(#{<<"error">> => <<"invalid module">>}, Body).
 
--define(PARSE_ERROR,
-        <<"\n                      [{2,erl_parse,[\"syntax error before: \",[]]}]}]\n">>).
 -if(?OTP_RELEASE >= 24).
--undef(PARSE_ERROR).
 -define(PARSE_ERROR,
         <<"\n                      [{{2,1},erl_parse,[\"syntax error before: \",[]]}]}]\n">>).
+-else.
+-define(PARSE_ERROR,
+        <<"\n                      [{2,erl_parse,[\"syntax error before: \",[]]}]}]\n">>).
 -endif.
 
 put_scenarios_returns_200_and_compile_error_when_scenario_source_not_valid(_Config) ->
