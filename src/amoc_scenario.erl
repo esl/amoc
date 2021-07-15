@@ -106,7 +106,9 @@ add_code_paths() ->
 
 -spec find_scenario_modules() -> [module()].
 find_scenario_modules() ->
-    AllBeamFiles = [File || Path <- code:get_path(), File <- filelib:wildcard("*.beam", Path)],
+    ErtsPath = code:lib_dir(),
+    AllPaths = [Path || Path <- code:get_path(), not lists:prefix(ErtsPath, Path)],
+    AllBeamFiles = [File || Path <- AllPaths, File <- filelib:wildcard("*.beam", Path)],
     AllModules = [list_to_atom(filename:rootname(BeamFile)) || BeamFile <- AllBeamFiles],
     ok = code:ensure_modules_loaded(AllModules),
     [maybe_store_module(Module) || Module <- erlang:loaded()].
