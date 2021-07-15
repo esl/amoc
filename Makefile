@@ -1,6 +1,8 @@
 .PHONY: all rel compile clean ct test integration_test dialyzer xref console lint
 
-REBAR = ./rebar3
+REBARVER = 3.16.1
+
+REBAR = rebar3
 
 ifdef SUITE
 SUITE_OPTS = --suite $$SUITE
@@ -8,8 +10,8 @@ endif
 
 all: rel
 
-rel:
-	$(REBAR) as prod tar
+rel: rebar3
+	./rebar3 as prod tar
 
 compile:
 	$(REBAR) as prod compile
@@ -37,6 +39,10 @@ rerun_integration_test:
 	./integration_test/test_distribute_scenario.sh
 	./integration_test/test_run_scenario.sh
 	./integration_test/test_add_new_node.sh
+
+rebar3:
+	wget https://github.com/erlang/rebar3/releases/download/${REBARVER}/rebar3 &&\
+	chmod u+x rebar3
 
 dialyzer:
 	$(REBAR) as prod dialyzer

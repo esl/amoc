@@ -21,7 +21,7 @@ process_scenario_config(Config, Settings) ->
 
 -spec get_value_and_verify(module_parameter(), settings()) ->
     {ok, module_parameter()} | {error, reason()}.
-get_value_and_verify(#module_parameter{name = Name, mod = Module, value = Default,
+get_value_and_verify(#module_parameter{name = Name, value = Default,
                                        verification_fn = VerificationFn} = Param,
                      Settings) ->
     DefaultValue = amoc_config_env:get(Name, Default),
