@@ -1,15 +1,19 @@
-FROM phusion/baseimage:focal-1.0.0 as amoc-build
+FROM phusion/baseimage:focal-1.0.0 as base-image
+FROM base-image as amoc-build
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-                    git make wget gnupg
+RUN apt-get update
+RUN apt-get -y install gnupg2
 
+ARG DEBIAN_FRONTEND=noninteractive
 ARG otp_vsn=24.0-1
 
-RUN wget https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb && \
-    dpkg -i erlang-solutions_2.0_all.deb && \
-    apt-get update && \
-    apt-get install -y esl-erlang=1:${otp_vsn}
+ADD https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb /tmp/
+RUN dpkg -i /tmp/erlang-solutions_2.0_all.deb
+RUN apt-get update
+
+RUN apt-get -y install esl-erlang=1:${otp_vsn}
+
+RUN apt-get -y install git make wget
 
 COPY . /amoc_build
 
@@ -17,7 +21,7 @@ RUN cd amoc_build && \
     git clean -ffxd && \
     make rel
 
-FROM phusion/baseimage:focal-1.0.0
+FROM base-image
 MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
 RUN useradd -ms /bin/bash amoc
@@ -29,6 +33,6 @@ RUN chown -R amoc:amoc /home/amoc/amoc
 EXPOSE 4000
 
 RUN mkdir /etc/service/amoc
-ADD docker/amoc.sh /etc/service/amoc/run
+COPY docker/amoc.sh /etc/service/amoc/run
 
 CMD ["/sbin/my_init"]
