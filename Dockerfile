@@ -22,7 +22,7 @@ MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
 RUN useradd -ms /bin/bash amoc
 
-COPY --from=amoc-build /amoc_build/_build/prod/rel/amoc/ /home/amoc/amoc/
+COPY --from=amoc-build /amoc_build/_build/demo/rel/amoc/ /home/amoc/amoc/
 # It seems hub.docker.com does not support --chown param to COPY directive
 RUN chown -R amoc:amoc /home/amoc/amoc
 
