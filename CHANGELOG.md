@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/)
 
+## [2.2.1](https://github.com/esl/amoc/compare/2.2.0...2.2.1) - 2021-07-19
+
+* [PR#138](https://github.com/esl/amoc/pull/138) - Fixing docsh dependency
+
 ## [2.2.0](https://github.com/esl/amoc/compare/2.1.0...2.2.0) - 2021-07-15
 
 This release enables OTP24, and migrates CI to Github Actions.
