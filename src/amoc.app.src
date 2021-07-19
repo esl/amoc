@@ -8,7 +8,8 @@
         compiler,
         exometer_core,
         exometer_report_graphite,
-        amoc_rest
+        amoc_rest,
+        docsh
     ]},
     {mod, {amoc_app, []}},
     {env, [{exometer_predefined, [

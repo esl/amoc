@@ -11,10 +11,10 @@ endif
 all: rel
 
 rel: rebar3
-	./rebar3 as prod tar
+	./rebar3 as demo tar
 
 compile:
-	$(REBAR) as prod compile
+	$(REBAR) as demo compile
 
 clean:
 	$(REBAR) clean
@@ -45,10 +45,10 @@ rebar3:
 	chmod u+x rebar3
 
 dialyzer:
-	$(REBAR) as prod dialyzer
+	$(REBAR) as demo dialyzer
 
 xref:
-	$(REBAR) as prod xref
+	$(REBAR) as demo xref
 
 console:
 	@echo "tests can be executed manually using ct:run/1 function:\n" \
