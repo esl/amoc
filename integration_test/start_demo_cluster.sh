@@ -2,12 +2,11 @@
 
 source "$(dirname "$0")/helper.sh"
 enable_strict_mode
-cd "${git_root}"
 
 create_code_path test1
 create_code_path test2
 
-docker-compose up -d amoc-{master,worker-1,worker-2} graphite grafana
+docker_compose up -d amoc-{master,worker-1,worker-2} graphite grafana
 
 wait_for_healthcheck amoc-master
 wait_for_healthcheck amoc-worker-1

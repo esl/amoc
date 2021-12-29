@@ -6,7 +6,7 @@ x-amoc-defaults: &amoc-defaults
     - amoc-test-network
   volumes:
     - type: bind
-      source: ./integration_test/extra_code_paths
+      source: ./extra_code_paths
       target: /extra_code_paths
   environment:
     AMOC_GRAPHITE_HOST: '"graphite"'

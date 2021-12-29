@@ -73,8 +73,8 @@ different components using the following addresses:
 
 To check the most recent `amoc-master` logs you can run this command:
 
-`docker-compose logs --tail=100 amoc-master`
+`docker-compose -p "amoc-demo-cluster" logs --tail=100 amoc-master`
 
 To attach to `amoc-master` node use the following command:
 
-`docker-compose exec amoc-master /home/amoc/amoc/bin/amoc remote_console`
+`docker-compose -p "amoc-demo-cluster" exec amoc-master /home/amoc/amoc/bin/amoc remote_console`

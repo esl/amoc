@@ -63,15 +63,20 @@ function amoc_container_port() {
     esac
 }
 
+docker_compose() {
+    local compose_file="${git_root}/integration_test/docker-compose.yml"
+    docker-compose -p "amoc-demo-cluster" -f "$compose_file" "$@"
+}
+
 function amoc_eval() {
     local exec_path="/home/amoc/amoc/bin/amoc"
     local service="$1"
     shift 1
-    docker-compose exec -T "$service" "$exec_path" eval "$@"
+    docker_compose exec -T "$service" "$exec_path" eval "$@"
 }
 
 function container_is_healthy() {
-  docker-compose -f ${git_root}/docker-compose.yml ps $1 | contain "healthy"
+   docker_compose ps $1 | contain "healthy"
 }
 
 function wait_for_healthcheck() {
