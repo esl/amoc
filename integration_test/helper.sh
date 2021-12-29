@@ -11,13 +11,12 @@ function enable_strict_mode() {
 }
 
 function create_code_path() {
-    cd "${git_root}/integration_test"
-    dir="tmp/${1}"
+    dir="${git_root}/integration_test/extra_code_paths/${1}"
+    [ -d "$dir" ] || return 1
     erl_file="${dir}/${1}.erl"
-    mkdir -p "${dir}"
-    sed "s/-module(.*)./-module(${1})./" dummy_scenario.erl > "${erl_file}"
-    erlc -o "${dir}" "${erl_file}"
-    cd -
+    dummy_scenario="${git_root}/integration_test/dummy_scenario.erl"
+    sed "s/-module(.*)./-module(${1})./" "$dummy_scenario" > "$erl_file"
+    erlc -o "$dir" "$erl_file"
 }
 
 function contain() {
@@ -30,54 +29,49 @@ function contain() {
     test "$(($output))" -eq 0
 }
 
+function wait_for_cmd() {
+    local timeout="${1:-0}"
+    local cmd="${2:-true}"
+    shift 2
+    local full_cmd=("$cmd" "$@")
+    echo "Waiting for '${full_cmd[@]}'"
+    for i in $(seq 0 "${timeout}"); do
+        if "${full_cmd[@]}"; then
+            [ "$i" -ne 0 ] && echo
+            echo "Waiting is done after $i seconds"
+            return 0
+        fi
+        echo -n "."
+        sleep 1
+    done
+    echo -e "\nKilled by timeout"
+    return 1
+}
+
 ######################
 ## docker functions ##
 ######################
-function start_graphite_container() {
-    docker network create "${docker_network}"
-    docker run --rm -d --name=graphite \
-               -p 2003:2003 -p 8080:80 \
-               --network="$docker_network" \
-               graphiteapp/graphite-statsd:1.1.7-2
-}
-
 function amoc_container_port() {
-    local container="$1"
-    if [[ "$container" =~ ^amoc-[0-9]$ ]]; then
-        echo "888${container#amoc-}"
-    else
-        return 1
-    fi
-}
-
-function start_amoc_container() {
-    local name="$1"
-    shift 1
-    local port="$(amoc_container_port "$name")"
-    docker run --rm -d --name "$name" -h "$name" \
-               --network "$docker_network" \
-               -e AMOC_GRAPHITE_HOST='"graphite"' \
-               --health-cmd="/home/amoc/amoc/bin/amoc status" \
-               -p "$port:4000" \
-               "$@" \
-               amoc:latest
+    local service="$1"
+    case "$service" in
+       amoc-master)
+         echo 4000 ;;
+       amoc-worker-[0-9])
+         echo "400${service#amoc-worker-}" ;;
+       *) 
+         return 1 ;;
+    esac
 }
 
 function amoc_eval() {
     local exec_path="/home/amoc/amoc/bin/amoc"
-    local container="$1"
+    local service="$1"
     shift 1
-    docker exec "$container" "$exec_path" eval "$@"
-}
-
-function get_health_status() {
-    docker inspect --format '{{json .State.Health.Status }}' "$1"
+    docker-compose exec -T "$service" "$exec_path" eval "$@"
 }
 
 function container_is_healthy() {
-  local health_status="$(get_health_status "$1")"
-  #echo "$1 container health status == '${health_status}'"
-  [ "$health_status" = "\"healthy\"" ]
+  docker-compose -f ${git_root}/docker-compose.yml ps $1 | contain "healthy"
 }
 
 function wait_for_healthcheck() {
@@ -95,32 +89,7 @@ function wait_for_metrics() {
      wait_for_cmd 60 metrics_reported "$@"
 }
 
-function wait_for_cmd() {
-    local timeout="${1:-0}"
-    local cmd="${2:-true}"
-    shift 2
-    local full_cmd=("$cmd" "$@")
-    echo "Waiting for '${full_cmd[@]}'"
-    for i in $(seq 0 "${timeout}"); do
-        if "${full_cmd[@]}"; then
-            echo -e "\nWaiting is done after $i seconds"
-            return 0
-        fi
-        echo -n "."
-        sleep 1
-    done
-    echo -e "\nKilled by timeout"
-    return 1
-}
-
-function get_amoc_logs() {
-    local logs_path="/home/amoc/amoc/log/erlang.log"
-    local container="$1"
-    docker exec "$container" cat "$logs_path"
-}
-
 ######################
 ## common variables ##
 ######################
 git_root="$(git rev-parse --show-toplevel)"
-docker_network=amoc-test-network

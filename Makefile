@@ -28,16 +28,18 @@ ct:
 test: compile xref lint dialyzer ct
 
 integration_test:
-	./integration_test/cleanup_containers.sh
+	./integration_test/stop_demo_cluster.sh
 	./integration_test/build_docker_image.sh
-	./integration_test/test_docker_image.sh
+	./integration_test/start_demo_cluster.sh
+	./integration_test/test_amoc_cluster.sh
 	./integration_test/test_distribute_scenario.sh
 	./integration_test/test_run_scenario.sh
 	./integration_test/test_add_new_node.sh
 
 rerun_integration_test:
-	./integration_test/cleanup_containers.sh
-	./integration_test/test_docker_image.sh
+	./integration_test/stop_demo_cluster.sh
+	./integration_test/start_demo_cluster.sh
+	./integration_test/test_amoc_cluster.sh
 	./integration_test/test_distribute_scenario.sh
 	./integration_test/test_run_scenario.sh
 	./integration_test/test_add_new_node.sh

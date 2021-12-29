@@ -18,6 +18,3 @@ _build
 *.iml
 rebar3.crashdump
 *~
-
-## amoc specific
-integration_test/tmp

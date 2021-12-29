@@ -1,0 +1,10 @@
+## this directory is a placeholder for testing
+## AMOC_EXTRA_CODE_PATHS configuration option
+
+## the purpose of this .gitignore file is to ensure
+## that such data is not commiteded accidentaly to git
+
+# Ignore all files in this dir ...
+*
+# ... except for this one.
+!.gitignore
