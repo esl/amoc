@@ -2,24 +2,15 @@
 
 source "$(dirname "$0")/helper.sh"
 enable_strict_mode
-cd "${git_root}/integration_test"
 
-start_graphite_container
+create_code_path test1
+create_code_path test2
 
-## start grafana
-docker run --rm -d --name=grafana \
-           -p 3000:3000 --network="$docker_network" \
-           grafana/grafana:6.7.3
+docker_compose up -d amoc-{master,worker-1,worker-2} graphite grafana
 
-amoc_nodes="['amoc@amoc-1']"
-
-start_amoc_container amoc-1 -e AMOC_NODES="${amoc_nodes}"
-start_amoc_container amoc-2 -e AMOC_NODES="${amoc_nodes}"
-start_amoc_container amoc-3 -e AMOC_NODES="${amoc_nodes}"
-
-wait_for_healthcheck amoc-1
-wait_for_healthcheck amoc-2
-wait_for_healthcheck amoc-3
+wait_for_healthcheck amoc-master
+wait_for_healthcheck amoc-worker-1
+wait_for_healthcheck amoc-worker-2
 
 json=( '{'
        '"name": "graphite",'

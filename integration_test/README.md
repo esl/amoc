@@ -3,37 +3,55 @@
 All shell scripts should conform to this
 [code style](https://google.github.io/styleguide/shellguide.html)
 
-### 1. Build docker containers
+### 1. Build amoc docker image
 
-In amoc dirctory run:
+In the Amoc repo root directory run:
 
 `./integration_test/build_docker_image.sh`
 
-This will build docker image `amoc:latest`.
+This command builds docker image `amoc:latest`.
 
-### 2. Run docker containers
-`./integration_test/test_docker_image.sh`
+### 2. Start amoc demo cluster
 
-This will start two containers `amoc-1` and `amoc-2` and
-will wait until healthcheck is successful.
+`./integration_test/start_demo_cluster.sh`
 
-### 3. Test installation of user scenario in amoc cluster
+More information about the demo cluster can be found further in this document.
+
+### 3. Check the amoc clustering is done properly
+
+`./integration_test/test_amoc_cluster.sh`
+
+This command verifies that clustering is done properly and metrics are reported
+from all the nodes.
+
+### 4. Test installation of user scenario in amoc cluster
 
 `./integration_test/test_distribute_scenario.sh`
  
-This will install a sample `dummy_scenario.erl` on the `amoc-1` node
-using curl and then it will verify that it is propagated to the other
-node in the cluster, `amoc-2`.
+This command uploads a sample `dummy_scenario.erl` on the `amoc-master` node
+using `curl` and after uploading verifies that scenario is propagated to the
+worker nodes.
 
-### 4. Run the scenario and verify that it finishes without errors
+### 5. Run the uploaded scenario.
 
 `./integration_test/test_run_scenario.sh`
 
-### 5. Cleanup
+This command starts execution of `dummy_scenario.erl` scenario (must be uploaded
+before this action)
 
-To stop containers and remove Amoc image run:
+### 6. Add additional node to the cluster
 
-`./integration_test/cleanup_containers.sh`
+`./integration_test/test_add_new_node.sh`
+
+This command verifies that joining of the new node to the cluster is done properly.
+It is expected that cluster is running `dummy_scenario.erl` scenario at the moment
+when the new amoc node joins.
+
+### 7. Cleanup
+
+To stop Amoc demo cluster run:
+
+`./integration_test/stop_demo_cluster.sh`
 
 ## Demo cluster
 
@@ -47,16 +65,16 @@ To start the demo cluster you can run these commands:
 When the demo cluster is up and running you can access its
 different components using the following addresses:
  * Amoc Swagger UI:
-    * [amoc-1](http://localhost:8081/api-docs/)
-    * [amoc-2](http://localhost:8082/api-docs/)
-    * [amoc-3](http://localhost:8083/api-docs/)
+    * [amoc-master](http://localhost:4000/api-docs/)
+    * [amoc-worker-1](http://localhost:4001/api-docs/)
+    * [amoc-worker-2](http://localhost:4002/api-docs/)
  * [graphite](http://localhost:8080/) web interface
  * [grafana](http://localhost:3000/) - default username and password is `admin`/`admin`
 
-To check the most recent `amoc-1` logs you can run this command:
+To check the most recent `amoc-master` logs you can run this command:
 
-`docker exec amoc-1 tail /home/amoc/amoc/log/erlang.log`
+`docker-compose -p "amoc-demo-cluster" logs --tail=100 amoc-master`
 
-To attach to `amoc-1` node use the following command:
+To attach to `amoc-master` node use the following command:
 
-`docker exec -it amoc-1 /home/amoc/amoc/bin/amoc remote_console`
+`docker-compose -p "amoc-demo-cluster" exec amoc-master /home/amoc/amoc/bin/amoc remote_console`

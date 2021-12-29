@@ -13,7 +13,7 @@ run_scenario() {
          -s  -w "%{http_code}" -o /dev/null -d "$json_body" "http://localhost:${port}/execution/start"
 }
 
-result="$(run_scenario amoc-1 dummy_scenario 10)"
+result="$(run_scenario amoc-master dummy_scenario 10)"
 
 if [ "$result" = "200" ]; then
     echo "Scenario executed"

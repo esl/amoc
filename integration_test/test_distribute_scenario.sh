@@ -34,15 +34,15 @@ function upload_module() {
          "http://localhost:${port}/scenarios/upload"
 }
 
-list_scenarios_by_port amoc-1
-list_scenarios_by_port amoc-2
-list_scenarios_by_port amoc-3
+list_scenarios_by_port amoc-master
+list_scenarios_by_port amoc-worker-1
+list_scenarios_by_port amoc-worker-2
 
-echo "Installing scenario and helper module on the amoc-1 node"
-scenario_put="$(upload_module amoc-1 "${scenario_name}.erl")"
-echo "Response: ${scenario_put}"
-helper_put="$(upload_module amoc-1 "dummy_helper.erl")"
-echo "Response: ${helper_put}"
+echo "Installing scenario and helper module on the amoc-master node"
+scenario_put="$(upload_module amoc-master "${scenario_name}.erl")"
+echo "Response for '${scenario_name}.erl': ${scenario_put}"
+helper_put="$(upload_module amoc-master "dummy_helper.erl")"
+echo "Response for 'dummy_helper.erl': ${helper_put}"
 
-ensure_scenarios_installed amoc-2 ${scenario_name}
-ensure_scenarios_installed amoc-3 ${scenario_name}
+ensure_scenarios_installed amoc-worker-1 ${scenario_name}
+ensure_scenarios_installed amoc-worker-2 ${scenario_name}

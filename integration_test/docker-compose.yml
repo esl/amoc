@@ -1,0 +1,52 @@
+version: "3.4"
+
+x-amoc-defaults: &amoc-defaults
+  image: "amoc:latest"
+  networks:
+    - amoc-test-network
+  volumes:
+    - type: bind
+      source: ./extra_code_paths
+      target: /extra_code_paths
+  environment:
+    AMOC_GRAPHITE_HOST: '"graphite"'
+    AMOC_NODES: "['amoc@amoc-master']"
+    AMOC_EXTRA_CODE_PATHS: '["/extra_code_paths/test1", "/extra_code_paths/test2"]'
+  healthcheck:
+    test: "/home/amoc/amoc/bin/amoc status"
+
+services:
+  amoc-master:
+    <<: *amoc-defaults
+    hostname: "amoc-master"
+    ports:
+      - "4000:4000"
+  amoc-worker-1: &amoc-worker
+    <<: *amoc-defaults
+    hostname: "amoc-worker-1"
+    ports:
+      - "4001:4000"
+  amoc-worker-2: 
+    <<: *amoc-defaults
+    hostname: "amoc-worker-2"
+    ports:
+      - "4002:4000"
+  amoc-worker-3: 
+    <<: *amoc-defaults
+    hostname: "amoc-worker-3"
+    ports:
+      - "4003:4000"
+  graphite:
+    image: "graphiteapp/graphite-statsd:1.1.7-2"
+    ports:
+      - "8080:80"
+    networks:
+      - amoc-test-network
+  grafana:
+    image: "grafana/grafana:6.7.3"
+    ports:
+      - "3000:3000"
+    networks:
+      - amoc-test-network
+networks:
+  amoc-test-network:
