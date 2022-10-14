@@ -1,43 +1,42 @@
-FROM phusion/baseimage:focal-1.0.0 as base-image
-FROM base-image as amoc-build
-
-RUN apt-get update
-RUN apt-get -y install gnupg2
+FROM public.ecr.aws/debian/debian:buster 
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG otp_vsn=24.0
-ARG rebar_vsn=3.16.1
+ARG otp_vsn=18.3
+ARG asdf_version=0.8.1
+ARG HOME=/root
 
-ADD https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb /tmp/
-RUN dpkg -i /tmp/erlang-solutions_2.0_all.deb
-RUN apt-get update
+RUN apt-get --quiet update
+RUN apt-get -q -y install ca-certificates \
+                          procps \
+                          git \
+                          unzip \
+                          curl \
+                          build-essential \
+                          libncurses5-dev \
+                          libssl-dev \
+                          unixodbc-dev
 
-RUN apt-get -y install esl-erlang=1:${otp_vsn}-1
+RUN git clone https://github.com/openssl/openssl.git /openssl --branch OpenSSL_1_0_2-stable
+WORKDIR /openssl
+RUN ./config --prefix=/openssl-1.0 shared -fPIC
+RUN make depend && make && make install
 
-RUN apt-get -y install git make wget
+RUN git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch "v${asdf_version}"
+RUN echo '. ~/.asdf/asdf.sh' >> ~/.bashrc
+ENV PATH "${HOME}/.asdf/shims:${HOME}/.asdf/bin:${PATH}"
+RUN asdf plugin add erlang
+RUN KERL_CONFIGURE_OPTIONS="--with-ssl=/openssl-1.0" asdf install erlang "${otp_vsn}"
+RUN asdf global erlang "${otp_vsn}"
 
 COPY . /amoc_build
+WORKDIR /amoc_build
 
-ADD https://github.com/erlang/rebar3/releases/download/${rebar_vsn}/rebar3 /bin
-RUN chmod u+x /bin/rebar3
+RUN git clean -ffxd
+RUN make rel
 
-RUN cd /amoc_build && \
-    git clean -ffxd && \
-    make rel
+RUN mkdir /amoc
+RUN tar -C /amoc -zxf _build/demo/rel/amoc/amoc-2.2.1-OTP18.tar.gz
+ENV PATH "/amoc/bin:${PATH}"
 
-FROM base-image
+CMD ["amoc", "foreground"]
 
-RUN useradd -ms /bin/bash amoc
-
-COPY --from=amoc-build /amoc_build/_build/demo/rel/amoc/ /home/amoc/amoc/
-COPY --from=amoc-build /amoc_build/scenarios /amoc_build/scenarios
-
-# It seems hub.docker.com does not support --chown param to COPY directive
-RUN chown -R amoc:amoc /home/amoc/amoc
-
-EXPOSE 4000
-
-RUN mkdir /etc/service/amoc
-COPY docker/amoc.sh /etc/service/amoc/run
-
-CMD ["/sbin/my_init"]

@@ -6,10 +6,9 @@
         kernel,
         stdlib,
         compiler,
+        lager,
         exometer_core,
-        exometer_report_graphite,
-        amoc_rest,
-        docsh
+        exometer_report_graphite
     ]},
     {mod, {amoc_app, []}},
     {env, [{exometer_predefined, [

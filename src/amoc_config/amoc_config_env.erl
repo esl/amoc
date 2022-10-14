@@ -11,20 +11,18 @@
 
 -export([get/1, get/2, parse_value/1, format/2]).
 
--include_lib("kernel/include/logger.hrl").
-
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec get(amoc_config:name()) -> amoc_config:value().
+-spec get(atom()) -> any().
 get(Name) ->
     get(Name, undefined).
 
--spec get(amoc_config:name(), amoc_config:value()) -> amoc_config:value().
+-spec get(atom(), any()) -> any().
 get(Name, Default) when is_atom(Name) ->
     get_os_env(Name, Default).
 
--spec parse_value(string() | binary()) -> {ok, amoc_config:value()} | {error, any()}.
+-spec parse_value(string() | binary()) -> {ok, any()} | {error, any()}.
 parse_value(Binary) when is_binary(Binary) ->
     parse_value(binary_to_list(Binary));
 parse_value(String) when is_list(String) ->
@@ -45,22 +43,22 @@ format(Value, string) ->
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
--spec get_os_env(amoc_config:name(), amoc_config:value()) -> amoc_config:value().
+-spec get_os_env(atom(), any()) -> any().
 get_os_env(Name, Default) ->
     EnvName = os_env_name(Name),
     Value = os:getenv(EnvName),
     case parse_value(Value, Default) of
         {ok, Term} -> Term;
         {error, _} ->
-            ?LOG_ERROR("cannot parse $~p value \"~p\", using default one", [EnvName, Value]),
+            lager:error("cannot parse $~p value \"~p\", using default one", [EnvName, Value]),
             Default
     end.
 
--spec os_env_name(amoc_config:name()) -> string().
+-spec os_env_name(atom()) -> string().
 os_env_name(Name) when is_atom(Name) ->
-    "AMOC_" ++ string:uppercase(erlang:atom_to_list(Name)).
+    "AMOC_" ++ string:to_upper(erlang:atom_to_list(Name)).
 
--spec parse_value(string() | false, any()) -> {ok, amoc_config:value()} | {error, any()}.
+-spec parse_value(string() | false, any()) -> {ok, any()} | {error, any()}.
 parse_value(false, Default) -> {ok, Default};
 parse_value("", Default)    -> {ok, Default};
 parse_value(String, _) ->

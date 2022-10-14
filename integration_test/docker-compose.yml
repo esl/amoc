@@ -13,29 +13,21 @@ x-amoc-defaults: &amoc-defaults
     AMOC_NODES: "['amoc@amoc-master']"
     AMOC_EXTRA_CODE_PATHS: '["/extra_code_paths/test1", "/extra_code_paths/test2"]'
   healthcheck:
-    test: "/home/amoc/amoc/bin/amoc status"
+    test: "amoc status"
 
 services:
   amoc-master:
     <<: *amoc-defaults
     hostname: "amoc-master"
-    ports:
-      - "4000:4000"
   amoc-worker-1: &amoc-worker
     <<: *amoc-defaults
     hostname: "amoc-worker-1"
-    ports:
-      - "4001:4000"
   amoc-worker-2: 
     <<: *amoc-defaults
     hostname: "amoc-worker-2"
-    ports:
-      - "4002:4000"
   amoc-worker-3: 
     <<: *amoc-defaults
     hostname: "amoc-worker-3"
-    ports:
-      - "4003:4000"
   graphite:
     image: "graphiteapp/graphite-statsd:1.1.7-2"
     ports:

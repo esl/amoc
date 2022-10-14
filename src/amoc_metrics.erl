@@ -7,8 +7,6 @@
 -export([start/0, init/2]).
 -export([update_time/2, update_counter/2, update_counter/1, update_gauge/2]).
 
--include_lib("kernel/include/logger.hrl").
-
 -type simple_name() :: atom() | [atom()].
 
 -type name() :: simple_name() | {strict, simple_name()}.
@@ -21,8 +19,7 @@
 -spec start() -> any().
 start() ->
     maybe_add_reporter(),
-    subsribe_default_metrics(),
-    maybe_init_predefined_metrics().
+    subsribe_default_metrics().
 
 -spec init(type(), name()) -> ok.
 init(Type, Name) ->
@@ -114,9 +111,6 @@ maybe_subscribe(ExName, Datapoints) ->
             exometer_report:unsubscribe(Reporter, ExName, Datapoints, []),
             ok = exometer_report:subscribe(Reporter, ExName, Datapoints, Interval);
         _ ->
-            ?LOG_WARNING("Reporter=~p not_enbled", [Reporter])
+            lager:warning("Reporter=~p not_enbled", [Reporter])
     end.
 
-maybe_init_predefined_metrics() ->
-    Preconfigured = amoc_config_utils:find_all_vars(predefined_metrics),
-    [init(Type, Name) || {Type, Name} <- lists:flatten(Preconfigured)].

@@ -14,7 +14,10 @@
 %% gen_server callbacks
 -export([init/1,
          handle_call/3,
-         handle_cast/2]).
+         handle_cast/2,
+         handle_info/2,
+         terminate/2,
+         code_change/3]).
 
 -type event() :: amoc_coordinator:coordination_event().
 -type action() :: amoc_coordinator:coordination_action().
@@ -72,7 +75,19 @@ handle_cast({add, Data}, State) ->
     NewState = add_data(Data, State),
     {noreply, NewState}.
 
+-spec handle_info(any(), state()) -> {noreply, state()}.
+handle_info(Info, State) ->
+    lager:warning("Unexpected message: ~p", [Info]),
+    {noreply, State}.
 
+-spec code_change(OldVsn :: any(), State :: state(), Extra :: any()) ->
+        {ok, state()}.
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+-spec terminate(Reason :: any(), State :: state()) -> ok.
+terminate(_Reason, _State) ->
+    ok.
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================

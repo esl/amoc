@@ -17,7 +17,9 @@
 -export([init/1,
          handle_call/3,
          handle_cast/2,
-         handle_info/2]).
+         handle_info/2,
+         terminate/2,
+         code_change/3]).
 
 -define(SERVER, ?MODULE).
 -define(MASTER_SERVER, {?SERVER, amoc_cluster:master_node()}).
@@ -49,7 +51,7 @@
 -spec(start_link() ->
     {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
-    pg:start_link(),
+    pg2:start(),
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 -spec(ensure_throttle_processes_started(name(), non_neg_integer(),
@@ -133,8 +135,8 @@ init([]) ->
                      {reply, ok, state()} |
                      {reply, {error, any()}, state()}.
 handle_call({start_processes, Name, Rate, Interval, NoOfProcesses}, _From, State) ->
-    case pg:get_members(Name) of
-        [] ->
+    case pg2:get_members(Name) of
+        {error, {no_such_group, Name}} ->
             RealNoOfProcesses = start_processes(Name, Rate, Interval, NoOfProcesses),
             {reply, {ok, started},
              State#{Name => #throttle_info{rate = Rate, interval = Interval, active = true,
@@ -181,6 +183,7 @@ handle_call({change_rate_gradually, Name, LowRate, HighRate,
 handle_call({stop, Name}, _From, State) ->
     case all_processes(Name, stop) of
         ok ->
+            pg2:delete(Name),
             {reply, ok, maps:remove(Name, State)};
         Error -> {reply, Error, State}
     end.
@@ -200,6 +203,15 @@ handle_info({change_plan, Name}, State) ->
         N when N > 1 -> NewState = continue_plan(Name, State),
             {noreply, NewState}
     end.
+
+-spec code_change(OldVsn :: any(), State :: state(), Extra :: any()) ->
+        {ok, state()}.
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+-spec terminate(Reason :: any(), State :: state()) -> ok.
+terminate(_Reason, _State) ->
+    ok.
 
 %%%===================================================================
 %%% Internal functions
@@ -252,6 +264,7 @@ rate_per_minute(Rate, Interval) ->
 
 -spec start_processes(name(), pos_integer(), non_neg_integer(), pos_integer()) -> pos_integer().
 start_processes(Name, Rate, Interval, NoOfProcesses) ->
+    pg2:create(Name),
     % Master metrics
     amoc_metrics:init(gauge, ?RATE(Name)),
     [amoc_metrics:init(counters, E) || E <- [?EXEC_RATE(Name), ?REQ_RATE(Name)]],
@@ -262,11 +275,13 @@ start_processes(Name, Rate, Interval, NoOfProcesses) ->
     RealNoOfProcesses.
 
 -spec get_throttle_process(name()) -> {error, {no_throttle_process_registered, name()}} |
-                                      {error, any()} | {ok, pid()}.
+{error, any()} | {ok, pid()}.
 get_throttle_process(Name) ->
-    case pg:get_members(Name) of
+    case pg2:get_members(Name) of
         [] ->
             {error, {no_throttle_process_registered, Name}};
+        {error, Error} ->
+            {error, Error};
         List -> %% nonempty list
             N = rand:uniform(length(List)),
             {ok, lists:nth(N, List)}
@@ -286,8 +301,8 @@ maybe_change_rate(Name, Rate, Interval, Info) ->
 -spec do_change_rate(name(), pos_integer(), non_neg_integer()) ->
     {ok, non_neg_integer()} | {error, any()}.
 do_change_rate(Name, Rate, Interval) ->
-    case pg:get_members(Name) of
-        [] -> {error, no_processes_in_group};
+    case pg2:get_members(Name) of
+        {error, Err} -> {error, Err};
         List when is_list(List) ->
             RatePerMinute = rate_per_minute(Rate, Interval),
             amoc_metrics:update_gauge(?RATE(Name), RatePerMinute),
@@ -313,7 +328,7 @@ start_throttle_processes(Name, Interval, Rate, N) when is_integer(N), N > 1 ->
 
 start_throttle_process(Name, Interval, Rate) ->
     {ok, Pid} = amoc_throttle_process:start(Name, Interval, Rate),
-    pg:join(Name, Pid).
+    pg2:join(Name, Pid).
 
 update_throttle_processes([Pid], Interval, Rate, 1) ->
     amoc_throttle_process:update(Pid, Interval, Rate);
@@ -323,9 +338,10 @@ update_throttle_processes([Pid | Tail], Interval, Rate, N) when N > 1 ->
     update_throttle_processes(Tail, Interval, Rate - ProcessRate, N - 1).
 
 all_processes(Name, Cmd) ->
-    case pg:get_members(Name) of
-        [] -> {error, no_processes_in_group};
-        Ps -> [run_cmd(P, Cmd) || P <- Ps], ok
+    case pg2:get_members(Name) of
+        List when is_list(List) ->
+            [run_cmd(P, Cmd) || P <- List], ok;
+        Error -> Error
     end.
 
 run_cmd(Pid, stop) ->

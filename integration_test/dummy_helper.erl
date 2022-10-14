@@ -1,8 +1,5 @@
 -module(dummy_helper).
 
--required_variable(#{name=>dummy_var, description=>"dummy_var",
-                     default_value=>default_value}).
-
 %% amoc_dist testing function
 -export([test_amoc_dist/0]).
 
@@ -59,8 +56,8 @@ test_amoc_dist() ->
         %% return expected value
         amoc_dist_works_as_expected
     catch
-        C:E:S ->
-            {error, {C, E, S}}
+        C:E ->
+            {error, {C, E}}
     end.
 
 get_users_info(SlaveNodes) ->

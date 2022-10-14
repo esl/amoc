@@ -10,9 +10,7 @@ scenario_name="dummy_scenario"
 ## amoc REST API functions ##
 #############################
 function get_scenarios() {
-    local port="$(amoc_container_port "$1")"
-    curl -s -S -H "Content-Type: application/json" -H "Accept: application/json" \
-         --request GET "http://localhost:${port}/scenarios"
+    amoc_eval "$1" "amoc_scenario:list_scenario_modules()."
 }
 
 function list_scenarios_by_port() {
@@ -28,10 +26,11 @@ function ensure_scenarios_installed() {
 }
 
 function upload_module() {
-    local port="$(amoc_container_port "$1")"
     local filename="$2"
-    curl -s -H "Content-Type: text/plain" -T "$filename" \
-         "http://localhost:${port}/scenarios/upload"
+    docker_compose cp "$2" "${1}:/tmp/erlang_module"
+    eval_cmd=( "{ok, FileContent} = file:read_file(\"/tmp/erlang_module\"),"
+               "amoc_scenario:install_module(${filename%.erl}, FileContent)." )
+    amoc_eval "${1}" "${eval_cmd[*]}"
 }
 
 list_scenarios_by_port amoc-master

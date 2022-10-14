@@ -9,7 +9,7 @@ unset_os_env(Name) ->
     os:unsetenv(env_name(Name)).
 
 env_name(Name) ->
-    "AMOC_" ++ string:uppercase(erlang:atom_to_list(Name)).
+    "AMOC_" ++ string:to_upper(erlang:atom_to_list(Name)).
 
 get_env(Name) ->
     amoc_config_env:get(Name).

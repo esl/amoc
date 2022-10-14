@@ -32,6 +32,7 @@ start_link() ->
           [ChildSpec :: supervisor:child_spec()]
     }}.
 init([]) ->
+    ets:new(amoc_dist, [named_table, public]),
     {ok, {{one_for_one, 5, 10},
           [
               ?CHILD(amoc_users_sup, supervisor),

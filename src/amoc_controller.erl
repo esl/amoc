@@ -5,14 +5,10 @@
 -module(amoc_controller).
 -behaviour(gen_server).
 
+-dialyzer({no_match, [terminate_all_users/1, handle_remove/3]}).
+
 -define(SERVER, ?MODULE).
 -define(USERS_TABLE, amoc_users).
-
--required_variable(#{name => interarrival, default_value => 50,
-                     verification => fun ?MODULE:positive_integer/1,
-                     description => "a delay between creating the processes for two "
-                                    "consecutive users (ms, def: 50ms)",
-                     update => fun ?MODULE:maybe_update_interarrival_timer/2}).
 
 -record(state, {scenario :: amoc:scenario() | undefined,
                 no_of_users = 0 :: user_count(),
@@ -36,8 +32,6 @@
 -type last_user_id() :: non_neg_integer().
 -type interarrival() :: non_neg_integer().
 
--include_lib("kernel/include/logger.hrl").
-
 %% ------------------------------------------------------------------
 %% Types Exports
 %% ------------------------------------------------------------------
@@ -48,19 +42,12 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 -export([start_link/0,
-         start_scenario/2,
+         start_scenario/1,
          stop_scenario/0,
-         update_settings/1,
          add_users/2,
          remove_users/2,
          get_status/0,
          disable/0]).
-
-%% ------------------------------------------------------------------
-%% Parameters verification functions
-%% ------------------------------------------------------------------
--export([maybe_update_interarrival_timer/2,
-         positive_integer/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -68,7 +55,9 @@
 -export([init/1,
          handle_call/3,
          handle_cast/2,
-         handle_info/2]).
+         handle_info/2,
+         terminate/2,
+         code_change/3]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -77,12 +66,12 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec start_scenario(amoc:scenario(), amoc_config:settings()) ->
+-spec start_scenario(amoc:scenario()) ->
     ok | {error, term()}.
-start_scenario(Scenario, Settings) ->
+start_scenario(Scenario) ->
     case amoc_scenario:does_scenario_exist(Scenario) of
         true ->
-            gen_server:call(?SERVER, {start_scenario, Scenario, Settings});
+            gen_server:call(?SERVER, {start_scenario, Scenario});
         false ->
             {error, {no_such_scenario, Scenario}}
     end.
@@ -90,10 +79,6 @@ start_scenario(Scenario, Settings) ->
 -spec stop_scenario() -> ok | {error, term()}.
 stop_scenario() ->
     gen_server:call(?SERVER, stop_scenario).
-
--spec update_settings(amoc_config:settings()) -> ok | {error, term()}.
-update_settings(Settings) ->
-    gen_server:call(?SERVER, {update_settings, Settings}).
 
 -spec add_users(amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     ok | {error, term()}.
@@ -115,12 +100,6 @@ get_status() ->
 disable() ->
     gen_server:call(?SERVER, disable).
 
--spec positive_integer(any()) -> boolean().
-positive_integer(Interarrival) ->
-    is_integer(Interarrival) andalso Interarrival > 0.
-
-maybe_update_interarrival_timer(interarrival, _) ->
-    gen_server:cast(?SERVER, maybe_update_interarrival_timer).
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -131,15 +110,12 @@ init([]) ->
     {ok, #state{}}.
 
 -spec handle_call(any(), any(), state()) -> {reply, handle_call_res(), state()}.
-handle_call({start_scenario, Scenario, Settings}, _From, State) ->
-    {RetValue, NewState} = handle_start_scenario(Scenario, Settings, State),
+handle_call({start_scenario, Scenario}, _From, State) ->
+    {RetValue, NewState} = handle_start_scenario(Scenario, State),
     {reply, RetValue, NewState};
 handle_call(stop_scenario, _From, State) ->
     {RetValue, NewState} = handle_stop_scenario(State),
     {reply, RetValue, NewState};
-handle_call({update_settings, Settings}, _From, State) ->
-    RetValue = handle_update_settings(Settings, State),
-    {reply, RetValue, State};
 handle_call({add, StartId, EndID}, _From, State) ->
     {RetValue, NewState} = handle_add(StartId, EndID, State),
     {reply, RetValue, NewState};
@@ -156,8 +132,6 @@ handle_call(_Request, _From, State) ->
     {reply, {error, not_implemented}, State}.
 
 -spec handle_cast(any(), state()) -> {noreply, state()}.
-handle_cast(maybe_update_interarrival_timer, State) ->
-    {noreply, maybe_update_interarrival_timer(State)};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -171,13 +145,21 @@ handle_info({'DOWN', _, process, Pid, _}, State) ->
 handle_info(_Msg, State) ->
     {noreply, State}.
 
+-spec code_change(OldVsn :: any(), State :: state(), Extra :: any()) ->
+        {ok, state()}.
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+-spec terminate(Reason :: any(), State :: state()) -> ok.
+terminate(_Reason, _State) ->
+    ok.
 %% ------------------------------------------------------------------
 %% internal functions
 %% ------------------------------------------------------------------
--spec handle_start_scenario(module(), amoc_config:settings(), state()) ->
+-spec handle_start_scenario(module(), state()) ->
     {handle_call_res(), state()}.
-handle_start_scenario(Scenario, Settings, #state{status = idle} = State) ->
-    case init_scenario(Scenario, Settings) of
+handle_start_scenario(Scenario, #state{status = idle} = State) ->
+    case init_scenario(Scenario) of
         {ok, ScenarioState} ->
             NewState = State#state{scenario       = Scenario,
                                    scenario_state = ScenarioState,
@@ -187,7 +169,7 @@ handle_start_scenario(Scenario, Settings, #state{status = idle} = State) ->
             NewState = State#state{scenario = Scenario, status = Error},
             {Error, NewState}
     end;
-handle_start_scenario(_Scenario, _Settings, #state{status = Status} = State) ->
+handle_start_scenario(_Scenario, #state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
 -spec handle_stop_scenario(state()) -> {handle_call_res(), state()}.
@@ -196,15 +178,6 @@ handle_stop_scenario(#state{status = running} = State) ->
     {ok, State#state{status = terminating}};
 handle_stop_scenario(#state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
-
--spec handle_update_settings(amoc_config:settings(), state()) -> handle_call_res().
-handle_update_settings(Settings, #state{status = running}) ->
-    case amoc_config_scenario:update_settings(Settings) of
-        ok -> ok;
-        {error, Type, Reason} -> {error, {Type, Reason}}
-    end;
-handle_update_settings(_Settings, #state{status = Status}) ->
-    {error, {invalid_status, Status}}.
 
 -spec handle_add(amoc_scenario:user_id(), amoc_scenario:user_id(), state()) ->
     {handle_call_res(), state()}.
@@ -280,16 +253,12 @@ start_tables() -> %% ETS creation
                                           ordered_set,
                                           protected,
                                           {read_concurrency, true}]),
-    amoc_config_utils:create_amoc_config_ets(),
     ok.
 
--spec init_scenario(amoc:scenario(), amoc_config:settings()) ->
+-spec init_scenario(amoc:scenario()) ->
     {ok | error, any()}.
-init_scenario(Scenario, Settings) ->
-    case amoc_config_scenario:parse_scenario_settings(Scenario, Settings) of
-        ok -> apply_safely(Scenario, init, []);
-        {error, Type, Reason} -> {error, {Type, Reason}}
-    end.
+init_scenario(Scenario) ->
+    apply_safely(Scenario, init, []).
 
 -spec maybe_start_timer(timer:tref()|undefined) -> timer:tref().
 maybe_start_timer(undefined) ->
@@ -335,7 +304,7 @@ dec_no_of_users(#state{no_of_users = N} = State) ->
 
 -spec interarrival() -> interarrival().
 interarrival() ->
-    amoc_config:get(interarrival).
+    amoc_config_env:get(interarrival, 50).
 
 -spec apply_safely(atom(), atom(), [term()]) -> {ok | error, term()}.
 apply_safely(M, F, A) ->
@@ -344,13 +313,6 @@ apply_safely(M, F, A) ->
         {error, Error} -> {error, Error};
         Result -> {ok, Result}
     catch
-        Class:Exception:Stacktrace ->
-            {error, {Class, Exception, Stacktrace}}
+        Class:Exception ->
+            {error, {Class, Exception, erlang:get_stacktrace()}}
     end.
-
-maybe_update_interarrival_timer(#state{tref = undefined} = State) ->
-    State;
-maybe_update_interarrival_timer(#state{tref = TRef} = State) ->
-    {ok, cancel} = timer:cancel(TRef),
-    {ok, NewTRef} = timer:send_interval(interarrival(), start_user),
-    State#state{tref = NewTRef}.

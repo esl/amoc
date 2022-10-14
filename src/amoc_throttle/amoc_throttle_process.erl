@@ -19,10 +19,9 @@
          handle_call/3,
          handle_info/2,
          handle_cast/2,
-         handle_continue/2,
-         format_status/2]).
-
--include_lib("kernel/include/logger.hrl").
+         format_status/2,
+         code_change/3,
+         terminate/2]).
 
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
@@ -80,63 +79,80 @@ init([Name, Interval, Rate]) ->
     StateWithTimer = maybe_start_timer(InitialState),
     {ok, StateWithTimer#state{name = Name}, timeout(InitialState)}.
 
--spec handle_info(term(), state()) -> {noreply, state(), {continue, maybe_run_fn}}.
+-spec handle_info(term(), state()) -> {noreply, state(), timeout()}.
 handle_info({'DOWN', _, process, _, _}, State) ->
-    {noreply, inc_n(State), {continue, maybe_run_fn}};
+    NewState = maybe_run_fn(inc_n(State)),
+    {noreply, NewState, timeout(NewState)};
 handle_info(delay_between_executions, State) ->
-    {noreply, State#state{can_run_fn = true}, {continue, maybe_run_fn}};
+    NewState = maybe_run_fn(State#state{can_run_fn = true}),
+    {noreply, NewState, timeout(NewState)};
 handle_info(timeout, State) ->
     log_state("is inactive", State),
-    {noreply, State, {continue, maybe_run_fn}}.
+    NewState = maybe_run_fn(State),
+    {noreply, NewState, timeout(NewState)}.
 
 -spec handle_cast(term(), state()) ->
-    {noreply, state(), {continue, maybe_run_fn}} | {stop, normal, state()}.
+    {noreply, state(), timeout()} | {stop, normal, state()}.
 handle_cast(stop_process, State) ->
     {stop, normal, State};
 handle_cast(pause_process, State) ->
-    {noreply, State#state{pause = true}, {continue, maybe_run_fn}};
+    NewState = maybe_run_fn(State#state{pause = true}),
+    {noreply, NewState, timeout(NewState)};
 handle_cast(resume_process, State) ->
-    {noreply, State#state{pause = false}, {continue, maybe_run_fn}};
+    NewState = maybe_run_fn(State#state{pause = false}),
+    {noreply, NewState, timeout(NewState)};
 handle_cast({schedule, RunnerPid}, #state{schedule_reversed = SchRev, name = Name} = State) ->
     amoc_throttle_controller:update_metric(Name, request),
-    {noreply, State#state{schedule_reversed = [RunnerPid | SchRev]}, {continue, maybe_run_fn}};
+    NewState = maybe_run_fn(State#state{schedule_reversed = [RunnerPid | SchRev]}),
+    {noreply, NewState, timeout(NewState)};
 handle_cast({update, Interval, Rate}, State) ->
-    NewState = merge_state(initial_state(Interval, Rate), State),
-    log_state("state update", NewState),
-    {noreply, NewState, {continue, maybe_run_fn}}.
+    MergedState = merge_state(initial_state(Interval, Rate), State),
+    log_state("state update", MergedState),
+    NewState = maybe_run_fn(MergedState),
+    {noreply, NewState, timeout(NewState)}.
 
 -spec handle_call(term(), term(), state()) ->
-    {reply, {error, not_implemented} | state(), state(), {continue, maybe_run_fn}}.
-handle_call(get_state, _, State) ->
-    {reply, printable_state(State), State, {continue, maybe_run_fn}};
-handle_call(_, _, State) ->
-    {reply, {error, not_implemented}, State, {continue, maybe_run_fn}}.
-
--spec handle_continue(maybe_run_fn, state()) -> {noreply, state(), timeout()}.
-handle_continue(maybe_run_fn, State) ->
+    {noreply, state(), timeout()}.
+handle_call(get_state, From, State) ->
+    gen_server:reply(From, printable_state(State)),
+    NewState = maybe_run_fn(State),
+    {noreply, NewState, timeout(NewState)};
+handle_call(_, From, State) ->
+    gen_server:reply(From, {error, not_implemented}),
     NewState = maybe_run_fn(State),
     {noreply, NewState, timeout(NewState)}.
+
 
 format_status(_Opt, [_PDict, State]) ->
     ScheduleLen = length(State#state.schedule),
     ScheduleRevLen = length(State#state.schedule_reversed),
     State1 = setelement(#state.schedule, State, ScheduleLen),
     setelement(#state.schedule_reversed, State1, ScheduleRevLen).
+
+-spec code_change(OldVsn :: any(), State :: state(), Extra :: any()) ->
+        {ok, state()}.
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+-spec terminate(Reason :: any(), State :: state()) -> ok.
+terminate(_Reason, _State) ->
+    ok.
+
 %%------------------------------------------------------------------------------
 %% internal functions
 %%------------------------------------------------------------------------------
 initial_state(Interval, 0) ->
-    ?LOG_ERROR("invalid rate, must be higher than zero"),
+    lager:error("invalid rate, must be higher than zero"),
     initial_state(Interval, 1);
 initial_state(Interval, Rate) when Rate > 0 ->
     case Rate < 5 of
-        true -> ?LOG_ERROR("too low rate, please reduce NoOfProcesses");
+        true -> lager:error("too low rate, please reduce NoOfProcesses");
         false -> ok
     end,
     Delay = case {Interval, Interval div Rate, Interval rem Rate} of
                 {0, _, _} -> 0; %% limit only No of simultaneous executions
                 {_, I, _} when I < 10 ->
-                    ?LOG_ERROR("too high rate, please increase NoOfProcesses"),
+                    lager:error("too high rate, please increase NoOfProcesses"),
                     10;
                 {_, DelayBetweenExecutions, 0} -> DelayBetweenExecutions;
                 {_, DelayBetweenExecutions, _} -> DelayBetweenExecutions + 1
@@ -203,7 +219,7 @@ inc_n(#state{n = N, max_n = MaxN} = State) ->
     case MaxN < NewN of
         true ->
             PrintableState = printable_state(State),
-            ?LOG_ERROR("~nthrottle process ~p: invalid N (~p)~n", [self(), PrintableState]),
+            lager:error("~nthrottle process ~p: invalid N (~p)~n", [self(), PrintableState]),
             State#state{n = MaxN};
         false ->
             State#state{n = NewN}
@@ -211,7 +227,7 @@ inc_n(#state{n = N, max_n = MaxN} = State) ->
 
 log_state(Msg, State) ->
     PrintableState = printable_state(State),
-    ?LOG_DEBUG("~nthrottle process ~p: ~s (~p)~n", [self(), Msg, PrintableState]).
+    lager:debug("~nthrottle process ~p: ~s (~p)~n", [self(), Msg, PrintableState]).
 
 printable_state(#state{} = State) ->
     Fields = record_info(fields, state),

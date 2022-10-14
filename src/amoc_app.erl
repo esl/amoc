@@ -17,7 +17,6 @@
 start(_StartType, _StartArgs) ->
     Ret = amoc_sup:start_link(),
     amoc_metrics:start(),
-    amoc_api:start(),
     Ret.
 
 -spec stop(term()) -> ok.

@@ -8,12 +8,13 @@
          install_module/2,
          does_scenario_exist/1,
          list_scenario_modules/0,
-         list_uploaded_modules/0,
-         list_configurable_modules/0]).
+         list_uploaded_modules/0]).
 
 -behaviour(gen_server).
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2]).
+-export([init/1, handle_call/3,
+         handle_cast/2, code_change/3,
+         handle_info/2, terminate/2]).
 
 -define(PRIV_DIR, code:priv_dir(amoc)).
 -define(EBIN_DIR, filename:join(code:priv_dir(amoc), "scenarios_ebin")).
@@ -46,7 +47,13 @@ start_link() ->
 -spec install_module(module(), sourcecode()) ->
     ok | {error, [Errors :: string()], [Warnings :: string()]}.
 install_module(Module, ModuleSource) ->
-    gen_server:call(?MODULE, {add_module, Module, ModuleSource}).
+    case gen_server:call(?MODULE, {add_module, Module, ModuleSource}) of
+        ok -> 
+            [gen_server:call({?MODULE, N}, {add_module, Module, ModuleSource})
+                || N <- amoc_cluster:connected_nodes()],
+            ok;
+        Error -> Error
+    end.
 
 -spec does_scenario_exist(module()) -> boolean().
 does_scenario_exist(Scenario) ->
@@ -61,9 +68,6 @@ list_scenario_modules() ->
 list_uploaded_modules() ->
     ets:tab2list(uploaded_modules).
 
--spec list_configurable_modules() -> [module()].
-list_configurable_modules() ->
-    [S || [S] <- ets:match(amoc_scenarios, {'$1', configurable})].
 %%-------------------------------------------------------------------------
 %% gen_server callbacks
 %%-------------------------------------------------------------------------
@@ -84,6 +88,20 @@ handle_call(_, _, State) ->
 -spec handle_cast(any(), state()) -> {noreply, state()}.
 handle_cast(_, State) ->
     {noreply, State}.
+
+-spec handle_info(any(), state()) -> {noreply, state()}.
+handle_info(Info, State) ->
+    lager:warning("Unexpected message: ~p", [Info]),
+    {noreply, State}.
+
+-spec code_change(OldVsn :: any(), State :: state(), Extra :: any()) ->
+        {ok, state()}.
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+-spec terminate(Reason :: any(), State :: state()) -> ok.
+terminate(_Reason, _State) ->
+    ok.
 
 %%-------------------------------------------------------------------------
 %%  local functions
@@ -110,21 +128,26 @@ find_scenario_modules() ->
     AllPaths = [Path || Path <- code:get_path(), not lists:prefix(ErtsPath, Path)],
     AllBeamFiles = [File || Path <- AllPaths, File <- filelib:wildcard("*.beam", Path)],
     AllModules = [list_to_atom(filename:rootname(BeamFile)) || BeamFile <- AllBeamFiles],
-    ok = code:ensure_modules_loaded(AllModules),
+    [code:load_file(M)|| M <- AllModules, not is_loaded(M)],
     [maybe_store_module(Module) || Module <- erlang:loaded()].
+
+
+is_loaded(Module) ->
+    case code:is_loaded(Module) of
+        false -> false;
+        {file, _} -> true
+    end.
 
 -spec maybe_store_module(module()) -> any().
 maybe_store_module(Module) ->
     case get_module_type(Module) of
         scenario ->
             ets:insert(amoc_scenarios, {Module, scenario});
-        configurable ->
-            ets:insert(amoc_scenarios, {Module, configurable});
         ordinary ->
             ok
     end.
 
--spec get_module_type(module()) -> scenario | configurable | ordinary.
+-spec get_module_type(module()) -> scenario | ordinary.
 get_module_type(Module) ->
     case erlang:function_exported(Module, module_info, 1) of
         false ->
@@ -136,7 +159,6 @@ get_module_type(Module) ->
             ModuleAttributes = apply(Module, module_info, [attributes]),
             lists:foldl(fun({behaviour, [?MODULE]}, _) -> scenario;
                            ({behavior, [?MODULE]}, _) -> scenario;
-                           ({required_variable, _}, ordinary) -> configurable;
                            (_, Ret) -> Ret
                         end, ordinary, ModuleAttributes)
     end.

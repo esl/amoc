@@ -51,17 +51,6 @@ function wait_for_cmd() {
 ######################
 ## docker functions ##
 ######################
-function amoc_container_port() {
-    local service="$1"
-    case "$service" in
-       amoc-master)
-         echo 4000 ;;
-       amoc-worker-[0-9])
-         echo "400${service#amoc-worker-}" ;;
-       *) 
-         return 1 ;;
-    esac
-}
 
 docker_compose() {
     local compose_file="${git_root}/integration_test/docker-compose.yml"
@@ -69,7 +58,7 @@ docker_compose() {
 }
 
 function amoc_eval() {
-    local exec_path="/home/amoc/amoc/bin/amoc"
+    local exec_path="amoc"
     local service="$1"
     shift 1
     docker_compose exec -T "$service" "$exec_path" eval "$@"

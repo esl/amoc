@@ -6,8 +6,6 @@
 -behaviour(gen_server).
 -define(SERVER, ?MODULE).
 
--include_lib("kernel/include/logger.hrl").
-
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
@@ -18,6 +16,7 @@
          on_new_connection/1,
          get_status/0,
          all_nodes/0,
+         connected_nodes/0,
          slave_nodes/0,
          master_node/0]).
 
@@ -27,7 +26,9 @@
 -export([init/1,
          handle_call/3,
          handle_cast/2,
-         handle_info/2]).
+         handle_info/2,
+         code_change/3,
+         terminate/2]).
 
 -record(state, {to_ack = [] :: [to_ack()], %% sorted by nodes
                 failed_to_connect = [] :: [node()],
@@ -91,8 +92,12 @@ on_new_connection(Action) when is_function(Action, 1) ->
 
 -spec all_nodes() -> [node()].
 all_nodes() ->
+    [node() | connected_nodes()].
+
+-spec connected_nodes() -> [node()].
+connected_nodes() ->
     Status = get_status(),
-    [node() | maps:get(connected, Status, [])].
+    maps:get(connected, Status, []).
 
 -spec slave_nodes() -> [node()].
 slave_nodes() ->
@@ -133,7 +138,7 @@ handle_call(_Request, _From, State) ->
 
 -spec handle_cast(any(), state()) -> {noreply, state()}.
 handle_cast({connect_nodes, Nodes}, State) ->
-    ?LOG_INFO("{connect_nodes, ~p}, state: ~p", [Nodes, state_to_map(State)]),
+    lager:info("{connect_nodes, ~p}, state: ~p", [Nodes, state_to_map(State)]),
     NewState = handle_connect_nodes(Nodes, State),
     schedule_timer(NewState),
     {noreply, NewState};
@@ -148,14 +153,23 @@ handle_info(timeout, State) ->
     schedule_timer(NewState),
     {noreply, NewState};
 handle_info({nodedown, Node}, #state{master = Node} = State) ->
-    ?LOG_ERROR("Master node ~p is down. Halting.", [Node]),
+    lager:error("Master node ~p is down. Halting.", [Node]),
     erlang:halt(),
     {noreply, State};
 handle_info({nodedown, Node}, State) ->
-    ?LOG_ERROR("node ~p is down.", [Node]),
+    lager:error("node ~p is down.", [Node]),
     {noreply, merge(connection_lost, [Node], State)};
 handle_info(_Info, State) ->
     {noreply, State}.
+
+-spec code_change(OldVsn :: any(), State :: state(), Extra :: any()) ->
+        {ok, state()}.
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+-spec terminate(Reason :: any(), State :: state()) -> ok.
+terminate(_Reason, _State) ->
+    ok.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

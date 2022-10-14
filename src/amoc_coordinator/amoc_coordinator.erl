@@ -15,7 +15,9 @@
 -export([init/1,
          handle_event/2,
          handle_call/2,
-         terminate/2]).
+         terminate/2,
+         code_change/3,
+         handle_info/2]).
 
 -define(DEFAULT_TIMEOUT, 30). %% 30 seconds
 
@@ -180,6 +182,16 @@ terminate(_, {timeout, Pid}) ->
 terminate(_, {worker, Pid}) ->
     %% synchronous notification
     amoc_coordinator_worker:stop(Pid), ok.
+
+-spec code_change(OldVsn :: any(), State :: state(), Extra :: any()) ->
+        {ok, state()}.
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+-spec handle_info(any(), state()) -> {ok, state()}.
+handle_info(Info, State) ->
+    lager:warning("Unexpected message: ~p", [Info]),
+    {ok, State}.
 
 %%%===================================================================
 %%% Internal functions

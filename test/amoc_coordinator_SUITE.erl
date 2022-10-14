@@ -27,7 +27,7 @@ end_per_suite(_Config) ->
     meck:unload().
 
 execute_plan_without_timeout(_Config) ->
-    N = 4, Name = ?FUNCTION_NAME,
+    N = 4, Name = execute_plan_without_timeout,
 
     Plan = [Item1 = {2, [mocked_action(item1, 2), mocked_action(item1, 1)]},
             Item2 = {4, [mocked_action(item2, 3), mocked_action(item2, 1)]},
@@ -49,7 +49,7 @@ execute_plan_without_timeout(_Config) ->
     nothing_after_tags(History, [all1, all2]).
 
 reset_plan_without_timeout(_Config) ->
-    N1 = 5, N2 = 6, Name = ?FUNCTION_NAME,
+    N1 = 5, N2 = 6, Name = reset_plan_without_timeout,
 
     Plan = [All1 = {all, [mocked_action(all1, 2), mocked_action(all1, 1)]},
             Item1 = {2, [mocked_action(item1, 2), mocked_action(item1, 1)]},
@@ -89,7 +89,7 @@ reset_plan_without_timeout(_Config) ->
 
 
 execute_plan_with_timeout(_Config) ->
-    N1 = 7, N2 = 8, Name = ?FUNCTION_NAME,
+    N1 = 7, N2 = 8, Name = execute_plan_with_timeout,
 
     Plan = [Item1 = {2, [mocked_action(item1, 2), mocked_action(item1, 1)]},
             All1 = {all, [mocked_action(all1, 2), mocked_action(all1, 1)]},
@@ -163,7 +163,7 @@ nothing_after_tag(History, Tag) ->
            (_, [_]) -> throw({calls_after_tag, Tag, History}); %% nonempty Acc, another tag
            (_, []) -> []
         end, [], History),
-    ?assertNotMatch([], CallsWithTag, {tag, Tag}),
+    ?assertNotMatch([], CallsWithTag),
     CallsWithTag.
 
 check_item_calls(CallsHistory, {all, Actions}, Tag, NoOfUsers) ->

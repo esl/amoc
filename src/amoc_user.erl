@@ -37,8 +37,8 @@ init(Parent, Scenario, Id, State) ->
         catch
             throw:normal_user_stop ->
                 normal;
-            E:Reason:Stacktrace ->
-                {E, Reason, Stacktrace}
+            E:Reason ->
+                {E, Reason, erlang:get_stacktrace()}
         end,
     exit(R).
 

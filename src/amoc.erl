@@ -4,7 +4,7 @@
 %%==============================================================================
 -module(amoc).
 
--export([do/3,
+-export([do/2,
          add/1,
          remove/2,
          stop/0]).
@@ -16,14 +16,14 @@
 %% API for the local scenario execution, use amoc_dist module to run
 %% scenarios in a distributed environment
 %% ------------------------------------------------------------------
--spec do(scenario(), non_neg_integer(), amoc_config:settings()) ->
+-spec do(scenario(), non_neg_integer()) ->
     ok | {error, term()}.
-do(Scenario, Count, Settings) ->
+do(Scenario, Count) ->
     case amoc_cluster:set_master_node(node()) of
         ok ->
             %% amoc_controller:start_scenario/2 will fail,
             %% if amoc is running in a distributed mode
-            case {amoc_controller:start_scenario(Scenario, Settings), Count} of
+            case {amoc_controller:start_scenario(Scenario), Count} of
                 {ok, 0} -> ok;
                 {ok, Count} -> amoc_controller:add_users(1, Count);
                 Error -> Error

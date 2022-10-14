@@ -4,13 +4,11 @@
 %%==============================================================================
 -module(amoc_dist).
 
--export([do/3,
+-export([do/2,
          add/1,
          add/2,
          remove/2,
          remove/3,
-         update_settings/1,
-         update_settings/2,
          stop/0,
          get_state/0]).
 
@@ -20,10 +18,10 @@
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec do(amoc:scenario(), non_neg_integer(), amoc_config:settings()) ->
+-spec do(amoc:scenario(), non_neg_integer()) ->
     {ok, any()} | {error, any()}.
-do(Scenario, Count, Settings) ->
-    case {prepare_cluster(Scenario, Settings), Count} of
+do(Scenario, Count) ->
+    case {prepare_cluster(Scenario), Count} of
         {{ok, _}, 0} -> {ok, no_users};
         {{ok, _}, Count} -> add(Count);
         {Error, _} -> Error
@@ -51,22 +49,6 @@ remove(Count, ForceRemove, Nodes) when is_integer(Count), Count > 0 ->
         Error -> Error
     end.
 
--spec update_settings(amoc_config:settings()) -> {ok, any()} | {error, any()}.
-update_settings(Settings) ->
-    Ret = update_settings(Settings, amoc_cluster:slave_nodes()),
-    case Ret of
-        {ok, _} -> set_param(settings, Settings);
-        {error, _} -> ok
-    end,
-    Ret.
-
--spec update_settings(amoc_config:settings(), [node()]) -> {ok, any()} | {error, any()}.
-update_settings(Settings, Nodes) ->
-    case check_nodes(Nodes) of
-        ok -> update_settings_on_nodes(Settings, Nodes);
-        Error -> Error
-    end.
-
 -spec stop() -> {ok, any()} | {error, any()}.
 stop() ->
     stop_cluster().
@@ -76,22 +58,21 @@ get_state() ->
     case {amoc_cluster:master_node(), get_param(state)} of
         {undefined, undefined} -> idle;
         {_, {ok, State}} -> State;
-        {Node, undefined} -> rpc:call(Node, ?MODULE, ?FUNCTION_NAME, [])
+        {Node, undefined} -> rpc:call(Node, ?MODULE, get_state, [])
     end.
 %% ------------------------------------------------------------------
 %% Local functions
 %% ------------------------------------------------------------------
 -spec get_param(any()) -> {ok, any()} | undefined.
 get_param(Key) ->
-    try persistent_term:get({amoc_dist, Key}) of
-        Value -> {ok, Value}
-    catch
-        error:badarg -> undefined
+    case ets:lookup(amoc_dist, Key) of
+        [{Key, Value}] -> {ok, Value};
+        [] -> undefined
     end.
 
--spec set_param(any(), any()) -> ok.
+-spec set_param(any(), any()) -> any().
 set_param(Key, Value) ->
-    persistent_term:put({amoc_dist, Key}, Value).
+    ets:insert(amoc_dist, {Key, Value}).
 
 -spec set_state(cluster_state()) -> any().
 set_state(State) ->
@@ -115,12 +96,11 @@ check_nodes(Nodes) ->
             {error, not_a_master}
     end.
 
--spec prepare_cluster(amoc:scenario(), amoc_config:settings()) -> {ok, any()} | {error, any()}.
-prepare_cluster(Scenario, Settings) ->
+-spec prepare_cluster(amoc:scenario()) -> {ok, any()} | {error, any()}.
+prepare_cluster(Scenario) ->
     case setup_master_node() of
         ok ->
             set_param(scenario, Scenario),
-            set_param(settings, Settings),
             set_state(running),
             set_param(last_id, 0),
             setup_cluster();
@@ -151,8 +131,7 @@ setup_slave_node(Node) ->
     case propagate_uploaded_modules(Node) of
         {ok, _} ->
             {ok, Scenario} = get_param(scenario),
-            {ok, Settings} = get_param(settings),
-            rpc:call(Node, amoc_controller, start_scenario, [Scenario, Settings]);
+            rpc:call(Node, amoc_controller, start_scenario, [Scenario]);
         Error -> Error
     end.
 
@@ -201,16 +180,6 @@ remove_users(Result, Count, ForceRemove, [Node | T] = Nodes) ->
             Ret = rpc:call(Node, amoc_controller, remove_users, [N, ForceRemove]),
             remove_users([{Node, Ret} | Result], Count - N, ForceRemove, T)
     end.
-
--spec update_settings_on_nodes(amoc_config:settings(), [node()]) -> {ok, any()} | {error, any()}.
-update_settings_on_nodes(Settings, Nodes) ->
-    Result = [{Node, update_settings_on_node(Settings, Node)} || Node <- Nodes],
-    maybe_error(Result).
-
--spec update_settings_on_node(amoc_config:settings(), node()) ->
-          ok | {badrpc, any()} | {error, any()}.
-update_settings_on_node(Settings, Node) ->
-    rpc:call(Node, amoc_controller, update_settings, [Settings]).
 
 -spec stop_cluster() -> {ok, any()} | {error, any()}.
 stop_cluster() ->
