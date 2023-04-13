@@ -1,27 +1,15 @@
-{ application, amoc, [
-    {description, "A murder of crows"},
+{application, amoc, [
+    {description, "A Murder of Crows"},
     {vsn, git},
     {registered, []},
     {applications, [
         kernel,
         stdlib,
         compiler,
-        exometer_core,
-        exometer_report_graphite,
-        amoc_rest,
-        docsh
+        telemetry
     ]},
     {mod, {amoc_app, []}},
-    {env, [{exometer_predefined, [
-               {[erlang, system_info],
-                {function, erlang, system_info, ['$dp'], value, [port_count, process_count]},
-                []},
-               {[erlang, memory],
-                {function, erlang, memory, ['$dp'], value, [total, processes, processes_used, system, binary, ets]},
-                []},
-               {[amoc, users],
-                {function, ets, info, [amoc_users], proplist, [size]},
-                []}
-           ]}
-    ]}
+    {env, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/esl/amoc"}]}
 ]}.
