@@ -43,7 +43,7 @@ try_apply_fn(Fun, Args) ->
     end.
 
 -spec merge_config(module_configuration(), module_configuration()) ->
-    {ok, module_configuration()} | error().
+    maybe_module_config().
 merge_config(MergedConfig, []) ->
     {ok, MergedConfig};
 merge_config(OldConfig, [#module_parameter{name = Name, mod = Module} = Param | L]) ->

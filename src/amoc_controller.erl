@@ -36,8 +36,6 @@
 -type last_user_id() :: non_neg_integer().
 -type interarrival() :: non_neg_integer().
 
--include_lib("kernel/include/logger.hrl").
-
 %% ------------------------------------------------------------------
 %% Types Exports
 %% ------------------------------------------------------------------
@@ -322,7 +320,8 @@ terminate_all_users() ->
     Match = ets:match_object(?USERS_TABLE, '$1', 200),
     terminate_all_users(Match).
 
--spec terminate_all_users({tuple(), ets:continuation()} | '$end_of_table') -> ok.
+%% ets:continuation/0 type is unfortunately not exported from the ets module.
+-spec terminate_all_users({tuple(), term()} | '$end_of_table') -> ok.
 terminate_all_users({Objects, Continuation}) ->
     Pids = [Pid || {_Id, Pid} <- Objects],
     amoc_users_sup:stop_children(Pids, true),
@@ -353,6 +352,7 @@ apply_safely(M, F, A) ->
             {error, {Class, Exception, Stacktrace}}
     end.
 
+-spec maybe_update_interarrival_timer(state()) -> state().
 maybe_update_interarrival_timer(#state{tref = undefined} = State) ->
     State;
 maybe_update_interarrival_timer(#state{tref = TRef} = State) ->

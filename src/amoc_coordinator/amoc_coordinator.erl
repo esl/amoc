@@ -51,7 +51,12 @@
 %% timeout in seconds
 -type coordination_timeout_in_sec() :: pos_integer() | infinity.
 
--export_type([coordination_plan/0, normalized_coordination_item/0]).
+-export_type([coordination_event_type/0,
+              coordination_event/0,
+              coordination_action/0,
+              coordination_data/0,
+              coordination_plan/0,
+              normalized_coordination_item/0]).
 
 %%%===================================================================
 %%% Api

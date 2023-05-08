@@ -16,6 +16,7 @@
          handle_call/3,
          handle_cast/2]).
 
+-type event_type() :: amoc_coordinator:coordination_event_type().
 -type event() :: amoc_coordinator:coordination_event().
 -type action() :: amoc_coordinator:coordination_action().
 -type data() :: amoc_coordinator:coordination_data().
@@ -98,7 +99,7 @@ maybe_reset_state(#state{n = N, required_n = N} = State) ->
 maybe_reset_state(State) ->
     State.
 
--spec reset_state(event(), state()) -> state().
+-spec reset_state(event_type(), state()) -> state().
 reset_state(Event, #state{actions = Actions, accumulator = Acc, n = N} = State) ->
     [execute_action(Action, {Event, N}, Acc) || Action <- Actions],
     State#state{accumulator = [], n = 0}.

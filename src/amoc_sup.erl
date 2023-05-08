@@ -40,5 +40,3 @@ init([]) ->
               ?CHILD(amoc_scenario, worker),
               ?CHILD(amoc_throttle_controller, worker)
           ]}}.
-
-

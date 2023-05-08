@@ -50,7 +50,7 @@ start(Name, Interval, Rate) ->
 stop(Pid) ->
     gen_server:cast(Pid, stop_process).
 
--spec run(pid(), fun(()-> any())) -> ok.
+-spec run(pid(), fun(() -> any())) -> ok.
 run(Pid, Fun) ->
     RunnerPid = spawn(fun() -> async_runner(Fun) end),
     gen_server:cast(Pid, {schedule, RunnerPid}).
