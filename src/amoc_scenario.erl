@@ -15,6 +15,7 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2]).
 
+-define(TABLE, amoc_scenarios).
 -define(PRIV_DIR, code:priv_dir(amoc)).
 -define(EBIN_DIR, filename:join(code:priv_dir(amoc), "scenarios_ebin")).
 
@@ -50,12 +51,11 @@ install_module(Module, ModuleSource) ->
 
 -spec does_scenario_exist(module()) -> boolean().
 does_scenario_exist(Scenario) ->
-    AllScenarios = list_scenario_modules(),
-    lists:member(Scenario, AllScenarios).
+    [{Scenario, scenario}] =:= ets:lookup(amoc_scenarios, Scenario).
 
 -spec list_scenario_modules() -> [module()].
 list_scenario_modules() ->
-    [S || [S] <- ets:match(amoc_scenarios, {'$1', scenario})].
+    [S || [S] <- ets:match(?TABLE, {'$1', scenario})].
 
 -spec list_uploaded_modules() -> [{module(), sourcecode()}].
 list_uploaded_modules() ->
@@ -63,7 +63,8 @@ list_uploaded_modules() ->
 
 -spec list_configurable_modules() -> [module()].
 list_configurable_modules() ->
-    [S || [S] <- ets:match(amoc_scenarios, {'$1', configurable})].
+    [S || [S] <- ets:match(?TABLE, {'$1', configurable})].
+
 %%-------------------------------------------------------------------------
 %% gen_server callbacks
 %%-------------------------------------------------------------------------
@@ -88,10 +89,10 @@ handle_cast(_, State) ->
 %%-------------------------------------------------------------------------
 %%  local functions
 %%-------------------------------------------------------------------------
--spec start_scenarios_ets() -> amoc_scenarios.
+-spec start_scenarios_ets() -> term().
 start_scenarios_ets() ->
     EtsOptions = [named_table, protected, {read_concurrency, true}],
-    ets:new(amoc_scenarios, EtsOptions),
+    ets:new(?TABLE, EtsOptions),
     ets:new(uploaded_modules, EtsOptions).
 
 -spec add_code_paths() -> ok | {error, {bad_directories, [file:filename()]}}.
@@ -117,9 +118,9 @@ find_scenario_modules() ->
 maybe_store_module(Module) ->
     case get_module_type(Module) of
         scenario ->
-            ets:insert(amoc_scenarios, {Module, scenario});
+            ets:insert(?TABLE, {Module, scenario});
         configurable ->
-            ets:insert(amoc_scenarios, {Module, configurable});
+            ets:insert(?TABLE, {Module, configurable});
         ordinary ->
             ok
     end.
