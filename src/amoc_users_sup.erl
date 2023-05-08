@@ -47,10 +47,8 @@ stop_children(Pids, true) ->
 
 -spec init(term()) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
-    process_flag(priority, max),
-
+    process_flag(priority, high),
     SupFlags = #{strategy => simple_one_for_one},
-
     AChild = #{id => amoc_user,
                start => {amoc_user, start_link, []},
                %% A temporary child process is never restarted
