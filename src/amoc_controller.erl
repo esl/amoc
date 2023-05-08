@@ -126,16 +126,21 @@ maybe_update_interarrival_timer(interarrival, _) ->
 %% ------------------------------------------------------------------
 -spec init([]) -> {ok, state()}.
 init([]) ->
-    process_flag(priority, max),
     start_tables(),
     {ok, #state{}}.
 
+%% We set the priority to high after starting the scenario,
+%% and then reset priority to normal after terminating it.
+%% The most important part is precise timing for users spawning/removal,
+%% so priority is higher in between init and terminate.
 -spec handle_call(any(), any(), state()) -> {reply, handle_call_res(), state()}.
 handle_call({start_scenario, Scenario, Settings}, _From, State) ->
     {RetValue, NewState} = handle_start_scenario(Scenario, Settings, State),
+    process_flag(priority, high),
     {reply, RetValue, NewState};
 handle_call(stop_scenario, _From, State) ->
     {RetValue, NewState} = handle_stop_scenario(State),
+    process_flag(priority, normal),
     {reply, RetValue, NewState};
 handle_call({update_settings, Settings}, _From, State) ->
     RetValue = handle_update_settings(Settings, State),
