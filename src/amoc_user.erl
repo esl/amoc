@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2020 Erlang Solutions Ltd.
+%% Copyright 2023 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(amoc_user).
@@ -17,7 +17,7 @@ start_link(Scenario, Id, State) ->
     proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
 
 -spec stop() -> no_return().
-stop() -> throw(normal_user_stop).
+stop() -> exit(shutdown).
 
 -spec stop(pid(), boolean()) -> no_return() | ok | {error, any()}.
 stop(Pid, _Force) when Pid =:= self() ->
@@ -25,22 +25,12 @@ stop(Pid, _Force) when Pid =:= self() ->
 stop(Pid, Force) when is_pid(Pid) ->
     amoc_users_sup:stop_child(Pid, Force).
 
-
 -spec init(pid(), amoc:scenario(), amoc_scenario:user_id(), state()) ->
     no_return().
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     process_flag(trap_exit, true),
-    R = try
-            perform_scenario(Scenario, Id, State),
-            normal
-        catch
-            throw:normal_user_stop ->
-                normal;
-            E:Reason:Stacktrace ->
-                {E, Reason, Stacktrace}
-        end,
-    exit(R).
+    perform_scenario(Scenario, Id, State).
 
 -spec perform_scenario(amoc:scenario(), amoc_scenario:user_id(), state()) -> ok.
 perform_scenario(Scenario, Id, State) ->
