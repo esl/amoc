@@ -96,11 +96,13 @@ update_settings(Settings) ->
 -spec add_users(amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     ok | {error, term()}.
 add_users(StartId, EndID) ->
+    telemetry:execute([amoc, controller, users], #{count => EndID - StartId + 1}, #{type => add}),
     %% adding the exact range of the users
     gen_server:call(?SERVER, {add, StartId, EndID}).
 
 -spec remove_users(user_count(), boolean()) -> {ok, user_count()}.
 remove_users(Count, ForceRemove) ->
+    telemetry:execute([amoc, controller, users], #{count => Count}, #{type => remove}),
     %% trying to remove Count users, this action is async!!!
     gen_server:call(?SERVER, {remove, Count, ForceRemove}).
 

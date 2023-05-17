@@ -14,7 +14,7 @@
 -module(rate_throttle_test).
 
 %% API
--behavior(amoc_scenario).
+-behaviour(amoc_scenario).
 -export([start/1, init/0]).
 
 -define(RATE_CHANGE_TEST, testing).
@@ -79,7 +79,6 @@ count_per_minute() ->
     %% metric to ensure that amoc_throttle is not crossing
     %% the upper execution rate boundary
     erlang:register(?METRICS_PROC_NAME, self()),
-    amoc_metrics:init(gauge, scheduled_per_minute),
     erlang:send_after(60000, self(), one_minute),
     count_per_minute(0).
 
@@ -89,6 +88,6 @@ count_per_minute(N) ->
             count_per_minute(N + 1);
         one_minute ->
             erlang:send_after(60000, self(), one_minute),
-            amoc_metrics:update_gauge(scheduled_per_minute, N),
+            telemetry:execute([amoc, scheduled_per_minute], #{value => N}, #{}),
             count_per_minute(0)
     end.

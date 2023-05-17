@@ -15,9 +15,7 @@
 
 -spec start(application:start_type(), term()) -> {ok, pid()}.
 start(_StartType, _StartArgs) ->
-    Ret = amoc_sup:start_link(),
-    amoc_metrics:start(),
-    Ret.
+    amoc_sup:start_link().
 
 -spec stop(term()) -> ok.
 stop(_State) ->

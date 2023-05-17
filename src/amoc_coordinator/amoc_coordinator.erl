@@ -146,6 +146,7 @@ handle_event(Event, {timeout, Pid}) ->
     erlang:send(Pid, Event),
     {ok, {timeout, Pid}};
 handle_event(Event, {worker, Pid}) ->
+    telemetry:execute([amoc, coordinator, event], #{count => 1}, #{type => Event}),
     case Event of
         coordinator_timeout -> %% synchronous notification
             amoc_coordinator_worker:timeout(Pid);

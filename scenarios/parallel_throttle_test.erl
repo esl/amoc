@@ -14,7 +14,7 @@
 -module(parallel_throttle_test).
 
 %% API
--behavior(amoc_scenario).
+-behaviour(amoc_scenario).
 -export([start/1, init/0]).
 
 -define(PARALLEL_EXECUTION_TEST, parallel_testing).
@@ -82,17 +82,15 @@ start_metrics_on_master_node() ->
 
 max_counter_value() ->
     erlang:register(?METRICS_PROC_NAME, self()),
-    amoc_metrics:init(gauge, max_scheduled),
-    amoc_metrics:init(gauge, current_scheduled),
     max_counter_value(0, 0).
 
 max_counter_value(Gauge, MaxGauge) when Gauge =:= 0 andalso MaxGauge =/= 0;
                                         Gauge > MaxGauge ->
-    amoc_metrics:update_gauge(max_scheduled, Gauge),
+    telemetry:execute([amoc, max_scheduled], #{value => Gauge}, #{}),
     max_counter_value(Gauge, Gauge);
 max_counter_value(Gauge, MaxGauge) ->
     receive
         {delta, N} ->
-            amoc_metrics:update_gauge(current_scheduled, Gauge + N),
+            telemetry:execute([amoc, current_scheduled], #{value => Gauge + N}, #{}),
             max_counter_value(Gauge + N, MaxGauge)
     end.
