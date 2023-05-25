@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2020 Erlang Solutions Ltd.
+%% Copyright 2023 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 %% This module can be used directly only for the readonly env init parameters.
