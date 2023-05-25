@@ -65,7 +65,7 @@ function amoc_container_port() {
 
 docker_compose() {
     local compose_file="${git_root}/integration_test/docker-compose.yml"
-    docker-compose -p "amoc-demo-cluster" -f "$compose_file" "$@"
+    docker compose -p "amoc-demo-cluster" -f "$compose_file" "$@"
 }
 
 function amoc_eval() {
