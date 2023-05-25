@@ -5,10 +5,10 @@
 %% @doc
 %%   This scenario demonstrates amoc_throttle execution rate limiting
 %%   functionality. You might be interested in the next metrics:
-%%     - *.amoc.users.size
-%%     - *.amoc.throttle.testing.rate.value
-%%     - *.amoc.throttle.testing.*.one
-%%     - *.amoc.gauge.scheduled_per_minute.value
+%%     - [amoc, controller, users], #{count := non_neg_integer()}, #{}
+%%     - [amoc, throttle, rate], #{rate := non_neg_integer()}, #{name := testing}
+%%     - [amoc, throttle, execute], #{count := non_neg_integer()}, #{name := testing}
+%%     - [amoc, scheduled_per_minute], #{value := non_neg_integer()}, #{}
 %% @end
 %%==============================================================================
 -module(rate_throttle_test).

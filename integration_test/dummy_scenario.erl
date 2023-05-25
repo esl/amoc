@@ -74,5 +74,5 @@ init() ->
 -spec start(amoc_scenario:user_id()) -> any().
 start(_Id) ->
     %%sleep 15 minutes
-    timer:sleep(1000 * 60 * 15),
+    timer:sleep(timer:minutes(15)),
     amoc_user:stop().

@@ -4,11 +4,11 @@
 %%==============================================================================
 %% @doc
 %%   This scenario demonstrates amoc_throttle execution rate limiting
-%%   functionality. You might be interested in the next metrics:
-%%     - *.amoc.users.size
-%%     - *.amoc.throttle.parallel_testing.*.one
-%%     - *.amoc.gauge.max_scheduled.value
-%%     - *.amoc.gauge.current_scheduled.value
+%%   functionality. You might be interested in the next telemetry events:
+%%     - [amoc, controller, users], #{count := non_neg_integer()}, #{}
+%%     - [amoc, throttle, rate], #{rate := non_neg_integer()}, #{name := parallel_testing}
+%%     - [amoc, max_scheduled], #{value := non_neg_integer()}, #{}
+%%     - [amoc, current_scheduled], #{value := non_neg_integer()}, #{}
 %% @end
 %%==============================================================================
 -module(parallel_throttle_test).

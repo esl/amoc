@@ -6,6 +6,7 @@
 %% API
 -export([start_link/0,
          install_module/2,
+         remove_module/1,
          does_scenario_exist/1,
          list_scenario_modules/0,
          list_uploaded_modules/0,
@@ -49,9 +50,14 @@ start_link() ->
 install_module(Module, ModuleSource) ->
     gen_server:call(?MODULE, {add_module, Module, ModuleSource}).
 
+-spec remove_module(module()) ->
+    ok | {error, [Errors :: string()], [Warnings :: string()]}.
+remove_module(Module) ->
+    gen_server:call(?MODULE, {remove_module, Module}).
+
 -spec does_scenario_exist(module()) -> boolean().
 does_scenario_exist(Scenario) ->
-    [{Scenario, scenario}] =:= ets:lookup(amoc_scenarios, Scenario).
+    [{Scenario, scenario}] =:= ets:lookup(?TABLE, Scenario).
 
 -spec list_scenario_modules() -> [module()].
 list_scenario_modules() ->
@@ -78,6 +84,9 @@ init([]) ->
 -spec handle_call(any(), any(), state()) -> {reply, any(), state()}.
 handle_call({add_module, Module, ModuleSource}, _, State) ->
     Reply = add_module(Module, ModuleSource),
+    {reply, Reply, State};
+handle_call({remove_module, Module}, _, State) ->
+    Reply = do_remove_module(Module),
     {reply, Reply, State};
 handle_call(_, _, State) ->
     {reply, {error, not_implemented}, State}.
@@ -157,11 +166,36 @@ add_module(Module, ModuleSource) ->
             case compile_and_load_scenario(ScenarioPath) of
                 {ok, Module} ->
                     maybe_store_module(Module),
+                    propagate_module(Module, ModuleSource),
                     ets:insert(uploaded_modules, {Module, ModuleSource}),
                     ok;
                 Error -> Error
             end
     end.
+
+-spec do_remove_module(module()) ->
+    ok | {error, [Errors :: string()], [Warnings :: string()]}.
+do_remove_module(Module) ->
+    case erlang:module_loaded(Module) andalso
+         ets:member(?TABLE, Module) of
+        true ->
+            ets:delete(?TABLE, Module),
+            propagate_remove_module(Module),
+            ets:delete(uploaded_modules, Module),
+            ok;
+        false ->
+                {error, ["module with such name does not exist"], []}
+    end.
+
+-spec propagate_module(module(), sourcecode()) -> any().
+propagate_module(Module, ModuleSource) ->
+    Nodes = amoc_cluster:all_nodes() -- [node()],
+    rpc:multicall(Nodes, amoc_scenario, install_module, [Module, ModuleSource]).
+
+-spec propagate_remove_module(module()) -> any().
+propagate_remove_module(Module) ->
+    Nodes = amoc_cluster:all_nodes() -- [node()],
+    rpc:multicall(Nodes, amoc_scenario, remove_module, [Module]).
 
 -spec scenario_path_name(module()) -> file:filename().
 scenario_path_name(Module) -> %% w/o ".erl" extension
