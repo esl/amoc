@@ -2,6 +2,15 @@
 
 Amoc also exposes the following telemetry events:
 
+### Scenario
+
+A telemetry span of a full scenario execution
+```erlang
+event_name: [amoc, scenario, user]
+measurements: #{}
+metadata: #{}
+```
+
 ### Controller
 
 Indicates the number of users added or removed
