@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2020 Erlang Solutions Ltd.
+%% Copyright 2023 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(amoc_config_scenario).
@@ -10,7 +10,6 @@
          get_default_configuration/1,
          get_current_configuration/0]).
 
--include_lib("kernel/include/logger.hrl").
 -include("amoc_config.hrl").
 
 -type module_configuration_map() :: #{name() => #{value := any(),

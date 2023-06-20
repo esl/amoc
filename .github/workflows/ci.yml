@@ -27,4 +27,3 @@ jobs:
         run: make integration_test
         env:
           OTP_RELEASE: ${{ matrix.otp_vsn }}
-          REBAR_RELEASE: ${{ matrix.rebar_vsn }}

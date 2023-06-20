@@ -7,15 +7,14 @@ enable_strict_mode
 ## amoc REST API functions ##
 #############################
 run_scenario() {
-    local port="$(amoc_container_port "$1")"
-    local json_body='{ "scenario": "'"$2"'", "users": '"$3"' , "settings" : { "test" : "<<\"test_value\">>" } }'
-    curl -X PATCH --header 'Content-Type: application/json' --header 'Accept: application/json' \
-         -s  -w "%{http_code}" -o /dev/null -d "$json_body" "http://localhost:${port}/execution/start"
+    amoc_eval "$1" "amoc_dist:do(${2}, ${3}, [{test, <<\"test_value\">>}])."
 }
 
 result="$(run_scenario amoc-master dummy_scenario 10)"
 
-if [ "$result" = "200" ]; then
+echo "$result"
+
+if echo "$result" | contain "ok" "'amoc@amoc-worker-1'" "'amoc@amoc-worker-2'" ; then
     echo "Scenario executed"
     exit 0
 else

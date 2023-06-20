@@ -4,14 +4,7 @@ source "$(dirname "$0")/helper.sh"
 enable_strict_mode
 cd "$git_root"
 
-otp_vsn="${OTP_RELEASE:-24.0}"
-rebar_vsn="${REBAR_RELEASE:-3.16.1}"
+otp_vsn="${OTP_RELEASE:-25.3}"
 echo "ERLANG/OTP '${otp_vsn}'"
-echo "REBAR '${rebar_vsn}'"
 
-docker build \
-	-f Dockerfile \
-	-t amoc:latest \
-	--build-arg "otp_vsn=${otp_vsn}" \
-	--build-arg "rebar_vsn=${rebar_vsn}" \
-	.
+docker_compose build --build-arg otp_vsn=${otp_vsn}

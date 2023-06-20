@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2020 Erlang Solutions Ltd.
+%% Copyright 2023 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 
@@ -43,6 +43,7 @@
 
 -type module_parameter() :: #module_parameter{}.
 -type module_configuration() :: [module_parameter()].
+-type maybe_module_config() :: {ok, [module_parameter()]} | error().
 
 -type one_of() :: [value(), ...].
 -type verification_method() :: none | one_of() | verification_fun().

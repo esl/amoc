@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2020 Erlang Solutions Ltd.
+%% Copyright 2023 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(amoc_controller).
@@ -35,8 +35,6 @@
 -type user_count() :: non_neg_integer().
 -type last_user_id() :: non_neg_integer().
 -type interarrival() :: non_neg_integer().
-
--include_lib("kernel/include/logger.hrl").
 
 %% ------------------------------------------------------------------
 %% Types Exports
@@ -98,11 +96,13 @@ update_settings(Settings) ->
 -spec add_users(amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     ok | {error, term()}.
 add_users(StartId, EndID) ->
+    telemetry:execute([amoc, controller, users], #{count => EndID - StartId + 1}, #{type => add}),
     %% adding the exact range of the users
     gen_server:call(?SERVER, {add, StartId, EndID}).
 
 -spec remove_users(user_count(), boolean()) -> {ok, user_count()}.
 remove_users(Count, ForceRemove) ->
+    telemetry:execute([amoc, controller, users], #{count => Count}, #{type => remove}),
     %% trying to remove Count users, this action is async!!!
     gen_server:call(?SERVER, {remove, Count, ForceRemove}).
 
@@ -322,7 +322,8 @@ terminate_all_users() ->
     Match = ets:match_object(?USERS_TABLE, '$1', 200),
     terminate_all_users(Match).
 
--spec terminate_all_users({tuple(), ets:continuation()} | '$end_of_table') -> ok.
+%% ets:continuation/0 type is unfortunately not exported from the ets module.
+-spec terminate_all_users({tuple(), term()} | '$end_of_table') -> ok.
 terminate_all_users({Objects, Continuation}) ->
     Pids = [Pid || {_Id, Pid} <- Objects],
     amoc_users_sup:stop_children(Pids, true),
@@ -353,6 +354,7 @@ apply_safely(M, F, A) ->
             {error, {Class, Exception, Stacktrace}}
     end.
 
+-spec maybe_update_interarrival_timer(state()) -> state().
 maybe_update_interarrival_timer(#state{tref = undefined} = State) ->
     State;
 maybe_update_interarrival_timer(#state{tref = TRef} = State) ->

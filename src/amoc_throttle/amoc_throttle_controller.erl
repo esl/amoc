@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2020 Erlang Solutions Ltd.
+%% Copyright 2023 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(amoc_throttle_controller).
@@ -11,7 +11,7 @@
          ensure_throttle_processes_started/4,
          pause/1, resume/1, stop/1,
          change_rate/3, change_rate_gradually/6,
-         run/2, update_metric/2]).
+         run/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -21,10 +21,6 @@
 
 -define(SERVER, ?MODULE).
 -define(MASTER_SERVER, {?SERVER, amoc_cluster:master_node()}).
-
--define(RATE(Name), {strict, [throttle, Name, rate]}).
--define(EXEC_RATE(Name), {strict, [throttle, Name, exec_rate]}).
--define(REQ_RATE(Name), {strict, [throttle, Name, req_rate]}).
 
 -record(throttle_info, {
     rate :: non_neg_integer(),
@@ -58,22 +54,18 @@ start_link() ->
     {ok, throttle_processes_already_started} |
     {error, any()}).
 ensure_throttle_processes_started(Name, Interval, Rate, NoOfProcesses) ->
-    case {amoc_cluster:master_node(), node()} of
-        {N, N} -> ok;
-        _ -> [amoc_metrics:init(counters, E) || E <- [?EXEC_RATE(Name), ?REQ_RATE(Name)]]
-    end,
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Interval, Rate, NoOfProcesses}).
 
 -spec run(name(), fun(()-> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
     case get_throttle_process(Name) of
         {ok, Pid} ->
-            maybe_update_metric(Name, request),
+            maybe_raise_event([amoc, throttle, request], #{count => 1}, #{name => Name}),
             Fun =
-            fun() ->
-                maybe_update_metric(Name, execution),
-                Fn()
-            end,
+                fun() ->
+                    maybe_raise_event([amoc, throttle, execute], #{count => 1}, #{name => Name}),
+                    Fn()
+                end,
             amoc_throttle_process:run(Pid, Fun),
             ok;
         Error -> Error
@@ -101,12 +93,6 @@ change_rate_gradually(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfS
 -spec stop(name()) -> ok | {error, any()}.
 stop(Name) ->
     gen_server:call(?MASTER_SERVER, {stop, Name}).
-
--spec update_metric(name(), execution | request) -> ok.
-update_metric(Name, execution) ->
-    amoc_metrics:update_counter(?EXEC_RATE(Name));
-update_metric(Name, request) ->
-    amoc_metrics:update_counter(?REQ_RATE(Name)).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -205,10 +191,10 @@ handle_info({change_plan, Name}, State) ->
 %%% Internal functions
 %%%===================================================================
 
-maybe_update_metric(Name, Type) ->
-    case {amoc_cluster:master_node(), node()} of
-        {N, N} -> ok;
-        _ -> update_metric(Name, Type)
+maybe_raise_event(Name, Measurements, Metadata) ->
+    case amoc_cluster:master_node() =:= node() of
+        true -> ok;
+        _ -> telemetry:execute(Name, Measurements, Metadata)
     end.
 
 -spec change_rate_and_stop_plan(name(), state()) -> state().
@@ -253,10 +239,8 @@ rate_per_minute(Rate, Interval) ->
 -spec start_processes(name(), pos_integer(), non_neg_integer(), pos_integer()) -> pos_integer().
 start_processes(Name, Rate, Interval, NoOfProcesses) ->
     % Master metrics
-    amoc_metrics:init(gauge, ?RATE(Name)),
-    [amoc_metrics:init(counters, E) || E <- [?EXEC_RATE(Name), ?REQ_RATE(Name)]],
     RatePerMinute = rate_per_minute(Rate, Interval),
-    amoc_metrics:update_gauge(?RATE(Name), RatePerMinute),
+    telemetry:execute([amoc, throttle, rate], #{rate => RatePerMinute}, #{name => Name}),
     RealNoOfProcesses = min(Rate, NoOfProcesses),
     start_throttle_processes(Name, Interval, Rate, RealNoOfProcesses),
     RealNoOfProcesses.
@@ -290,7 +274,7 @@ do_change_rate(Name, Rate, Interval) ->
         [] -> {error, no_processes_in_group};
         List when is_list(List) ->
             RatePerMinute = rate_per_minute(Rate, Interval),
-            amoc_metrics:update_gauge(?RATE(Name), RatePerMinute),
+            telemetry:execute([amoc, throttle, rate], #{rate => RatePerMinute}, #{name => Name}),
             update_throttle_processes(List, Interval, Rate, length(List)),
             {ok, RatePerMinute}
     end.

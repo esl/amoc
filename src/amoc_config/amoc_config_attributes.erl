@@ -1,5 +1,5 @@
 %%==============================================================================
-%% Copyright 2020 Erlang Solutions Ltd.
+%% Copyright 2023 Erlang Solutions Ltd.
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 %% this module is responsible for parsing module attributes
@@ -27,7 +27,7 @@
 %% API
 %% ------------------------------------------------------------------
 -spec get_module_configuration(attribute_name(), module()) ->
-    {ok, module_configuration()} | amoc_config_utils:error().
+    maybe_module_config().
 get_module_configuration(AttrName, Module) ->
     ScenarioAttributes = get_module_attributes(AttrName, Module),
     process_module_attributes(Module, ScenarioAttributes).
@@ -47,7 +47,7 @@ get_module_attributes(AttrName, Module) ->
     lists:append(RequiredVariables).
 
 -spec process_module_attributes(module(), [maybe_module_attribute()]) ->
-    {ok, module_configuration()} | amoc_config_utils:error().
+    maybe_module_config().
 process_module_attributes(Module, ScenarioAttributes) ->
     Config = [process_var_attr(Module, Attr)
               || Attr <- ScenarioAttributes],
