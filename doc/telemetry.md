@@ -42,7 +42,6 @@ measurements: #{count => 1}
 metadata: #{name => atom()}
 ```
 
-
 #### Execute
 
 Raised when a process client is allowed to execute after a throttled mechanism.
@@ -52,7 +51,6 @@ event_name: [amoc, throttle, execute]
 measurements: #{count => 1}
 metadata: #{name => atom()}
 ```
-
 
 ### Coordinate
 
