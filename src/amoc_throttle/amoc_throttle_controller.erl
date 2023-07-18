@@ -1,7 +1,6 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
+%% @private
+%% @see amoc_throttle
+%% @copyright 2023 Erlang Solutions Ltd.
 -module(amoc_throttle_controller).
 
 -behaviour(gen_server).

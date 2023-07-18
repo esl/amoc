@@ -1,7 +1,6 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
+%% @private
+%% @see amoc_throttle
+%% @copyright 2023 Erlang Solutions Ltd.
 -module(amoc_throttle_process).
 -behaviour(gen_server).
 
@@ -117,11 +116,13 @@ handle_continue(maybe_run_fn, State) ->
     NewState = maybe_run_fn(State),
     {noreply, NewState, timeout(NewState)}.
 
+-spec format_status(term(), term()) -> term().
 format_status(_Opt, [_PDict, State]) ->
     ScheduleLen = length(State#state.schedule),
     ScheduleRevLen = length(State#state.schedule_reversed),
     State1 = setelement(#state.schedule, State, ScheduleLen),
     setelement(#state.schedule_reversed, State1, ScheduleRevLen).
+
 %%------------------------------------------------------------------------------
 %% internal functions
 %%------------------------------------------------------------------------------
