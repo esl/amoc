@@ -139,6 +139,9 @@
 %% This way it knows that the execution of a task has ended, and can allow a different process
 %% to run its task connected to the same `Name' if the current `Rate' allows it.
 %%
+%% Below is a graph showing the communication between processes on different nodes described above:
+%%  <div style="width: 650px; height: 840px; background-image: url('assets/amoc_throttle_dist.svg');" />
+%%
 %% @end
 %%==============================================================================
 -module(amoc_throttle).

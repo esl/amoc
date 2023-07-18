@@ -1,7 +1,5 @@
-## Configuration
-
 Amoc is configured through environment variables (uppercase with prefix ``AMOC_``).
-Note that the environment variables are evaluated as erlang code
+Note that the environment variables are evaluated as Erlang code.
 
 Amoc supports the following generic configuration parameters:
 
@@ -62,5 +60,4 @@ error
 [{"some",value},
  {another,"value"},
  {yet,<<"another">>,"value"}]
-
 ```

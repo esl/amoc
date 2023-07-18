@@ -60,3 +60,9 @@ For developing XMPP scenarios, we recommend the
 If additional dependencies are required by your scenario,
 a `rebar.config` file can be created inside the `scenario` dir
 and `deps` from that file will be merged with Amoc's dependencies.
+
+## Coordinate users
+See `amoc_coordinator`.
+
+## Throttle actions
+See `amoc_throttle`.

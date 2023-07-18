@@ -1,8 +1,6 @@
-## Telemetry
-
 Amoc also exposes the following telemetry events:
 
-### Scenario
+## Scenario
 
 A telemetry span of a full scenario execution
 ```erlang
@@ -11,7 +9,7 @@ measurements: #{}
 metadata: #{}
 ```
 
-### Controller
+## Controller
 
 Indicates the number of users added or removed
 ```erlang
@@ -20,9 +18,9 @@ measurements: #{count => non_neg_integer()}
 metadata: #{type => add | remove}
 ```
 
-### Throttle
+## Throttle
 
-#### Rate
+### Rate
 
 Raised when a throttle mechanism is initialised or its configured rate is changed.
 
@@ -32,7 +30,7 @@ measurements: #{rate => non_neg_integer()}
 metadata: #{name => atom()}
 ```
 
-#### Request
+### Request
 
 Raised when a process client requests to be allowed pass through a throttled mechanism.
 
@@ -42,7 +40,7 @@ measurements: #{count => 1}
 metadata: #{name => atom()}
 ```
 
-#### Execute
+### Execute
 
 Raised when a process client is allowed to execute after a throttled mechanism.
 
@@ -52,11 +50,11 @@ measurements: #{count => 1}
 metadata: #{name => atom()}
 ```
 
-### Coordinate
+## Coordinate
 
 Indicates when a coordinating event was raised, like a callback index being reached or a timeout being triggered
 
-#### Event
+### Event
 ```erlang
 event_name: [amoc, coordinator, event]
 measurements: #{count => 1}
