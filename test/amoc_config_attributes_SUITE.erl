@@ -20,7 +20,7 @@
     #{name => var3, description => "var3", default_value => def3,
       verification => [def3, another_atom]},
     #{name => var4, description => "var4", default_value => def4,
-      verification => fun ?MODULE:verify_value/1}
+      verification => {?MODULE, verify_value, 1}}
 ]).
 -required_variable(#{name => var5, description => "var5", default_value => def5,
                      update => read_only}).
@@ -28,7 +28,7 @@
                      verification => none, update => none}).
 -required_variable([
     #{name => var7, description => "var7", default_value => def7,
-      verification => none, update => fun ?MODULE:update_value/2}
+      verification => none, update => {?MODULE, update_value, 2}}
 ]).
 
 %% verification functions
@@ -56,13 +56,13 @@ get_module_attributes(_) ->
         #{name => var3, description => "var3", default_value => def3,
           verification => [def3, another_atom]},
         #{name => var4, description => "var4", default_value => def4,
-          verification => fun ?MODULE:verify_value/1},
+          verification => {?MODULE, verify_value, 1}},
         #{name => var5, description => "var5", default_value => def5,
           update => read_only},
         #{name => var6, description => "var6", default_value => def6,
           verification => none, update => none},
         #{name => var7, description => "var7", default_value => def7,
-          verification => none, update => fun ?MODULE:update_value/2}],
+          verification => none, update => {?MODULE, update_value, 2}}],
     ?assertEqual(ExpectedResult, Result).
 
 get_module_configuration(_) ->
