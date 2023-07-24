@@ -18,6 +18,8 @@
 -override_variable(#{name => var2, description => "var2", default_value => val2,
                      verification => [def2, val2], update => {?MODULE, update_fn, 2}}).
 -override_variable(#{name => var3, description => "var3", default_value => def3,
+                     update => fun ?MODULE:update_fn/2}).
+-override_variable(#{name => var3, description => "var3", default_value => def3,
                      update => {?MODULE, update_fn, 2}}).
 
 update_fn(Name, Value) -> apply(?MOCK_MOD, update, [Name, Value]).

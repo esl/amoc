@@ -10,8 +10,8 @@
 -required_variable([
     %% var2 must be positively verified by the test_verification_function/1 function.
     %% verification function must be supplied as an mfa of the format
-    %% '{module, function, arity}' format. Note that it must be an exported function.
-    %% otherwise it will not pass compilation.
+    %% '{module, function, arity}', or a fun of the format `fun module:function/arity`.
+    %% Note that it must be an exported function, otherwise it will not pass compilation.
     #{name => var2, description => "description2", default_value => def2,
       verification => {?MODULE, test_verification_function, 1}},
     #{name => var3, description => "description3", default_value => def3,
