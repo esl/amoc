@@ -45,32 +45,38 @@ where
 ### `name`
 * **Syntax:** atom
 * **Example:** `name = var1`
+* **Default:** this field is mandatory
 
 ### `description`
 * **Syntax:** A string describing how this variable is used, can be extracted by APIs to document the behaviour
 * **Example:** `description = "a description of this variable"`
+* **Default:** this field is mandatory
 
 ### `default_value`
 * **Syntax:** value of the expected type
 * **Example:** `default_value = 10`
-
-### `update`
-* **Syntax:** `read_only`, `none`, or an `mfa` of arity 2
-* **Example:** `update = {?MODULE, update, 2}`
-
-An action to take when the value of this variable is updated.
-If it is set to `read_only`, updates will fail.
-If it is set to `none`, all updates are allowed.
+* **Default:** `undefined`
 
 ### `verification`
 * **Syntax:** `none`, a list of allowed values, or an `mfa` of arity `1`
 * **Example:** `verification = {?MODULE, is_binary, 1}`
+* **Default:** `none`
 
-A verification function that will check the value given is correct.
-If it is set to `none`, all updates are allowed.
-If it is set to a list of values, any given value checks that the new value is in such whitelist.
-If it is an `mfa`, the given function will be called on the given value. This function
-must be pure and return a boolean or a `{true, NewValue} | {false, Reason}`.
+A verification function that will check the given value is correct. It is trigger for verifying the initial values, including the default value, and before updated values are applied.
+- If it is set to `none`, all values are allowed.
+- If it is set to a list of values, any given value checks that the new value is in such allowlist.
+- If it is an `mfa`, the given function will be called on the given value. This function
+must be pure and return a boolean or a `{true, NewValue} | {false, Reason}`. It can also be used for preprocessing of the input value by returning `{true, NewValue}`.
+
+### `update`
+* **Syntax:** `read_only`, `none`, or an `mfa` of arity 2
+* **Example:** `update = {?MODULE, update, 2}`
+* **Default:** `read_only`
+
+An action to take when the value of this variable is updated. It is triggered at runtime when updates to the value are applied.
+- If it is set to `read_only`, updates will fail.
+- If it is set to `none`, all updates are allowed.
+- If it is an `mfa`, the given function will be called on the old and new value.
 
 ## Reasonale
 
