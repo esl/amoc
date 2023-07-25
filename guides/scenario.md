@@ -1,7 +1,6 @@
 ## Developing a scenario
 
-A scenario specification is an [Erlang](https://www.erlang.org/) module that implements
-the `amoc_scenario` behaviour.
+A scenario specification is an [Erlang](https://www.erlang.org/) or [Elixir](https://elixir-lang.org/) module that implements the `amoc_scenario` behaviour.
 It has to export two callback functions:
 - `init/0` - called only once per test run on every node, at the very beginning.
 It can be used for setting up initial (global) state: metrics, database connections, etc.
@@ -34,8 +33,28 @@ start(Id) ->
     %% send some messages again
     ok.
 ```
-or, using the `start/2` function:
+```elixir
+defmodule LoadTest do
+  @behaviour :amoc_scenario
 
+  def init do
+    ## initialize some metrics
+    settings = get_settings()
+    :ok
+  end
+
+  def start(id) do
+    ## connect user
+    ## fetch user's history
+    ## send some messages
+    ## wait a little bit
+    ## send some messages again
+    ok.
+  end
+
+end
+```
+or, using the `start/2` function:
 ```erlang
 -module(my_scenario).
 
@@ -55,7 +74,27 @@ start(Id, Settings) ->
     %% send some messages again
     ok.
 ```
+```elixir
+defmodule LoadTest do
+  @behaviour :amoc_scenario
 
+  def init do
+    ## initialize some metrics
+    settings = get_settings()
+    {:ok, Settings}
+  end
+
+  def start(id, settings) do
+    ## connect user using Settings
+    ## fetch user's history
+    ## send some messages
+    ## wait a little bit
+    ## send some messages again
+    ok.
+  end
+
+end
+```
 
 For developing XMPP scenarios, we recommend the
 [esl/escalus](https://github.com/esl/escalus) library.
