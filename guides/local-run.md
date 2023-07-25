@@ -8,15 +8,24 @@ Start `my_scenario` spawning 10 amoc users with IDs from range (1,10) inclusive.
 ```erlang
 amoc:do(my_scenario, 10, []).
 ```
+```elixir
+:amoc.do(:my_scenario, 10, []).
+```
 
 Add 10 more user sessions.
 ```erlang
 amoc:add(10).
 ```
+```elixir
+:amoc.add(10).
+```
 
 Remove 10 users.
 ```erlang
 amoc:remove(10, true).
+```
+```elixir
+:amoc.remove(10, true).
 ```
 
 #### Many independent Amoc nodes
