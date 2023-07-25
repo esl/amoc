@@ -11,5 +11,6 @@
     {mod, {amoc_app, []}},
     {env, []},
     {licenses, ["Apache-2.0"]},
-    {links, [{"GitHub", "https://github.com/esl/amoc"}]}
+    {links, [{"GitHub", "https://github.com/esl/amoc"}]},
+    {exclude_patterns, ["priv/*"]}
 ]}.
