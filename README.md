@@ -1,13 +1,16 @@
 # A Murder of Crows
 [![](https://github.com/esl/amoc/workflows/CI/badge.svg)](https://github.com/esl/amoc/actions?query=workflow%3ACI)
+[![Hex](http://img.shields.io/hexpm/v/amoc.svg)](https://hex.pm/packages/amoc)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/amoc/)
 
 ----------------------------------------------------------------------------------------------
 A Murder of Crows, aka amoc, is a simple framework for running massively parallel tests in a distributed environment.
 
 It can be used as a rebar3 dependency:
+
 ```erlang
 {deps, [
-    {amoc, {git, "https://github.com/esl/amoc", {tag, "2.0.1"}}}
+    {amoc, "3.0.0-rc1"}
 ]}.
 ```
 [MongooseIM](https://github.com/esl/MongooseIM) is continuously being load tested with Amoc.
