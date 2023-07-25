@@ -1,5 +1,3 @@
-## Set-up distributed environment with docker
-
 To build a Docker image with Amoc, run the following command from the root of
 the repository:
 ```
@@ -49,3 +47,4 @@ docker run --rm -t -d --name amoc-2 -h amoc-2 \
 Connect to Amoc console and go to the [next](../doc/distributed-run.md) section.
 ```
 docker exec -it amoc-1 /home/amoc/amoc/bin/amoc remote_console
+```

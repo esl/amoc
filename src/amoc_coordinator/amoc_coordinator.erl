@@ -1,6 +1,6 @@
 %%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
+%% @doc This module allows to synchronize the users and act on groups of them.
+%% @copyright 2023 Erlang Solutions Ltd.
 %%==============================================================================
 -module(amoc_coordinator).
 
@@ -62,10 +62,13 @@
 %%%===================================================================
 %%% Api
 %%%===================================================================
+
+%% @see start/3
 -spec start(name(), coordination_plan()) -> ok | error.
 start(Name, CoordinationPlan) ->
     start(Name, CoordinationPlan, ?DEFAULT_TIMEOUT).
 
+%% @doc Starts a coordinator. Usually called in the init callback of an amoc scenario.
 -spec start(name(), coordination_plan(), coordination_timeout_in_sec()) -> ok | error.
 start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
     Plan = normalize_coordination_plan(CoordinationPlan),
@@ -89,18 +92,22 @@ start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
         {error, _} -> error
     end.
 
+%% @doc Stops a coordinator.
 -spec stop(name()) -> ok.
 stop(Name) ->
     gen_event:stop(Name).
 
+%% @see add/3
 -spec add(name(), any()) -> ok.
 add(Name, Data) ->
     add(Name, self(), Data).
 
+%% @doc Adds the current process data. Usually called in the `start/2' callback of an amoc scenario.
 -spec add(name(), pid(), any()) -> ok.
 add(Name, Pid, Data) ->
     gen_event:notify(Name, {coordinate, {Pid, Data}}).
 
+%% @doc Resets a coordinator, that is, calls all coordination actions with `reset' as the coordination data.
 -spec reset(name()) -> ok.
 reset(Name) ->
     gen_event:notify(Name, reset_coordinator).
@@ -178,7 +185,6 @@ handle_call(_Request, State) ->
 %% function is called. It should be the opposite of Module:init/1 and
 %% do any necessary cleaning up.
 %%
-%% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
 -spec terminate(any(), state()) -> ok.

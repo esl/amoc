@@ -9,14 +9,13 @@
 
 -required_variable([
     %% var2 must be positively verified by the test_verification_function/1 function.
-    %% verification function must be supplied as a function pointer in a
-    %% 'fun module:function/arity' format. Note that it must be an exported function.
-    %% usage of 'fun function/arity' format in the module attribute simply will
-    %% not pass compilation.
+    %% verification function must be supplied as an mfa of the format
+    %% '{module, function, arity}', or a fun of the format `fun module:function/arity`.
+    %% Note that it must be an exported function, otherwise it will not pass compilation.
     #{name => var2, description => "description2", default_value => def2,
-      verification => fun ?MODULE:test_verification_function/1},
+      verification => {?MODULE, test_verification_function, 1}},
     #{name => var3, description => "description3", default_value => def3,
-      verification => fun ?MODULE:test_verification_function/1}]).
+      verification => {?MODULE, test_verification_function, 1}}]).
 
 %% 'none' is a predefined verification function which accepts all the values
 -required_variable(#{name => var4, description => "description4",

@@ -1,8 +1,6 @@
-# amoc_coordinator
+## API
 
-## Module
-
-`amoc_coordinator`
+See `amoc_coordinator`.
 
 ## Description
 
@@ -20,8 +18,8 @@ If more then one of the *Coordination Items* matching the `NumberOfUsers` is tri
 For example if the *Coordination Plan* is `[{2, Act1}, {3, Act2}]` then on the 6th user calling `add`, `Act1` will be called with 2 users passed and `Act2` will be called with 3 users passed.
 
 *Coordination Actions* may be one of the following:
- - `fun(Event) -> any()` - this type of action does not care about particular users, but only about the number of them;
- - `fun(Event, ListOfUsersData) -> any()` - this type of action gets `ListOfUsersData` which is a list of `{Pid, Data}` tuples with `Pid`s passed by users calling `amoc_coordinator:add/2` or `amoc_coordinator:add/3`;
+- `fun(Event) -> any()` - this type of action does not care about particular users, but only about the number of them;
+- `fun(Event, ListOfUsersData) -> any()` - this type of action gets `ListOfUsersData` which is a list of `{Pid, Data}` tuples with `Pid`s passed by users calling `amoc_coordinator:add/2` or `amoc_coordinator:add/3`;
 - `fun(Event, User1, User2) -> any()` - this type of action gets `distinct pairs` from the batch of users `User1` and `User2` which are `{Pid, Data}` tuples with `Pid`s passed by users calling `amoc_coordinator:add/2` or `amoc_coordinator:add/3`;
 
 where an `Event` is a `{EventType, NumOfUsers}` tuple, in which `NumOfUsers` is the number of users passed to the event.
@@ -36,44 +34,6 @@ It’s guaranteed that all the *Coordination Actions* with `all` are executed af
  - Eg. for `[a]`, the `distinct pairs` collection is `[{a, undefined}]`;
  - Eg. for `[a, b]`, the `distinct pairs` collection is `[{a, b}]`;
  - Eg. for `[a, b, c]`, the `distinct pairs` collection is `[{a, b}, {a, c}, {b, c}]`.
-
-## Exports
-
-#### `start(CoordinatorName, CoordinationPlan) -> ok | error`
-#### `start(CoordinatorName, CoordinationPlan, Timeout) -> ok | error`
-
-##### Types
-```erlang
-CoordinatorName :: atom()
-CoordinationPlan  :: [ CoordinationItem ]
-CoordinationItem :: {NumberOfUsers :: pos_integer() | all, CoordinationActions}
-CoordinationActions :: [ CoordinationActions ] | CoordinationAction
-CoordinationAction ::
-    fun(Event) -> any() |
-    fun(Event, ListOfUsersData) -> any() |
-    fun(Event, MaybeUser, MaybeUser) -> any()
-Event :: {EventType, NumOfUsers}
-EventType :: coordinate | timeout | stop | reset
-NumOfUsers :: non_neg_integer()
-ListOfUsersData :: [ User ]
-MaybeUser :: undefined | User
-User :: {UsersPid :: pid(), Data :: any()}
-Timeout :: pos_integer() | infinity
-```
-
-This function starts a coordinator. Usually is called in `init/0` of a amoc scenario.
-
-#### `add(CoordinatorName, Data) -> ok`
-#### `add(CoordinatorName, Pid, Data) -> ok`
-
-##### Types
-```erlang
-CoordinatorName :: atom()
-UsersPid :: pid()
-Data :: any()
-```
-
-This function adds the current process data. It is usually called in `start/2` of a amoc scenario.
 
 ## Example
 

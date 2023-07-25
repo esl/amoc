@@ -15,19 +15,9 @@ All the XMPP scenarios can be found [here](https://github.com/esl/amoc-arsenal-x
 
 ---------------------------------------------------------------------
 In order to implement and run locally your scenarios, follow the chapters about
-[developing](doc/scenario.md) and [running](doc/local-run.md) a scenario
+[developing](guides/scenario.md) and [running](guides/local-run.md) a scenario
 locally.
-Before [setting up the distributed environment](doc/distributed.md),
+Before [setting up the distributed environment](guides/distributed.md),
 please read through the configuration overview.
-If you wish to run load tests via http api,
-take a look at the [REST API](doc/http-api.md) chapter.
 
-### Table of Contents
-- [Developing a scenario](doc/scenario.md)
-- [Running locally](doc/local-run.md)
-- [Configuration](doc/configuration.md)
-- [Setting up distributed environment](doc/distributed.md)
-- [Running load test](doc/distributed-run.md)
-- [REST API](doc/http-api.md)
-- [Amoc throttle](doc/amoc_throttle.md)
-- [Amoc coordinator](doc/amoc_coordinator.md)
+To see the full documentation, see [hexdocs](https://hexdocs.pm/amoc).

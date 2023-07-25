@@ -20,6 +20,8 @@
     #{name => var3, description => "var3", default_value => def3,
       verification => [def3, another_atom]},
     #{name => var4, description => "var4", default_value => def4,
+      verification => {?MODULE, verify_value, 1}},
+    #{name => var4b, description => "var4b", default_value => def4b,
       verification => fun ?MODULE:verify_value/1}
 ]).
 -required_variable(#{name => var5, description => "var5", default_value => def5,
@@ -28,7 +30,7 @@
                      verification => none, update => none}).
 -required_variable([
     #{name => var7, description => "var7", default_value => def7,
-      verification => none, update => fun ?MODULE:update_value/2}
+      verification => none, update => {?MODULE, update_value, 2}}
 ]).
 
 %% verification functions
@@ -56,13 +58,15 @@ get_module_attributes(_) ->
         #{name => var3, description => "var3", default_value => def3,
           verification => [def3, another_atom]},
         #{name => var4, description => "var4", default_value => def4,
+          verification => {?MODULE, verify_value, 1}},
+        #{name => var4b, description => "var4b", default_value => def4b,
           verification => fun ?MODULE:verify_value/1},
         #{name => var5, description => "var5", default_value => def5,
           update => read_only},
         #{name => var6, description => "var6", default_value => def6,
           verification => none, update => none},
         #{name => var7, description => "var7", default_value => def7,
-          verification => none, update => fun ?MODULE:update_value/2}],
+          verification => none, update => {?MODULE, update_value, 2}}],
     ?assertEqual(ExpectedResult, Result).
 
 get_module_configuration(_) ->
@@ -84,6 +88,8 @@ get_module_configuration(_) ->
                                                    %% 'one_of_function' test case.
          #module_parameter{name = var4, mod = ?MODULE, value = def4,
                            verification_fn = VerifyValueFN, update_fn = read_only},
+         #module_parameter{name = var4b, mod = ?MODULE, value = def4b,
+                           verification_fn = VerifyValueFN, update_fn = read_only},
          #module_parameter{name = var5, mod = ?MODULE, value = def5,
                            verification_fn = VerificationNone, update_fn = read_only},
          #module_parameter{name = var6, mod = ?MODULE, value = def6,
@@ -100,6 +106,8 @@ errors_reporting(_) ->
     ValidParam3 = #{name => valid_var3, description => "var3", default_value => def3,
                     verification => [def3, another_atom]},
     InvalidParam4 = #{name => invalid_var4, description => "var4",
+                      verification => {erlang, not_exported_function, 1}},
+    InvalidParam4b = #{name => invalid_var4b, description => "var4b",
                       verification => fun erlang:not_exported_function/1},
     InvalidParam5 = #{name => invalid_var5, description => "var5",
                       update => invalid_update_method},
@@ -108,7 +116,7 @@ errors_reporting(_) ->
     InvalidParam7 = #{name => invalid_var7, description => "var7",
                       update => fun update_value/2}, %% local function
     Attributes = [InvalidParam0, InvalidParam1, InvalidParam2, ValidParam3,
-                  InvalidParam4, InvalidParam5, InvalidParam6, InvalidParam7],
+                  InvalidParam4, InvalidParam4b, InvalidParam5, InvalidParam6, InvalidParam7],
     {error, invalid_attribute_format, Reason} =
         amoc_config_attributes:process_module_attributes(?MODULE, Attributes),
     ?assertEqual(
@@ -116,6 +124,7 @@ errors_reporting(_) ->
          {InvalidParam1, invalid_attribute},
          {InvalidParam2, invalid_verification_method},
          {InvalidParam4, verification_method_not_exported},
+         {InvalidParam4b, verification_method_not_exported},
          {InvalidParam5, invalid_update_method},
          {InvalidParam6, update_method_not_exported},
          {InvalidParam7, update_method_not_exported}],

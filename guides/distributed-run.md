@@ -42,7 +42,7 @@ key set to ``2000``.
 Also all the user processes trap exit signal.
 
 
-### Don't stop scenario on exit
+## Don't stop scenario on exit
 
 There is one problem with the `bin/amoc console` command. When you exit the Erlang
 shell the scenario is stopped (in fact the erlang nodes are killed).

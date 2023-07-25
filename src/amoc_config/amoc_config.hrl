@@ -46,8 +46,8 @@
 -type maybe_module_config() :: {ok, [module_parameter()]} | error().
 
 -type one_of() :: [value(), ...].
--type verification_method() :: none | one_of() | verification_fun().
--type update_method() :: read_only | none | update_fun().
+-type verification_method() :: none | one_of() | {module(), atom(), 1}.
+-type update_method() :: read_only | none | {module(), atom(), 2}.
 
 -type module_attribute() :: #{ name := name(),
                                description := string(),

@@ -131,6 +131,8 @@ verification_fn([_ | _] = OneOF) ->
     one_of_fun(OneOF);
 verification_fn(Fun) when is_function(Fun, 1) ->
     is_exported(Fun);
+verification_fn({Module, Function, 1}) ->
+    is_exported(fun Module:Function/1);
 verification_fn(_) ->
     invalid_method.
 
@@ -142,6 +144,8 @@ update_fn(none) ->
     fun ?MODULE:none/2;
 update_fn(Fun) when is_function(Fun, 2) ->
     is_exported(Fun);
+update_fn({Module, Function, 2}) ->
+    is_exported(fun Module:Function/2);
 update_fn(_) ->
     invalid_method.
 
