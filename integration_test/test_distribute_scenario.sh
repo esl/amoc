@@ -27,9 +27,13 @@ function ensure_scenarios_installed() {
 
 function upload_module() {
     local filename="$2"
-    docker_compose cp "$2" "${1}:/tmp/erlang_module"
-    eval_cmd=( "{ok, FileContent} = file:read_file(\"/tmp/erlang_module\"),"
-               "amoc_scenario:install_module(${filename%.erl}, FileContent)." )
+    docker_compose cp "$2" "${1}:/tmp/${2}"
+    eval_cmd=( "File = \"/tmp/${2%.erl}\","
+               '{ok, Module} = compile:file(File, [{outdir,"/tmp"}]),'
+               'true = code:add_path("/tmp"),' ## required for successful amoc_scenario:add_module/1 execution
+               '{module, Module} = code:load_file(Module),'
+               'amoc_scenario:add_module(Module).' )
+    echo "${eval_cmd[*]}"
     amoc_eval "${1}" "${eval_cmd[*]}"
 }
 
@@ -43,5 +47,5 @@ echo "Response for '${scenario_name}.erl': ${scenario_put}"
 helper_put="$(upload_module amoc-master "dummy_helper.erl")"
 echo "Response for 'dummy_helper.erl': ${helper_put}"
 
-ensure_scenarios_installed amoc-worker-1 ${scenario_name}
-ensure_scenarios_installed amoc-worker-2 ${scenario_name}
+# ensure_scenarios_installed amoc-worker-1 ${scenario_name}
+# ensure_scenarios_installed amoc-worker-2 ${scenario_name}

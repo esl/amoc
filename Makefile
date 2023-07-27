@@ -18,10 +18,8 @@ compile:
 
 clean:
 	rm -rf _build
-	rm -rfv priv/scenarios_ebin/*.beam
 
 ct:
-	rm -rfv priv/scenarios_ebin/*.beam
 	## eunit and ct commands always add a test profile to the run
 	$(REBAR) ct --verbose $(SUITE_OPTS)
 

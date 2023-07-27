@@ -1,7 +1,5 @@
 x-amoc-defaults: &amoc-defaults
-  build:
-    context: ../
-    dockerfile: Dockerfile
+  image: "amoc:latest"
   networks:
     - amoc-test-network
   volumes:

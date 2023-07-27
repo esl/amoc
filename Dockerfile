@@ -5,11 +5,9 @@ MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 WORKDIR /amoc_build
 
 COPY ./rebar.config ./rebar.lock ./
-RUN rebar3 deps && rebar3 compile -d
+RUN rebar3 deps && rebar3 compile --deps_only
 
-COPY ./integration_test integration_test
 COPY ./scenarios scenarios
-COPY ./priv priv
 COPY ./rel rel
 COPY ./src src
 
