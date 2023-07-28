@@ -32,6 +32,8 @@
     #{name => var7, description => "var7", default_value => def7,
       verification => none, update => {?MODULE, update_value, 2}}
 ]).
+-required_variable(#{name => var7b, description => "var7b", default_value => def7,
+                     verification => none, update => fun ?MODULE:update_value/2}).
 
 %% verification functions
 -export([verify_value/1]).
@@ -66,7 +68,9 @@ get_module_attributes(_) ->
         #{name => var6, description => "var6", default_value => def6,
           verification => none, update => none},
         #{name => var7, description => "var7", default_value => def7,
-          verification => none, update => {?MODULE, update_value, 2}}],
+          verification => none, update => {?MODULE, update_value, 2}},
+        #{name => var7b, description => "var7b", default_value => def7,
+          verification => none, update => fun ?MODULE:update_value/2}],
     ?assertEqual(ExpectedResult, Result).
 
 get_module_configuration(_) ->
@@ -95,6 +99,8 @@ get_module_configuration(_) ->
          #module_parameter{name = var6, mod = ?MODULE, value = def6,
                            verification_fn = VerificationNone, update_fn = UpdateNone},
          #module_parameter{name = var7, mod = ?MODULE, value = def7,
+                           verification_fn = VerificationNone, update_fn = UpdateValueFN},
+         #module_parameter{name = var7b, mod = ?MODULE, value = def7,
                            verification_fn = VerificationNone, update_fn = UpdateValueFN}],
         Config).
 
@@ -115,8 +121,10 @@ errors_reporting(_) ->
                       update => fun invalid_module:not_exported_function/2},
     InvalidParam7 = #{name => invalid_var7, description => "var7",
                       update => fun update_value/2}, %% local function
-    Attributes = [InvalidParam0, InvalidParam1, InvalidParam2, ValidParam3,
-                  InvalidParam4, InvalidParam4b, InvalidParam5, InvalidParam6, InvalidParam7],
+    InvalidParam7b = #{name => invalid_var7, description => "var7b",
+                      update => fun update_value/2}, %% local function
+    Attributes = [InvalidParam0, InvalidParam1, InvalidParam2, ValidParam3, InvalidParam4,
+                  InvalidParam4b, InvalidParam5, InvalidParam6, InvalidParam7, InvalidParam7b],
     {error, invalid_attribute_format, Reason} =
         amoc_config_attributes:process_module_attributes(?MODULE, Attributes),
     ?assertEqual(
@@ -127,7 +135,8 @@ errors_reporting(_) ->
          {InvalidParam4b, verification_method_not_exported},
          {InvalidParam5, invalid_update_method},
          {InvalidParam6, update_method_not_exported},
-         {InvalidParam7, update_method_not_exported}],
+         {InvalidParam7, update_method_not_exported},
+         {InvalidParam7b, update_method_not_exported}],
         Reason).
 
 one_of_function(_) ->
