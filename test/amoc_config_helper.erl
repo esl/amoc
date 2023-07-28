@@ -5,6 +5,9 @@
 set_os_env(Name, Value) ->
     os:putenv(env_name(Name), format_value(Value)).
 
+set_empty_os_env(Name) ->
+    os:putenv(env_name(Name), "").
+
 unset_os_env(Name) ->
     os:unsetenv(env_name(Name)).
 
@@ -18,4 +21,4 @@ get_env(Name, Default) ->
     amoc_config_env:get(Name, Default).
 
 format_value(Value) ->
-    amoc_config_env:format(Value, string).
+    amoc_config_parser:format(Value, string).
