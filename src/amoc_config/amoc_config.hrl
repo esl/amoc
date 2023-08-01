@@ -46,8 +46,9 @@
 -type maybe_module_config() :: {ok, [module_parameter()]} | error().
 
 -type one_of() :: [value(), ...].
--type verification_method() :: none | one_of() | {module(), atom(), 1}.
--type update_method() :: read_only | none | {module(), atom(), 2}.
+-type mfa(Arity) :: {module(), atom(), Arity}.
+-type verification_method() :: none | one_of() | mfa(1) | verification_fun().
+-type update_method() :: read_only | none | mfa(2) | update_fun().
 
 -type module_attribute() :: #{ name := name(),
                                description := string(),
