@@ -39,7 +39,7 @@ update_settings(Settings) ->
         {fun verify_settings/2, [Settings]},
         {fun filter_configuration/2, [Settings]},
         {fun amoc_config_verification:process_scenario_config/2, [Settings]},
-        {fun store_scenario_config/1, []}],
+        {fun store_scenario_config_and_run_update_functions/1, []}],
     case amoc_config_utils:pipeline(PipelineActions, ok) of
         ok -> ok;
         {error, _, _} = Error -> Error;
@@ -129,12 +129,17 @@ filter_configuration(Config, Settings) ->
     FilteredConfig = [lists:keyfind(Name, KeyPos, Config) || Name <- Keys],
     case [{N, M} || #module_parameter{name = N, mod = M,
                                       update_fn = read_only} <- FilteredConfig] of
-        [] -> {ok, FilteredConfig};
+        [] ->
+            %% filter out unchanged parameters
+            ChangedParameters =
+                [P || #module_parameter{name = N, value = V} = P <- FilteredConfig,
+                      V =/= proplists:get_value(N, Settings)],
+            {ok, ChangedParameters};
         ReadOnlyParameters ->
             {error, readonly_parameters, ReadOnlyParameters}
     end.
 
-store_scenario_config(Config) ->
+store_scenario_config_and_run_update_functions(Config) ->
     amoc_config_utils:store_scenario_config(Config),
     [spawn(fun() -> apply(Fn, [Name, Value]) end)
      || #module_parameter{name = Name, value = Value, update_fn = Fn} <- Config],

@@ -9,6 +9,11 @@
 
 -define(MOCK_MOD, mock_mod).
 
+%% execution of update functions is done asynchronously
+-define(UPDATE_TIMEOUT, 500).
+%% execution of verification functions is done synchronously
+-define(VERIFY_TIMEOUT, 0).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% these attributes are required for the testing purposes %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -50,6 +55,8 @@ all() ->
 
 groups() ->
     [{update_settings, [], [update_settings,
+                            update_just_one_parameter,
+                            update_parameters_with_the_same_values,
                             update_settings_readonly,
                             update_settings_invalid_value,
                             update_settings_undef_param]}].
@@ -90,8 +97,8 @@ parse_scenario_settings(_) ->
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, ScenarioSettings),
     ?assertEqual(ok, Ret),
     %% check verification function calls
-    meck:wait(?MOCK_MOD, verify_fun, [def1], 0),
-    meck:wait(?MOCK_MOD, verify_mfa, [val3], 0),
+    meck:wait(?MOCK_MOD, verify_fun, [def1], ?VERIFY_TIMEOUT),
+    meck:wait(?MOCK_MOD, verify_mfa, [val3], ?VERIFY_TIMEOUT),
     ?assertEqual(2, length(meck:history(?MOCK_MOD))),
     assert_no_update_calls(),
     %% undefined variable
@@ -124,21 +131,71 @@ update_settings(_) ->
     ?assertEqual(val1, amoc_config:get(var1)),
     %% execution of update functions is done asynchronously
     %% and execution of verification functions is synchronous
-    meck:wait(?MOCK_MOD, verify_mfa, [new_val3], 0),
-    meck:wait(?MOCK_MOD, update_fun, [var3, new_val3], 500),
-    meck:wait(?MOCK_MOD, update_mfa, [var2, new_val2], 500),
-    ?assertEqual(3, length(meck:history(?MOCK_MOD))),
-    meck:reset(?MOCK_MOD),
+    meck:wait(?MOCK_MOD, verify_mfa, [new_val3], ?VERIFY_TIMEOUT),
+    meck:wait(?MOCK_MOD, update_fun, [var3, new_val3], ?UPDATE_TIMEOUT),
+    meck:wait(?MOCK_MOD, update_mfa, [var2, new_val2], ?UPDATE_TIMEOUT),
+    ?assertEqual(3, length(meck:history(?MOCK_MOD))).
+
+update_just_one_parameter(_) ->
+    set_initial_configuration(),
 
     %% update only 1 parameter and check that update
     %% function is call for that parameter
-    ?assertEqual(ok, amoc_config_scenario:update_settings([{var2, val2}])),
+    ?assertEqual(ok, amoc_config_scenario:update_settings([{var2, new_val2}])),
     %% updated variables
-    ?assertEqual(val2, amoc_config:get(var2)),
+    ?assertEqual(new_val2, amoc_config:get(var2)),
     %% execution of update functions is done asynchronously
     %% and execution of verification functions is synchronous
-    meck:wait(?MOCK_MOD, update_mfa, [var2, val2], 500),
-    ?assertEqual(1, length(meck:history(?MOCK_MOD))).
+    meck:wait(?MOCK_MOD, update_mfa, [var2, new_val2], ?UPDATE_TIMEOUT),
+    ?assertError(timeout, meck:wait(?MOCK_MOD, verify_fun, 2, ?VERIFY_TIMEOUT)),
+    ?assertEqual(1, length(meck:history(?MOCK_MOD))),
+    meck:reset(?MOCK_MOD),
+
+    %% update another parameter and check that update
+    %% function is call for it
+    ?assertEqual(ok, amoc_config_scenario:update_settings([{var3, new_val3}])),
+    %% updated variables
+    ?assertEqual(new_val3, amoc_config:get(var3)),
+    %% execution of update functions is done asynchronously
+    %% and execution of verification functions is synchronous
+    meck:wait(?MOCK_MOD, verify_mfa, [new_val3], ?VERIFY_TIMEOUT),
+    meck:wait(?MOCK_MOD, update_fun, [var3, new_val3], ?UPDATE_TIMEOUT),
+    ?assertEqual(2, length(meck:history(?MOCK_MOD))),
+    meck:reset(?MOCK_MOD),
+
+    %% run amoc_config_scenario:update_settings/2 with empty list
+    ?assertEqual(ok, amoc_config_scenario:update_settings([])),
+    assert_no_update_calls(),
+    assert_no_verify_calls().
+
+update_parameters_with_the_same_values(_) ->
+    set_initial_configuration(),
+
+    %% update 2 parameters with inital values, check that values are unchanged
+    %% and no verification/update functions called
+    ScenarioSettings = [{var3, val3},
+                        {var2, val2}],
+    ?assertEqual(ok, amoc_config_scenario:update_settings(ScenarioSettings)),
+    %% updated variables
+    ?assertEqual(val2, amoc_config:get(var2)),
+    ?assertEqual(val3, amoc_config:get(var3)),
+
+    assert_no_update_calls(),
+    assert_no_verify_calls(),
+
+    %% update 2 parameters but only one with the new value, check the value is
+    %% changed and no verification/update functions are called only for that
+    %% parameter
+    ScenarioSettings2 = [{var3, new_val3},
+                        {var2, val2}],
+    ?assertEqual(ok, amoc_config_scenario:update_settings(ScenarioSettings2)),
+    %% updated variables
+    ?assertEqual(val2, amoc_config:get(var2)),
+    ?assertEqual(new_val3, amoc_config:get(var3)),
+
+    meck:wait(?MOCK_MOD, verify_mfa, [new_val3], ?VERIFY_TIMEOUT),
+    meck:wait(?MOCK_MOD, update_fun, [var3, new_val3], ?UPDATE_TIMEOUT),
+    ?assertEqual(2, length(meck:history(?MOCK_MOD))).
 
 update_settings_readonly(_) ->
     set_initial_configuration(),
@@ -212,8 +269,8 @@ invalid_value(_) ->
                     {verification_failed, {not_one_of, [new_val2, val2]}}}]},
                  Ret),
     %% check verification function calls, verification
-    meck:wait(?MOCK_MOD, verify_fun, [val1], 0),
-    meck:wait(?MOCK_MOD, verify_mfa, [val3], 0),
+    meck:wait(?MOCK_MOD, verify_fun, [val1], ?VERIFY_TIMEOUT),
+    meck:wait(?MOCK_MOD, verify_mfa, [val3], ?VERIFY_TIMEOUT),
     assert_no_update_calls(),
     ?assertEqual(2, length(meck:history(?MOCK_MOD))).
 
@@ -243,14 +300,13 @@ mock_ets_tables() ->
     amoc_config_utils:create_amoc_config_ets().
 
 assert_no_update_calls() ->
-    %% execution of update functions is done asynchronously
-    ?assertError(timeout, meck:wait(?MOCK_MOD, update_mfa, 2, 500)),
+    ?assertError(timeout, meck:wait(?MOCK_MOD, update_mfa, 2, ?UPDATE_TIMEOUT)),
+    %% no need to wait for timeout twice
     ?assertError(timeout, meck:wait(?MOCK_MOD, update_fun, 2, 0)).
 
 assert_no_verify_calls() ->
-    %% execution of verification functions is done synchronously
-    ?assertError(timeout, meck:wait(?MOCK_MOD, verify_mfa, 1, 0)),
-    ?assertError(timeout, meck:wait(?MOCK_MOD, verify_fun, 1, 0)).
+    ?assertError(timeout, meck:wait(?MOCK_MOD, verify_mfa, 1, ?VERIFY_TIMEOUT)),
+    ?assertError(timeout, meck:wait(?MOCK_MOD, verify_fun, 1, ?VERIFY_TIMEOUT)).
 
 is_equal_list(List1, List2) ->
     ?assertEqual(lists:sort(List1), lists:sort(List2)).
@@ -261,8 +317,8 @@ set_initial_configuration() ->
     ?assertEqual(ok, Ret),
     %% check verification function calls
     % ct:pal("meck:history(?MOCK_MOD) = ~p", [meck:history(?MOCK_MOD)]),
-    meck:wait(?MOCK_MOD, verify_fun, [val1], 0),
-    meck:wait(?MOCK_MOD, verify_mfa, [val3], 0),
+    meck:wait(?MOCK_MOD, verify_fun, [val1], ?VERIFY_TIMEOUT),
+    meck:wait(?MOCK_MOD, verify_mfa, [val3], ?VERIFY_TIMEOUT),
     %% reset initial verification calls.
     assert_no_update_calls(),
     ?assertEqual(2, length(meck:history(?MOCK_MOD))),
