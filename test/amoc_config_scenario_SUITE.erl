@@ -51,15 +51,15 @@ all() ->
      invalid_module_attributes,
      invalid_settings,
      invalid_value,
-     {group, update_settings}].
+     update_settings,
+     update_just_one_parameter,
+     update_parameters_with_the_same_values,
+     update_settings_readonly,
+     update_settings_invalid_value,
+     update_settings_undef_param].
 
 groups() ->
-    [{update_settings, [], [update_settings,
-                            update_just_one_parameter,
-                            update_parameters_with_the_same_values,
-                            update_settings_readonly,
-                            update_settings_invalid_value,
-                            update_settings_undef_param]}].
+    [{update_settings, [], []}].
 
 init_per_suite(Config) ->
     meck:new(?MOCK_MOD, [non_strict, no_link]),
