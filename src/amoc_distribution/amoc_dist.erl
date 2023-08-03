@@ -16,7 +16,7 @@
 
 -compile({no_auto_import, [ceil/1]}).
 
--type cluster_state():: idle | running | stopped.
+-type cluster_state() :: idle | running | stopped.
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------

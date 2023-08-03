@@ -127,8 +127,8 @@ make_module_parameter(#{name := Name, description := Description, default_value 
     maybe_verification_fun() | not_exported | invalid_method.
 verification_fn(none) ->
     fun ?MODULE:none/1;
-verification_fn([_ | _] = OneOF) ->
-    one_of_fun(OneOF);
+verification_fn([_ | _] = OneOf) ->
+    one_of_fun(OneOf);
 verification_fn(Fun) when is_function(Fun, 1) ->
     is_exported(Fun);
 verification_fn({Module, Function, 1}) ->

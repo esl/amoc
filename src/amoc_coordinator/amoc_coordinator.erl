@@ -86,7 +86,8 @@ start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
             %% end, we need to add them first.
             AllItemsHandlers = lists:reverse([Item || {all, _} = Item <- Plan]),
             [gen_event:add_handler(Name, ?MODULE, {Name, Item}) || Item <- AllItemsHandlers],
-            [gen_event:add_handler(Name, ?MODULE, {Name, Item}) || {N, _} = Item <- Plan, is_integer(N)],
+            [gen_event:add_handler(Name, ?MODULE, {Name, Item}) || {N, _} = Item <- Plan,
+                                                                   is_integer(N)],
             gen_event:add_handler(Name, ?MODULE, {timeout, Name, Timeout}),
             ok;
         {error, _} -> error

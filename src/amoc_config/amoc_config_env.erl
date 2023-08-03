@@ -9,9 +9,13 @@
 %%==============================================================================
 -module(amoc_config_env).
 
--export([get/1, get/2, parse_value/1, format/2]).
+-export([get/1, get/2]).
 
 -include_lib("kernel/include/logger.hrl").
+
+-define(DEFAULT_PARSER_MODULE, amoc_config_parser).
+
+-callback(parse_value(string()) -> {ok, amoc_config:value()} | {error, any()}).
 
 %% ------------------------------------------------------------------
 %% API
@@ -24,24 +28,6 @@ get(Name) ->
 get(Name, Default) when is_atom(Name) ->
     get_os_env(Name, Default).
 
--spec parse_value(string() | binary()) -> {ok, amoc_config:value()} | {error, any()}.
-parse_value(Binary) when is_binary(Binary) ->
-    parse_value(binary_to_list(Binary));
-parse_value(String) when is_list(String) ->
-    try
-        {ok, Tokens, _} = erl_scan:string(String ++ "."),
-        {ok, _} = erl_parse:parse_term(Tokens)
-    catch
-        _:E -> {error, E}
-    end.
-
--spec format(any(), binary) -> binary();
-            (any(), string)  -> string().
-format(Value, binary) ->
-    list_to_binary(format(Value, string));
-format(Value, string) ->
-    lists:flatten(io_lib:format("~tp", [Value])).
-
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
@@ -51,8 +37,13 @@ get_os_env(Name, Default) ->
     Value = os:getenv(EnvName),
     case parse_value(Value, Default) of
         {ok, Term} -> Term;
-        {error, _} ->
-            ?LOG_ERROR("cannot parse $~p value \"~p\", using default one", [EnvName, Value]),
+        {error, Error} ->
+            ?LOG_ERROR("cannot parse environment variable, using default value.~n"
+                          "  parsing error:  '~p'~n"
+                          "  variable name:  '$~s'~n"
+                          "  variable value: '~s'~n"
+                          "  default value:  '~p'~n",
+                       [Error, EnvName, Value, Default]),
             Default
     end.
 
@@ -64,4 +55,13 @@ os_env_name(Name) when is_atom(Name) ->
 parse_value(false, Default) -> {ok, Default};
 parse_value("", Default)    -> {ok, Default};
 parse_value(String, _) ->
-    parse_value(String).
+    App = application:get_application(?MODULE),
+    Mod = application:get_env(App, config_parser_mod, ?DEFAULT_PARSER_MODULE),
+    try Mod:parse_value(String) of
+        {ok, Value} -> {ok, Value};
+        {error, Error} -> {error, Error};
+        InvalidRetValue -> {error, {parser_returned_invalid_value, InvalidRetValue}}
+    catch
+        Class:Error:Stacktrace ->
+            {error, {parser_crashed, {Class, Error, Stacktrace}}}
+    end.

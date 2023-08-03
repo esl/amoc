@@ -168,9 +168,11 @@ connect_nodes(Node, Nodes) ->
 set_master_node(Node, Action) ->
     case gen_server:call({?SERVER, Node}, {set_master_node, node()}) of
         ok ->
-            case catch apply(Action, [Node]) of
+            try apply(Action, [Node]) of
                 ok -> gen_server:cast(?SERVER, {add_slave, Node});
                 RetValue -> {error, {invalid_action_ret_value, RetValue}}
+            catch
+                C:E:S -> {error, {invalid_action_ret_value, {C, E, S}}}
             end;
         Error -> Error
     end.
