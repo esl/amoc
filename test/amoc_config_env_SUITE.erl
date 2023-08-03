@@ -28,7 +28,7 @@ init_per_suite(Config) ->
     ct:pal("OS env:~n   ~p", [os:getenv()]),
     Config.
 
-end_per_suite(_)->
+end_per_suite(_) ->
     %% unset predefined variables
     unset_os_env(set_var),
     unset_os_env(empty_var).
@@ -38,7 +38,8 @@ init_per_testcase(valid_custom_parser_test, Config) ->
     App = application:get_application(amoc_config_env),
     application:set_env(App, config_parser_mod, ?MOCK_MOD),
     ct:pal("amoc_config_env module belongs to '~p' application", [App]),
-    ct:pal("AMOC_* OS env. variables:~n   ~p", [[AmocEnv || "AMOC_" ++ _ = AmocEnv <- os:getenv()]]),
+    ct:pal("AMOC_* OS env. variables:~n   ~p",
+           [[AmocEnv || "AMOC_" ++ _ = AmocEnv <- os:getenv()]]),
     Config;
 init_per_testcase(invalid_custom_parser_test, Config) ->
     App = application:get_application(amoc_config_env),

@@ -114,7 +114,7 @@ change_rate_gradually(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfS
 %%        destroy Async runner
 %%  '''
 %% for the local execution, req/exec rates are increased only by throttle process.
--spec run(name(), fun(()-> any())) -> ok | {error, any()}.
+-spec run(name(), fun(() -> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
     amoc_throttle_controller:run(Name, Fn).
 

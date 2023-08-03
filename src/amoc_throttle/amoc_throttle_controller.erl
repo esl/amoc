@@ -55,7 +55,7 @@ start_link() ->
 ensure_throttle_processes_started(Name, Interval, Rate, NoOfProcesses) ->
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Interval, Rate, NoOfProcesses}).
 
--spec run(name(), fun(()-> any())) -> ok | {error, any()}.
+-spec run(name(), fun(() -> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
     case get_throttle_process(Name) of
         {ok, Pid} ->
@@ -239,7 +239,7 @@ rate_per_minute(Rate, Interval) ->
 start_processes(Name, Rate, Interval, NoOfProcesses) ->
     % Master metrics
     RatePerMinute = rate_per_minute(Rate, Interval),
-    telemetry:execute([amoc, throttle, rate], #{rate => RatePerMinute}, #{name => Name}),
+    report_rate(Name, RatePerMinute),
     RealNoOfProcesses = min(Rate, NoOfProcesses),
     start_throttle_processes(Name, Interval, Rate, RealNoOfProcesses),
     RealNoOfProcesses.
@@ -273,7 +273,7 @@ do_change_rate(Name, Rate, Interval) ->
         [] -> {error, no_processes_in_group};
         List when is_list(List) ->
             RatePerMinute = rate_per_minute(Rate, Interval),
-            telemetry:execute([amoc, throttle, rate], #{rate => RatePerMinute}, #{name => Name}),
+            report_rate(Name, RatePerMinute),
             update_throttle_processes(List, Interval, Rate, length(List)),
             {ok, RatePerMinute}
     end.
@@ -317,3 +317,6 @@ run_cmd(Pid, pause) ->
     amoc_throttle_process:pause(Pid);
 run_cmd(Pid, resume) ->
     amoc_throttle_process:resume(Pid).
+
+report_rate(Name, RatePerMinute) ->
+    telemetry:execute([amoc, throttle, rate], #{rate => RatePerMinute}, #{name => Name}).

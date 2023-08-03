@@ -95,10 +95,10 @@ update_settings(Settings) ->
 
 -spec add_users(amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     ok | {error, term()}.
-add_users(StartId, EndID) ->
-    telemetry:execute([amoc, controller, users], #{count => EndID - StartId + 1}, #{type => add}),
+add_users(StartId, EndId) ->
+    telemetry:execute([amoc, controller, users], #{count => EndId - StartId + 1}, #{type => add}),
     %% adding the exact range of the users
-    gen_server:call(?SERVER, {add, StartId, EndID}).
+    gen_server:call(?SERVER, {add, StartId, EndId}).
 
 -spec remove_users(user_count(), boolean()) -> {ok, user_count()}.
 remove_users(Count, ForceRemove) ->
@@ -145,8 +145,8 @@ handle_call(stop_scenario, _From, State) ->
 handle_call({update_settings, Settings}, _From, State) ->
     RetValue = handle_update_settings(Settings, State),
     {reply, RetValue, State};
-handle_call({add, StartId, EndID}, _From, State) ->
-    {RetValue, NewState} = handle_add(StartId, EndID, State),
+handle_call({add, StartId, EndId}, _From, State) ->
+    {RetValue, NewState} = handle_add(StartId, EndId, State),
     {reply, RetValue, NewState};
 handle_call({remove, Count, ForceRemove}, _From, State) ->
     RetValue = handle_remove(Count, ForceRemove, State),
@@ -296,13 +296,13 @@ init_scenario(Scenario, Settings) ->
         {error, Type, Reason} -> {error, {Type, Reason}}
     end.
 
--spec maybe_start_timer(timer:tref()|undefined) -> timer:tref().
+-spec maybe_start_timer(timer:tref() | undefined) -> timer:tref().
 maybe_start_timer(undefined) ->
     {ok, TRef} = timer:send_interval(interarrival(), start_user),
     TRef;
 maybe_start_timer(TRef) -> TRef.
 
--spec maybe_stop_timer(timer:tref()|undefined) -> undefined.
+-spec maybe_stop_timer(timer:tref() | undefined) -> undefined.
 maybe_stop_timer(undefined) ->
     undefined;
 maybe_stop_timer(TRef) ->

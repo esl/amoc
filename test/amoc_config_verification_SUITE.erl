@@ -42,10 +42,10 @@ process_scenario_config_shadows_default_values(_) ->
     ?assertEqual({ok, ScenarioConfig}, Result4).
 
 process_scenario_config_returns_error_for_invalid_values(_) ->
-    VerificationFN = fun(_) -> {false, some_reason} end,
+    VerificationFn = fun(_) -> {false, some_reason} end,
     IncorrectScenarioConfig =
     [#module_parameter{name = wrong_param, mod = ?MOD, value = any_value,
-                       verification_fn = VerificationFN}
+                       verification_fn = VerificationFn}
      | incorrect_scenario_config()],
     given_scenario_parameters_not_set(IncorrectScenarioConfig),
     Result = amoc_config_verification:process_scenario_config(IncorrectScenarioConfig, []),

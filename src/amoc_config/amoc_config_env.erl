@@ -60,8 +60,8 @@ parse_value(String, _) ->
     try Mod:parse_value(String) of
         {ok, Value} -> {ok, Value};
         {error, Error} -> {error, Error};
-        InvalidRetValue -> {error,{parser_returned_invalid_value, InvalidRetValue}}
+        InvalidRetValue -> {error, {parser_returned_invalid_value, InvalidRetValue}}
     catch
         Class:Error:Stacktrace ->
-            {error,{parser_crashed, {Class, Error, Stacktrace}}}
+            {error, {parser_crashed, {Class, Error, Stacktrace}}}
     end.

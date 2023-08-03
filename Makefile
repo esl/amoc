@@ -1,4 +1,4 @@
-.PHONY: default rel compile clean ct test integration_test dialyzer xref console
+.PHONY: default rel compile clean ct test integration_test dialyzer xref console lint
 
 REBAR = rebar3
 
@@ -25,7 +25,10 @@ ct:
 	## eunit and ct commands always add a test profile to the run
 	$(REBAR) ct --verbose $(SUITE_OPTS)
 
-test: compile xref dialyzer ct
+lint:
+	$(REBAR) as elvis lint
+
+test: compile xref dialyzer ct lint
 
 integration_test:
 	./integration_test/stop_demo_cluster.sh
