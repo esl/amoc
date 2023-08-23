@@ -28,10 +28,9 @@ function ensure_scenarios_installed() {
 function upload_module() {
     local filename="$2"
     docker_compose cp "$2" "${1}:/tmp/${2}"
-    eval_cmd=( "File = \"/tmp/${2%.erl}\","
+    eval_cmd=( "File = filename:rootname(\"/tmp/${2}\"),"
                '{ok, Module} = compile:file(File, [{outdir,"/tmp"}]),'
-               'true = code:add_path("/tmp"),' ## required for successful amoc_scenario:add_module/1 execution
-               '{module, Module} = code:load_file(Module),'
+               '{module, Module} = code:load_abs(File),'
                'amoc_scenario:add_module(Module).' )
     echo "${eval_cmd[*]}"
     amoc_eval "${1}" "${eval_cmd[*]}"

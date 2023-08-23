@@ -154,9 +154,12 @@ add_module_internal(Module) ->
         {_, error, [{Module, Binary, Filename}]} ->
             %% this is uploaded module, there's no beam file for it.
             ok;
-        {_, error, _} ->
+        {{file, BeamFile}, error, _} ->
             %% might happen if directory with beam file is not added to the code path
-            {error, no_beam_file_for_module};
+            case maybe_add_code_path(BeamFile) of
+                true -> add_module_internal(Module);
+                false -> {error, no_beam_file_for_module}
+            end;
         {_, {Module, Binary, Filename}, []} ->
             store_uploaded_module(Module, Binary, Filename);
         {_, {Module, Binary, Filename}, [{Module, Binary, Filename}]} ->
@@ -173,6 +176,20 @@ store_uploaded_module(Module, Binary, Filename) ->
     true = ets:insert_new(uploaded_modules, {Module, Binary, Filename}),
     maybe_store_module(Module),
     ok.
+
+maybe_add_code_path(BeamFile) ->
+    try
+        true = is_list(BeamFile),
+        true = filelib:is_regular(BeamFile),
+        BeamDir = filename:dirname(filename:absname(BeamFile)),
+        true = filelib:is_dir(BeamDir),
+        CodePath = code:get_path(),
+        code:add_pathz(BeamDir),
+        NewCodePath = code:get_path(),
+        NewCodePath =/= CodePath
+    catch
+        _C:_E -> false
+    end.
 
 upload_module_internal(Module, Binary, Filename) ->
     case code:is_loaded(Module) of
