@@ -10,7 +10,7 @@ scenario_name="dummy_scenario"
 ## amoc REST API functions ##
 #############################
 function get_scenarios() {
-    amoc_eval "$1" "amoc_scenario:list_scenario_modules()."
+    amoc_eval "$1" "amoc_code_server:list_scenario_modules()."
 }
 
 function list_scenarios_by_port() {
@@ -31,7 +31,7 @@ function upload_module() {
     eval_cmd=( "File = filename:rootname(\"/tmp/${2}\"),"
                '{ok, Module} = compile:file(File, [{outdir,"/tmp"}]),'
                '{module, Module} = code:load_abs(File),'
-               'amoc_scenario:add_module(Module).' )
+               'amoc_code_server:add_module(Module).' )
     echo "${eval_cmd[*]}"
     amoc_eval "${1}" "${eval_cmd[*]}"
 }

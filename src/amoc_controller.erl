@@ -19,7 +19,7 @@
                 last_user_id = 0 :: last_user_id(),
                 status = idle :: idle | running | terminating | finished |
                                  {error, any()} | disabled,
-                scenario_state :: any(),
+                scenario_state :: any(), %% state returned from Scenario:init/0
                 create_users = [] :: [amoc_scenario:user_id()],
                 tref :: timer:tref() | undefined}).
 
@@ -78,7 +78,7 @@ start_link() ->
 -spec start_scenario(amoc:scenario(), amoc_config:settings()) ->
     ok | {error, term()}.
 start_scenario(Scenario, Settings) ->
-    case amoc_scenario:does_scenario_exist(Scenario) of
+    case amoc_code_server:does_scenario_exist(Scenario) of
         true ->
             gen_server:call(?SERVER, {start_scenario, Scenario, Settings});
         false ->
@@ -292,7 +292,7 @@ start_tables() -> %% ETS creation
     {ok | error, any()}.
 init_scenario(Scenario, Settings) ->
     case amoc_config_scenario:parse_scenario_settings(Scenario, Settings) of
-        ok -> apply_safely(Scenario, init, []);
+        ok -> amoc_scenario:init(Scenario);
         {error, Type, Reason} -> {error, {Type, Reason}}
     end.
 
@@ -332,9 +332,9 @@ terminate_all_users({Objects, Continuation}) ->
 terminate_all_users('$end_of_table') -> ok.
 
 -spec dec_no_of_users(state()) -> state().
-dec_no_of_users(#state{scenario    = Scenario, scenario_state = ScenarioState,
+dec_no_of_users(#state{scenario = Scenario, scenario_state = ScenarioState,
                        no_of_users = 1, status = terminating} = State) ->
-    apply_safely(Scenario, terminate, [ScenarioState]),
+    amoc_scenario:terminate(Scenario, ScenarioState),
     State#state{no_of_users = 0, status = finished};
 dec_no_of_users(#state{no_of_users = N} = State) ->
     State#state{no_of_users = N - 1}.
@@ -342,17 +342,6 @@ dec_no_of_users(#state{no_of_users = N} = State) ->
 -spec interarrival() -> interarrival().
 interarrival() ->
     amoc_config:get(interarrival).
-
--spec apply_safely(atom(), atom(), [term()]) -> {ok | error, term()}.
-apply_safely(M, F, A) ->
-    try erlang:apply(M, F, A) of
-        {ok, RetVal} -> {ok, RetVal};
-        {error, Error} -> {error, Error};
-        Result -> {ok, Result}
-    catch
-        Class:Exception:Stacktrace ->
-            {error, {Class, Exception, Stacktrace}}
-    end.
 
 -spec maybe_update_interarrival_timer(state()) -> state().
 maybe_update_interarrival_timer(#state{tref = undefined} = State) ->
