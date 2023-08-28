@@ -10,13 +10,10 @@ function enable_strict_mode() {
     IFS=$'\n\t'
 }
 
-function create_code_path() {
-    dir="${git_root}/integration_test/extra_code_paths/${1}"
-    [ -d "$dir" ] || return 1
-    erl_file="${dir}/${1}.erl"
-    dummy_scenario="${git_root}/integration_test/dummy_scenario.erl"
-    sed "s/-module(.*)./-module(${1})./" "$dummy_scenario" > "$erl_file"
-    erlc -o "$dir" "$erl_file"
+function compile_file() {
+    local erl_file="$(realpath "$1")"
+    local output_dir="$(dirname "$erl_file")"
+    erlc -o "$output_dir" "$erl_file"
 }
 
 function contain() {

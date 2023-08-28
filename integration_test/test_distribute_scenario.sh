@@ -25,26 +25,18 @@ function ensure_scenarios_installed() {
     echo "$result" | contain "$@"
 }
 
-function upload_module() {
-    local filename="$2"
-    docker_compose cp "$2" "${1}:/tmp/${2}"
-    eval_cmd=( "File = filename:rootname(\"/tmp/${2}\"),"
-               '{ok, Module} = compile:file(File, [{outdir,"/tmp"}]),'
-               '{module, Module} = code:load_abs(File),'
-               'amoc_code_server:add_module(Module).' )
-    echo "${eval_cmd[*]}"
-    amoc_eval "${1}" "${eval_cmd[*]}"
+function add_module() {
+    echo "distributing module '${2}' from the node '${1}'"
+    amoc_eval "${1}" "amoc_code_server:add_module($2)."
 }
 
 list_scenarios_by_port amoc-master
 list_scenarios_by_port amoc-worker-1
 list_scenarios_by_port amoc-worker-2
 
-echo "Installing scenario and helper module on the amoc-master node"
-scenario_put="$(upload_module amoc-master "${scenario_name}.erl")"
-echo "Response for '${scenario_name}.erl': ${scenario_put}"
-helper_put="$(upload_module amoc-master "dummy_helper.erl")"
-echo "Response for 'dummy_helper.erl': ${helper_put}"
+echo "Distributing scenario and helper module from the amoc-master node"
+add_module amoc-master "$scenario_name"
+add_module amoc-master "dummy_helper"
 
 # ensure_scenarios_installed amoc-worker-1 ${scenario_name}
 # ensure_scenarios_installed amoc-worker-2 ${scenario_name}

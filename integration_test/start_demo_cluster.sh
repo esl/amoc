@@ -3,8 +3,8 @@
 source "$(dirname "$0")/helper.sh"
 enable_strict_mode
 
-create_code_path test1
-create_code_path test2
+compile_file integration_test/extra_code_paths/path1/dummy_helper.erl
+compile_file integration_test/extra_code_paths/path2/dummy_scenario.erl
 
 docker_compose up -d amoc-{master,worker-1,worker-2}
 
