@@ -14,7 +14,7 @@ result="$(run_scenario amoc-master dummy_scenario 10)"
 
 echo "$result"
 
-if echo "$result" | contain "ok" "'amoc@amoc-worker-1'" "'amoc@amoc-worker-2'" ; then
+if echo "$result" | contains "ok" "'amoc@amoc-worker-1'" "'amoc@amoc-worker-2'" ; then
     echo "Scenario executed"
     exit 0
 else

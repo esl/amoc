@@ -6,15 +6,18 @@
 %% API
 -export([start_link/0,
          add_module/1,
-         upload_module/3,
+         distribute_modules/1,
          does_scenario_exist/1,
          list_scenario_modules/0,
-         list_uploaded_modules/0,
          list_configurable_modules/0]).
 
 -behaviour(gen_server).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2]).
+
+-record(uploaded_module, {name :: module(),
+                          filename :: file:filename(),
+                          binary :: binary()}).
 
 -type state() :: map().
 
@@ -29,9 +32,11 @@ start_link() ->
 add_module(Module) ->
     gen_server:call(?MODULE, {add_module, Module}).
 
--spec upload_module(module(), binary(), file:filename()) -> ok | {error, term()}.
-upload_module(Module, Binary, Filename) ->
-    gen_server:call(?MODULE, {upload_module, Module, Binary, Filename}).
+-spec distribute_modules(node()) ->[{module(), ok | {error, term()}}].
+distribute_modules(Node) ->
+    UploadedModules = ets:tab2list(uploaded_modules),
+    [{Module, gen_server:call({?MODULE, Node}, {upload_module, UM})}
+        || #uploaded_module{name = Module} = UM <- UploadedModules].
 
 -spec does_scenario_exist(module()) -> boolean().
 does_scenario_exist(Scenario) ->
@@ -40,10 +45,6 @@ does_scenario_exist(Scenario) ->
 -spec list_scenario_modules() -> [module()].
 list_scenario_modules() ->
     [S || [S] <- ets:match(configurable_modules, {'$1', scenario})].
-
--spec list_uploaded_modules() -> [{module(), binary(), file:filename()}].
-list_uploaded_modules() ->
-    ets:tab2list(uploaded_modules).
 
 -spec list_configurable_modules() -> [module()].
 list_configurable_modules() ->
@@ -63,8 +64,8 @@ init([]) ->
 handle_call({add_module, Module}, _, State) ->
     Reply = add_module_internal(Module),
     {reply, Reply, State};
-handle_call({upload_module, Module, Binary, Filename}, _, State) ->
-    Reply = upload_module_internal(Module, Binary, Filename),
+handle_call({upload_module, #uploaded_module{} = UM}, _, State) ->
+    Reply = upload_module_internal(UM),
     {reply, Reply, State};
 handle_call(_, _, State) ->
     {reply, {error, not_implemented}, State}.
@@ -80,7 +81,7 @@ handle_cast(_, State) ->
 start_scenarios_ets() ->
     EtsOptions = [named_table, protected, {read_concurrency, true}],
     ets:new(configurable_modules, EtsOptions),
-    ets:new(uploaded_modules, EtsOptions).
+    ets:new(uploaded_modules, [{keypos, #uploaded_module.name} | EtsOptions]).
 
 -spec add_code_paths() -> ok | {error, {bad_directories, [file:filename()]}}.
 add_code_paths() ->
@@ -98,15 +99,15 @@ find_scenario_modules() ->
     AllBeamFiles = [File || Path <- AllPaths, File <- filelib:wildcard("*.beam", Path)],
     AllModules = [list_to_atom(filename:rootname(BeamFile)) || BeamFile <- AllBeamFiles],
     ok = code:ensure_modules_loaded(AllModules),
-    [maybe_store_module(Module) || {Module, _} <- code:all_loaded()].
+    [maybe_store_configurable_module(Module) || {Module, _} <- code:all_loaded()].
 
--spec maybe_store_module(module()) -> any().
-maybe_store_module(Module) ->
+-spec maybe_store_configurable_module(module()) -> any().
+maybe_store_configurable_module(Module) ->
     case get_module_type(Module) of
         scenario ->
-            ets:insert(configurable_modules, {Module, scenario});
+            ets:insert_new(configurable_modules, {Module, scenario});
         configurable ->
-            ets:insert(configurable_modules, {Module, configurable});
+            ets:insert_new(configurable_modules, {Module, configurable});
         ordinary ->
             ok
     end.
@@ -132,35 +133,45 @@ get_module_type(Module) ->
                                                     no_beam_file_for_module |
                                                     module_is_not_loaded}.
 add_module_internal(Module) ->
-    case {code:is_loaded(Module), code:get_object_code(Module),
-          ets:lookup(uploaded_modules, Module)} of
-        {false, _, _} ->
+    case {code:is_loaded(Module), code:get_object_code(Module)} of
+        {false, _} ->
             {error, module_is_not_loaded};
-        {_, error, [{Module, _Binary, _Filename}]} ->
-            %% this is uploaded module, there's no beam file for it.
-            ok;
-        {{file, BeamFile}, error, _} ->
+        {{file, BeamFile}, error} ->
             %% might happen if directory with beam file is not added to the code path
             case maybe_add_code_path(BeamFile) of
                 true -> add_module_internal(Module);
                 false -> {error, no_beam_file_for_module}
             end;
-        {_, {Module, Binary, Filename}, []} ->
-            store_uploaded_module(Module, Binary, Filename);
-        {_, {Module, Binary, Filename}, [{Module, Binary, Filename}]} ->
-            %% this module is already added, no need to do anything.
-            ok;
-        {_, {Module, Binary1, _}, [{Module, Binary2, _}]} when Binary1 =/= Binary2  ->
-            %% Another version of module is added.
-            %% Normally this should not happen, the most
-            %% possible case is module recompilation.
-            {error, module_version_has_changed}
+        {_, {Module, Binary, Filename}} ->
+            maybe_store_uploaded_module(Module, Binary, Filename)
     end.
 
-store_uploaded_module(Module, Binary, Filename) ->
-    true = ets:insert_new(uploaded_modules, {Module, Binary, Filename}),
-    maybe_store_module(Module),
-    ok.
+maybe_store_uploaded_module(Module, Binary, Filename) ->
+    UploadedModule = #uploaded_module{name = Module, binary = Binary,
+                                      filename = Filename},
+    case ets:insert_new(uploaded_modules, UploadedModule) of
+        true ->
+            maybe_store_configurable_module(Module),
+            ok;
+        false ->
+            check_uploaded_module_version(UploadedModule)
+    end.
+
+-spec check_uploaded_module_version(#uploaded_module{}) ->
+    ok | {error, module_version_has_changed}.
+check_uploaded_module_version(#uploaded_module{name = Module, binary = Binary}) ->
+    case {ets:lookup(uploaded_modules, Module), code:get_object_code(Module)} of
+        {[#uploaded_module{binary = Binary}], _} ->
+            %% Binary is the same, we have the same version of module already stored in ETS
+            ok;
+        {[], {Module, Binary, _}} ->
+            %% the same version of module is loaded, but not yet stored in ETS
+            %% so let's store it for consistency.
+            add_module_internal(Module),
+            ok;
+        _ ->
+            {error, module_version_has_changed}
+    end.
 
 maybe_add_code_path(BeamFile) ->
     try
@@ -176,26 +187,14 @@ maybe_add_code_path(BeamFile) ->
         _C:_E -> false
     end.
 
-upload_module_internal(Module, Binary, Filename) ->
+upload_module_internal(#uploaded_module{name = Module, binary = Binary,
+                                        filename = Filename} = UM) ->
     case code:is_loaded(Module) of
         false ->
             case code:load_binary(Module, Filename, Binary) of
                 {error, _Error} -> {error, module_loading_error};
-                {module, Module} -> store_uploaded_module(Module, Binary, Filename)
+                {module, Module} -> maybe_store_uploaded_module(Module, Binary, Filename)
             end;
         {file, _} ->
-            case {code:get_object_code(Module), ets:lookup(uploaded_modules, Module)} of
-                {{Module, Binary, Filename}, []} ->
-                    %% the same module is loaded, just add in uploaded modules table to
-                    %% keep nodes consistent.
-                    store_uploaded_module(Module, Binary, Filename);
-                {error, [{Module, Binary, Filename}]} ->
-                    %% this module is already uploaded, no need to do anything.
-                    ok;
-                {{Module, Binary, Filename}, [{Module, Binary, Filename}]} ->
-                    %% this module is already uploaded, no need to do anything.
-                    ok;
-                _ ->
-                    {error, another_version_is_loaded}
-           end
+            check_uploaded_module_version(UM)
     end.
