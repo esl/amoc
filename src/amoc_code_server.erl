@@ -17,7 +17,8 @@
 
 -record(uploaded_module, {name :: module(),
                           filename :: file:filename(),
-                          binary :: binary()}).
+                          binary :: binary(),
+                          md5 :: binary()}).
 
 -type state() :: map().
 
@@ -147,8 +148,9 @@ add_module_internal(Module) ->
     end.
 
 maybe_store_uploaded_module(Module, Binary, Filename) ->
+    MD5 = Module:module_info(md5),
     UploadedModule = #uploaded_module{name = Module, binary = Binary,
-                                      filename = Filename},
+                                      filename = Filename, md5 = MD5},
     case ets:insert_new(uploaded_modules, UploadedModule) of
         true ->
             maybe_store_configurable_module(Module),
@@ -159,12 +161,12 @@ maybe_store_uploaded_module(Module, Binary, Filename) ->
 
 -spec check_uploaded_module_version(#uploaded_module{}) ->
     ok | {error, module_version_has_changed}.
-check_uploaded_module_version(#uploaded_module{name = Module, binary = Binary}) ->
-    case {ets:lookup(uploaded_modules, Module), code:get_object_code(Module)} of
-        {[#uploaded_module{binary = Binary}], _} ->
-            %% Binary is the same, we have the same version of module already stored in ETS
+check_uploaded_module_version(#uploaded_module{name = Module, md5 = MD5}) ->
+    case {ets:lookup(uploaded_modules, Module), Module:module_info(md5)} of
+        {[#uploaded_module{md5 = MD5}], MD5} ->
+            %% md5 is the same, we have the same version of module loaded & stored in ETS
             ok;
-        {[], {Module, Binary, _}} ->
+        {[], MD5} ->
             %% the same version of module is loaded, but not yet stored in ETS
             %% so let's store it for consistency.
             add_module_internal(Module),

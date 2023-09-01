@@ -53,7 +53,7 @@ function add_module() {
 }
 
 function distribute_modules() {
-    echo "distributing modules '${1}' --> '${2}'"
+    echo "distributing modules from the '${1}' node to the '${2}' node"
     amoc_eval "${1}" "amoc_code_server:distribute_modules('amoc@${2}')."
 }
 
