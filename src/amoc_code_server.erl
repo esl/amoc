@@ -11,14 +11,53 @@
          list_scenario_modules/0,
          list_configurable_modules/0]).
 
+-ifdef(TEST).
+
+-export([upload_module/2,
+         uploaded_module_to_map/1,
+         map_to_uploaded_module/1]).
+
+-define(RECORD2MAP(RecordName),
+        (fun(#RecordName{} = Record) ->
+             RecordFields = lists:zip(lists:seq(2, record_info(size, RecordName)),
+                                      record_info(fields, RecordName)),
+             BasicMap = #{'$RECORD_NAME' => RecordName},
+             lists:foldl(fun({FieldPos, FieldName}, Map) ->
+                             Map#{FieldName => erlang:element(FieldPos, Record)}
+                         end,
+                         BasicMap, RecordFields)
+         end)).
+
+-define(MAP2RECORD(RecordName),
+        (fun(#{'$RECORD_NAME' := RecordName} = Map) ->
+             BasicRecord = #RecordName{},
+             RecordFields =
+                 lists:zip3(lists:seq(2, tuple_size(BasicRecord)),
+                            record_info(fields, RecordName),
+                            tl(tuple_to_list(BasicRecord))),
+             lists:foldl(fun({FieldPos, FieldName, DefaultValue}, Record) ->
+                             Value = maps:get(FieldName, Map, DefaultValue),
+                             setelement(FieldPos, Record, Value)
+                         end,
+                         BasicRecord, RecordFields)
+         end)).
+
+-endif.
+
 -behaviour(gen_server).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2]).
 
--record(uploaded_module, {name :: module(),
-                          filename :: file:filename(),
+%% renaming the fields of the uploaded_module record will
+%% break most test cases in amoc_code_server_SUITE because
+%% the module info map used in the suite must have key names
+%% matched to the field names of this record.
+-record(uploaded_module, {module :: module(),
+                          beam_file :: file:filename(),
                           binary :: binary(),
                           md5 :: binary()}).
+
+-type uploaded_module() :: #uploaded_module{}.
 
 -type state() :: map().
 
@@ -33,11 +72,25 @@ start_link() ->
 add_module(Module) ->
     gen_server:call(?MODULE, {add_module, Module}).
 
--spec distribute_modules(node()) ->[{module(), ok | {error, term()}}].
+-spec distribute_modules(node()) -> [{module(), ok | {error, term()}}].
 distribute_modules(Node) ->
     UploadedModules = ets:tab2list(uploaded_modules),
-    [{Module, gen_server:call({?MODULE, Node}, {upload_module, UM})}
-        || #uploaded_module{name = Module} = UM <- UploadedModules].
+    [{Module, upload_module(Node, UM)} ||
+        #uploaded_module{module = Module} = UM <- UploadedModules].
+
+-spec upload_module(node(), uploaded_module()) -> ok | {error, term()}.
+upload_module(Node, UploadedModule) ->
+    %% format of the call request is critical for the tests, it must be
+    %%    {upload_module, #uploaded_module{}}
+    gen_server:call({?MODULE, Node}, {upload_module, UploadedModule}).
+
+-ifdef(TEST).
+uploaded_module_to_map(Record) ->
+    ?RECORD2MAP(uploaded_module)(Record).
+
+map_to_uploaded_module(Map) ->
+    ?MAP2RECORD(uploaded_module)(Map).
+-endif.
 
 -spec does_scenario_exist(module()) -> boolean().
 does_scenario_exist(Scenario) ->
@@ -82,7 +135,7 @@ handle_cast(_, State) ->
 start_scenarios_ets() ->
     EtsOptions = [named_table, protected, {read_concurrency, true}],
     ets:new(configurable_modules, EtsOptions),
-    ets:new(uploaded_modules, [{keypos, #uploaded_module.name} | EtsOptions]).
+    ets:new(uploaded_modules, [{keypos, #uploaded_module.module} | EtsOptions]).
 
 -spec add_code_paths() -> ok | {error, {bad_directories, [file:filename()]}}.
 add_code_paths() ->
@@ -130,9 +183,9 @@ get_module_type(Module) ->
                         end, ordinary, ModuleAttributes)
     end.
 
--spec add_module_internal(module()) -> ok | {error, module_version_has_changed |
-                                                    no_beam_file_for_module |
-                                                    module_is_not_loaded}.
+-spec add_module_internal(module()) ->
+    ok | {error, module_version_has_changed | no_beam_file_for_module |
+                 module_is_not_loaded | code_path_collision}.
 add_module_internal(Module) ->
     case {code:is_loaded(Module), code:get_object_code(Module)} of
         {false, _} ->
@@ -143,14 +196,16 @@ add_module_internal(Module) ->
                 true -> add_module_internal(Module);
                 false -> {error, no_beam_file_for_module}
             end;
-        {_, {Module, Binary, Filename}} ->
-            maybe_store_uploaded_module(Module, Binary, Filename)
+        {{file, BeamFile}, {Module, _Binary, Filename}} when BeamFile =/= Filename ->
+            {error, code_path_collision};
+        {{file, BeamFile}, {Module, Binary, BeamFile}} ->
+            maybe_store_uploaded_module(Module, Binary, BeamFile)
     end.
 
 maybe_store_uploaded_module(Module, Binary, Filename) ->
-    MD5 = Module:module_info(md5),
-    UploadedModule = #uploaded_module{name = Module, binary = Binary,
-                                      filename = Filename, md5 = MD5},
+    MD5 = get_md5(Module),
+    UploadedModule = #uploaded_module{module = Module, binary = Binary,
+                                      beam_file = Filename, md5 = MD5},
     case ets:insert_new(uploaded_modules, UploadedModule) of
         true ->
             maybe_store_configurable_module(Module),
@@ -159,21 +214,26 @@ maybe_store_uploaded_module(Module, Binary, Filename) ->
             check_uploaded_module_version(UploadedModule)
     end.
 
--spec check_uploaded_module_version(#uploaded_module{}) ->
+-spec check_uploaded_module_version(uploaded_module()) ->
     ok | {error, module_version_has_changed}.
-check_uploaded_module_version(#uploaded_module{name = Module, md5 = MD5}) ->
-    case {ets:lookup(uploaded_modules, Module), Module:module_info(md5)} of
+check_uploaded_module_version(#uploaded_module{module = Module, md5 = MD5}) ->
+    case {ets:lookup(uploaded_modules, Module), get_md5(Module)} of
         {[#uploaded_module{md5 = MD5}], MD5} ->
             %% md5 is the same, we have the same version of module loaded & stored in ETS
             ok;
         {[], MD5} ->
             %% the same version of module is loaded, but not yet stored in ETS
-            %% so let's store it for consistency.
+            %% so let's try to store it for consistency. if module adding fails,
+            %% it's not a big problem, we can ignore it.
             add_module_internal(Module),
             ok;
         _ ->
             {error, module_version_has_changed}
     end.
+
+-spec get_md5(module()) -> binary().
+get_md5(Module) ->
+    Module:module_info(md5).
 
 maybe_add_code_path(BeamFile) ->
     try
@@ -189,8 +249,9 @@ maybe_add_code_path(BeamFile) ->
         _C:_E -> false
     end.
 
-upload_module_internal(#uploaded_module{name = Module, binary = Binary,
-                                        filename = Filename} = UM) ->
+
+upload_module_internal(#uploaded_module{module = Module, binary = Binary,
+                                        beam_file = Filename} = UM) ->
     case code:is_loaded(Module) of
         false ->
             case code:load_binary(Module, Filename, Binary) of
