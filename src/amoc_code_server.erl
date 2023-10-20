@@ -111,7 +111,7 @@ list_configurable_modules() ->
 init([]) ->
     start_scenarios_ets(),
     ok = add_code_paths(),
-    find_scenario_modules(),
+    find_all_configurable_and_scenario_modules(),
     {ok, #{}}.
 
 -spec handle_call(any(), any(), state()) -> {reply, any(), state()}.
@@ -146,8 +146,8 @@ add_code_paths() ->
         BadDirectories -> {error, {bad_directories, BadDirectories}}
     end.
 
--spec find_scenario_modules() -> [module()].
-find_scenario_modules() ->
+-spec find_all_configurable_and_scenario_modules() -> [module()].
+find_all_configurable_and_scenario_modules() ->
     ErtsPath = code:lib_dir(),
     AllPaths = [Path || Path <- code:get_path(), not lists:prefix(ErtsPath, Path)],
     AllBeamFiles = [File || Path <- AllPaths, File <- filelib:wildcard("*.beam", Path)],
@@ -187,15 +187,23 @@ get_module_type(Module) ->
     ok | {error, module_version_has_changed | no_beam_file_for_module |
                  module_is_not_loaded | code_path_collision}.
 add_module_internal(Module) ->
+case maybe_add_module(Module) of
+    ok -> ok;
+    {error, no_beam_file_for_module} ->
+        %% might happen if directory with beam file is not added to the code path
+        case maybe_add_code_path(Module) of
+            true -> maybe_add_module(Module);
+            false -> {error, no_beam_file_for_module}
+        end;
+    Error -> Error
+    end.
+
+maybe_add_module(Module) ->
     case {code:is_loaded(Module), code:get_object_code(Module)} of
         {false, _} ->
             {error, module_is_not_loaded};
-        {{file, BeamFile}, error} ->
-            %% might happen if directory with beam file is not added to the code path
-            case maybe_add_code_path(BeamFile) of
-                true -> add_module_internal(Module);
-                false -> {error, no_beam_file_for_module}
-            end;
+        {{file, _BeamFile}, error} ->
+            {error, no_beam_file_for_module};
         {{file, BeamFile}, {Module, _Binary, Filename}} when BeamFile =/= Filename ->
             {error, code_path_collision};
         {{file, BeamFile}, {Module, Binary, BeamFile}} ->
@@ -215,18 +223,16 @@ maybe_store_uploaded_module(Module, Binary, Filename) ->
     end.
 
 -spec check_uploaded_module_version(uploaded_module()) ->
-    ok | {error, module_version_has_changed}.
+    ok | {error, module_version_has_changed | module_is_not_uploaded}.
 check_uploaded_module_version(#uploaded_module{module = Module, md5 = MD5}) ->
     case {ets:lookup(uploaded_modules, Module), get_md5(Module)} of
         {[#uploaded_module{md5 = MD5}], MD5} ->
             %% md5 is the same, we have the same version of module loaded & stored in ETS
             ok;
         {[], MD5} ->
-            %% the same version of module is loaded, but not yet stored in ETS
-            %% so let's try to store it for consistency. if module adding fails,
-            %% it's not a big problem, we can ignore it.
-            add_module_internal(Module),
-            ok;
+            %% this can happen for upload_module_internal/1 calls
+            %% and should never happen for add_module_internal/1
+            {error, module_is_not_uploaded};
         _ ->
             {error, module_version_has_changed}
     end.
@@ -235,8 +241,9 @@ check_uploaded_module_version(#uploaded_module{module = Module, md5 = MD5}) ->
 get_md5(Module) ->
     Module:module_info(md5).
 
-maybe_add_code_path(BeamFile) ->
+maybe_add_code_path(Module) ->
     try
+        {file, BeamFile} = code:is_loaded(Module),
         true = is_list(BeamFile),
         true = filelib:is_regular(BeamFile),
         BeamDir = filename:dirname(filename:absname(BeamFile)),
@@ -249,7 +256,6 @@ maybe_add_code_path(BeamFile) ->
         _C:_E -> false
     end.
 
-
 upload_module_internal(#uploaded_module{module = Module, binary = Binary,
                                         beam_file = Filename} = UM) ->
     case code:is_loaded(Module) of
@@ -259,5 +265,15 @@ upload_module_internal(#uploaded_module{module = Module, binary = Binary,
                 {module, Module} -> maybe_store_uploaded_module(Module, Binary, Filename)
             end;
         {file, _} ->
-            check_uploaded_module_version(UM)
+            case check_uploaded_module_version(UM) of
+                ok -> ok;
+                {error, module_is_not_uploaded} ->
+                    %% the same version of module is loaded, but not yet stored in ETS
+                    %% so let's try to store it for consistency. if module adding fails
+                    %% (e.g. if there's no beam file), it's not a big problem and can
+                    %% be ignored.
+                    add_module_internal(Module),
+                    ok;
+                Error -> Error
+            end
     end.
