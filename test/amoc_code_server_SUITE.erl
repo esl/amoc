@@ -17,8 +17,8 @@
          reuploading_modules_after_amoc_code_server_restart_test/1,
          uploading_release_modules_test/1]).
 
--import(amoc_code_server,[map_to_uploaded_module/1,
-                          uploaded_module_to_map/1]).
+-import(amoc_code_server, [map_to_uploaded_module/1,
+                           uploaded_module_to_map/1]).
 
 -define(assertEqualLists(L1, L2),
         ?assertEqual(lists:sort(L1), lists:sort(L2))).
@@ -100,7 +100,7 @@ verify_module_info_compatibility(Config) ->
     %% while a record tuple has an extra additional element with a record name,
     %% its map counterpart contains an additional '$RECORD_NAME' key, so the sizes
     %% of map and tuple must be the same.
-    ?assertEqual(map_size(DummyUploadedModuleMap),tuple_size(DummyUploadedModuleRec)),
+    ?assertEqual(map_size(DummyUploadedModuleMap), tuple_size(DummyUploadedModuleRec)),
     UploadedModuleKeys = maps:keys(DummyUploadedModuleMap),
     ModuleInfoA = proplists:get_value(module_a, Config),
     [?assert(maps:is_key(Key, ModuleInfoA)) || Key <- UploadedModuleKeys],
@@ -397,7 +397,7 @@ basic_modules_uploading_test(Config) ->
     %% scenario and helper modules are added properly to the 'configurable_modules' ETS
     ?assert(amoc_code_server:does_scenario_exist(ScenarioModule)),
     ?assertEqualLists([HelperModule | ConfigurableModules],
-                      amoc_code_server:list_configurable_modules() ),
+                      amoc_code_server:list_configurable_modules()),
     ?assertEqualLists([ScenarioModule | ScenarioModules],
                       amoc_code_server:list_scenario_modules()),
 
@@ -411,7 +411,7 @@ basic_modules_uploading_test(Config) ->
     %% scenario and helper modules are added properly to the 'configurable_modules' ETS
     ?assert(amoc_code_server:does_scenario_exist(ScenarioModule)),
     ?assertEqualLists([HelperModule | ConfigurableModules],
-                      amoc_code_server:list_configurable_modules() ),
+                      amoc_code_server:list_configurable_modules()),
     ?assertEqualLists([ScenarioModule | ScenarioModules],
                       amoc_code_server:list_scenario_modules()),
 
@@ -502,7 +502,7 @@ uploading_release_modules_test(Config) ->
     %% 'uploaded_modules' ETS.
     ExpectedUploadingRet = [{M, ok} || #{module := M} <- TestModules],
     ?assertEqualLists(ExpectedUploadingRet, upload_modules(TestModules)),
-    ?assertError(_,assert_uploaded_modules_ets(TestModules)),
+    ?assertError(_, assert_uploaded_modules_ets(TestModules)),
     assert_uploaded_modules_ets(OriginalTestModules),
     [?assertError(_, assert_module_loaded(MI)) || MI <- TestModules],
     [assert_module_loaded(MI) || MI <- OriginalTestModules],
@@ -543,7 +543,7 @@ uploading_module_with_different_md5_test(Config) ->
 
     %% uploading module with another MD5 returns error
     %% without actual modules reloading
-    ?assertEqual([{ModuleName, {error,module_version_has_changed}}],
+    ?assertEqual([{ModuleName, {error, module_version_has_changed}}],
                  upload_modules([ModuleInfoC])),
     ?assertError(_, assert_module_loaded(ModuleInfoC)),
     assert_module_loaded(ModuleInfoA),
@@ -565,7 +565,7 @@ extract_gen_server_call_request({'$gen_call', _From, CallData}) ->
     %% this function crashes if supplied message is not gen_server call
     CallData.
 
-start_system_events_logging(Pid)->
+start_system_events_logging(Pid) ->
     ?assertEqual(ok, sys:log(Pid, true)),
     ?assertEqual({ok, []}, sys:log(Pid, get)).
 
