@@ -27,6 +27,10 @@ stop(Pid, Force) when is_pid(Pid) ->
 -spec init(pid(), amoc:scenario(), amoc_scenario:user_id(), state()) ->
     no_return().
 init(Parent, Scenario, Id, State) ->
+    case amoc_users_monitor:is_users_monitor_enabled() of
+        enabled -> {ok, _} = amoc_users_monitor:monitor_user(self());
+        disabled -> []
+    end,
     proc_lib:init_ack(Parent, {ok, self()}),
     process_flag(trap_exit, true),
     ScenarioFun = fun() -> perform_scenario(Scenario, Id, State) end,

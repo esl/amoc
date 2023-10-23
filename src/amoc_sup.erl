@@ -39,4 +39,11 @@ init([]) ->
               ?CHILD(amoc_cluster, worker),
               ?CHILD(amoc_scenario, worker),
               ?CHILD(amoc_throttle_controller, worker)
-          ]}}.
+          ] ++ maybe_add_worker(amoc_users_monitor)}}.
+
+maybe_add_worker(amoc_users_monitor) ->
+    case amoc_users_monitor:is_users_monitor_enabled() of
+        enabled -> [?CHILD(amoc_users_monitor, worker)];
+        disabled -> []
+    end.
+
