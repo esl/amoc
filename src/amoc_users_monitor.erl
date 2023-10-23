@@ -51,10 +51,10 @@ handle_info({'DOWN', _Ref, process, Pid, normal}, State = #{
     {noreply, NewState};
 handle_info({'DOWN', _Ref, process, Pid, Reason}, State = #{
     monitored_users := MonitoredUsers,
-    children_which_died_normally := ProcessesDiendNormally}) ->
+    children_which_died_unnormaly := ProcessesDiendUnnormally}) ->
     NewState = State#{
         monitored_users => sets:del_element(Pid, MonitoredUsers),
-        children_which_died_unnormaly => [{Pid, Reason} | ProcessesDiendNormally]
+        children_which_died_unnormaly => [{Pid, Reason} | ProcessesDiendUnnormally]
     },
     logger:warning("Process ~p died with reason ~p", [Pid, Reason]),
     {noreply, NewState}.
