@@ -21,23 +21,21 @@ More information about the demo cluster can be found further in this document.
 
 `./integration_test/test_amoc_cluster.sh`
 
-This command verifies that clustering is done properly and metrics are reported
-from all the nodes.
+This command verifies that clustering is done properly.
 
-### 4. Test installation of user scenario in amoc cluster
+### 4. Test distribution of a custom scenario in amoc cluster
 
 `./integration_test/test_distribute_scenario.sh`
- 
-This command uploads a sample `dummy_scenario.erl` on the `amoc-master` node
-using `curl` and after uploading verifies that scenario is propagated to the
-worker nodes.
 
-### 5. Run the uploaded scenario.
+This command checks distribution of the sample `dummy_scenario.erl` from the `amoc-master` node
+ to the worker nodes.
+
+### 5. Run the distributed scenario.
 
 `./integration_test/test_run_scenario.sh`
 
-This command starts execution of `dummy_scenario.erl` scenario (must be uploaded
-before this action)
+This command starts execution of `dummy_scenario.erl` scenario (it must be distributed
+prior to this action)
 
 ### 6. Add additional node to the cluster
 
@@ -62,19 +60,10 @@ To start the demo cluster you can run these commands:
 ./integration_test/start_demo_cluster.sh
 ```
 
-When the demo cluster is up and running you can access its
-different components using the following addresses:
- * Amoc Swagger UI:
-    * [amoc-master](http://localhost:4000/api-docs/)
-    * [amoc-worker-1](http://localhost:4001/api-docs/)
-    * [amoc-worker-2](http://localhost:4002/api-docs/)
- * [graphite](http://localhost:8080/) web interface
- * [grafana](http://localhost:3000/) - default username and password is `admin`/`admin`
-
 To check the most recent `amoc-master` logs you can run this command:
 
 `docker-compose -p "amoc-demo-cluster" logs --tail=100 amoc-master`
 
-To attach to `amoc-master` node use the following command:
+In order to attach to the `amoc-master` node use the following command:
 
-`docker-compose -p "amoc-demo-cluster" exec amoc-master /home/amoc/amoc/bin/amoc remote_console`
+`docker-compose -p "amoc-demo-cluster" exec amoc-master amoc remote_console`
