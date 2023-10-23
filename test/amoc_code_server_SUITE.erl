@@ -581,7 +581,8 @@ recreate_working_dir(Config) ->
         true -> ?assertEqual(ok, file:del_dir_r(WorkingDir));
         false -> ok
     end,
-    ?assertEqual(ok, filelib:ensure_path(WorkingDir)),
+    ?assertEqual(ok, filelib:ensure_dir(WorkingDir)),
+    ?assertEqual(ok, file:make_dir(WorkingDir)),
     WorkingDir.
 
 unload_modules_and_restore_code_path(Config) ->
