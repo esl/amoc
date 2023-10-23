@@ -1,5 +1,5 @@
--define(DUMMY_SCENARIO_MODULE(Name), <<"
--module(",(atom_to_binary(Name,utf8))/binary,").
+-module(dummy_scenario_test).
+
 -behaviour(amoc_scenario).
 
 -export([start/1]).
@@ -9,7 +9,6 @@
 init() ->
     ok.
 
-% -spec start(amoc_scenario:user_id()) -> any().
 start(Id) when Id == 2 ->
     1 = 2;
 start(Id) when Id == 3 ->
@@ -19,5 +18,3 @@ start(Id) when Id == 5; Id == 6 ->
 start(_Id) ->
     timer:sleep(timer:minutes(1)),
     amoc_user:stop().
-
-">>).
