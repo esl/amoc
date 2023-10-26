@@ -9,15 +9,15 @@ In the Amoc repo root directory run:
 
 `./integration_test/build_docker_image.sh`
 
-This command builds docker image `amoc:latest`.
+This command builds the `amoc:latest` docker image.
 
-### 2. Start amoc demo cluster
+### 2. Start amoc test cluster
 
-`./integration_test/start_demo_cluster.sh`
+`./integration_test/start_test_cluster.sh`
 
-More information about the demo cluster can be found further in this document.
+This command requires the `amoc:latest` docker image to exist. More information about the test cluster can be found further in this document.
 
-### 3. Check the amoc clustering is done properly
+### 3. Check that clustering is done properly
 
 `./integration_test/test_amoc_cluster.sh`
 
@@ -47,23 +47,23 @@ when the new amoc node joins.
 
 ### 7. Cleanup
 
-To stop Amoc demo cluster run:
+To stop Amoc test cluster run:
 
-`./integration_test/stop_demo_cluster.sh`
+`./integration_test/stop_test_cluster.sh`
 
-## Demo cluster
+## Test cluster
 
-To start the demo cluster you can run these commands:
+To start the test cluster you can run these commands:
 
 ```
 ./integration_test/build_docker_image.sh
-./integration_test/start_demo_cluster.sh
+./integration_test/start_test_cluster.sh
 ```
 
 To check the most recent `amoc-master` logs you can run this command:
 
-`docker-compose -p "amoc-demo-cluster" logs --tail=100 amoc-master`
+`docker compose -p "amoc-test-cluster" logs --tail=100 amoc-master`
 
 In order to attach to the `amoc-master` node use the following command:
 
-`docker-compose -p "amoc-demo-cluster" exec amoc-master amoc remote_console`
+`docker compose -p "amoc-test-cluster" exec amoc-master amoc remote_console`

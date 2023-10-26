@@ -1,4 +1,5 @@
-.PHONY: default rel compile clean ct test integration_test dialyzer xref console lint
+.PHONY: default rel deps compile clean ct lint dialyzer xref console
+.PHONY: test integration_test rerun_integration_test
 
 REBAR = rebar3
 
@@ -6,21 +7,25 @@ ifdef SUITE
 SUITE_OPTS = --suite $$SUITE
 endif
 
-## this target is triggered when amoc is used as an erlang.mk dependency
-default:
-	$(REBAR) compile
+default: compile
 
 rel:
-	$(REBAR) as demo tar
+	$(REBAR) tar
+
+deps:
+	$(REBAR) deps
+	$(REBAR) compile --deps_only
 
 compile:
-	$(REBAR) as demo compile
+	$(REBAR) compile
 
 clean:
 	rm -rf _build
 
 ct:
-	## eunit and ct commands always add a test profile to the run
+	## in order to run just a single test suite you can override
+	## the SUITE variable from the command line:
+	##     make ct SUITE=some_test_SUITE
 	$(REBAR) ct --verbose $(SUITE_OPTS)
 
 lint:
@@ -29,27 +34,27 @@ lint:
 test: compile xref dialyzer ct lint
 
 integration_test:
-	./integration_test/stop_demo_cluster.sh
+	./integration_test/stop_test_cluster.sh
 	./integration_test/build_docker_image.sh
-	./integration_test/start_demo_cluster.sh
+	./integration_test/start_test_cluster.sh
 	./integration_test/test_amoc_cluster.sh
 	./integration_test/test_distribute_scenario.sh
 	./integration_test/test_run_scenario.sh
 	./integration_test/test_add_new_node.sh
 
 rerun_integration_test:
-	./integration_test/stop_demo_cluster.sh
-	./integration_test/start_demo_cluster.sh
+	./integration_test/stop_test_cluster.sh
+	./integration_test/start_test_cluster.sh
 	./integration_test/test_amoc_cluster.sh
 	./integration_test/test_distribute_scenario.sh
 	./integration_test/test_run_scenario.sh
 	./integration_test/test_add_new_node.sh
 
 dialyzer:
-	$(REBAR) as demo dialyzer
+	$(REBAR) dialyzer
 
 xref:
-	$(REBAR) as demo xref
+	$(REBAR) xref
 
 console:
 	@echo "tests can be executed manually using ct:run/1 function:\n" \
