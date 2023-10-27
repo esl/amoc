@@ -53,17 +53,25 @@ To stop Amoc test cluster run:
 
 ## Test cluster
 
-To start the test cluster you can run these commands:
+* To start the test cluster you can run these commands:
 
 ```
 ./integration_test/build_docker_image.sh
 ./integration_test/start_test_cluster.sh
 ```
 
-To check the most recent `amoc-master` logs you can run this command:
+* To get the list of nodes in the amoc test cluster use the following command:
+
+`docker compose -p "amoc-test-cluster" ps`
+
+* To check the most recent `amoc-master` logs you can run this command:
 
 `docker compose -p "amoc-test-cluster" logs --tail=100 amoc-master`
 
-In order to attach to the `amoc-master` node use the following command:
+* In order to attach to the `amoc-master` erlang node run the following command:
 
 `docker compose -p "amoc-test-cluster" exec amoc-master amoc remote_console`
+
+* To open a shell inside the `amoc-master` container use this command:
+
+`docker compose -p "amoc-test-cluster" exec amoc-master bash`
