@@ -10,7 +10,7 @@ endif
 default: compile
 
 rel:
-	$(REBAR) tar
+	$(REBAR) release
 
 deps:
 	$(REBAR) deps
@@ -23,10 +23,14 @@ clean:
 	rm -rf _build
 
 ct:
-	## in order to run just a single test suite you can override
-	## the SUITE variable from the command line:
+	## in order to run some specific test suite(s) you can override
+	## the SUITE variable from the command line or as env variable:
 	##     make ct SUITE=some_test_SUITE
-	$(REBAR) ct --verbose $(SUITE_OPTS)
+	##     make ct SUITE=some_test_SUITE,another_test_SUITE
+	##     SUITE=some_test_SUITE make ct
+	##     SUITE=some_test_SUITE,another_test_SUITE make ct
+	@ echo $(REBAR) ct --verbose $(SUITE_OPTS)
+	@ $(REBAR) ct --verbose $(SUITE_OPTS)
 
 lint:
 	$(REBAR) as elvis lint
