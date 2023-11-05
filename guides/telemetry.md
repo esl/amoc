@@ -20,9 +20,20 @@ metadata: #{type => add | remove}
 
 ## Throttle
 
+### Init
+
+Raised when a throttle mechanism is initialised.
+
+```erlang
+event_name: [amoc, throttle, init]
+measurements: #{count => 1}
+metadata: #{name => atom()}
+```
+
 ### Rate
 
 Raised when a throttle mechanism is initialised or its configured rate is changed.
+This event is raised only on the master node.
 
 ```erlang
 event_name: [amoc, throttle, rate]

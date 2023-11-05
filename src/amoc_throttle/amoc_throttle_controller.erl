@@ -10,7 +10,7 @@
          ensure_throttle_processes_started/4,
          pause/1, resume/1, stop/1,
          change_rate/3, change_rate_gradually/6,
-         run/2]).
+         run/2, telemetry_event/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -53,16 +53,17 @@ start_link() ->
     {ok, throttle_processes_already_started} |
     {error, any()}).
 ensure_throttle_processes_started(Name, Interval, Rate, NoOfProcesses) ->
+    maybe_raise_event(Name, init),
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Interval, Rate, NoOfProcesses}).
 
 -spec run(name(), fun(() -> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
     case get_throttle_process(Name) of
         {ok, Pid} ->
-            maybe_raise_event([amoc, throttle, request], #{count => 1}, #{name => Name}),
+            maybe_raise_event(Name, request),
             Fun =
                 fun() ->
-                    maybe_raise_event([amoc, throttle, execute], #{count => 1}, #{name => Name}),
+                    maybe_raise_event(Name, execute),
                     Fn()
                 end,
             amoc_throttle_process:run(Pid, Fun),
@@ -92,6 +93,10 @@ change_rate_gradually(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfS
 -spec stop(name()) -> ok | {error, any()}.
 stop(Name) ->
     gen_server:call(?MASTER_SERVER, {stop, Name}).
+
+-spec telemetry_event(name(), request | execute) -> ok.
+telemetry_event(Name, Event) when Event =:= request; Event =:= execute ->
+    raise_event(Name, Event).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -190,11 +195,14 @@ handle_info({change_plan, Name}, State) ->
 %%% Internal functions
 %%%===================================================================
 
-maybe_raise_event(Name, Measurements, Metadata) ->
+maybe_raise_event(Name, Event) ->
     case amoc_cluster:master_node() =:= node() of
         true -> ok;
-        _ -> telemetry:execute(Name, Measurements, Metadata)
+        _ -> raise_event(Name, Event)
     end.
+
+raise_event(Name, Event) when Event =:= request; Event =:= execute; Event =:= init ->
+    telemetry:execute([amoc, throttle, Event], #{count => 1}, #{name => Name}).
 
 -spec change_rate_and_stop_plan(name(), state()) -> state().
 change_rate_and_stop_plan(Name, State) ->
@@ -237,7 +245,7 @@ rate_per_minute(Rate, Interval) ->
 
 -spec start_processes(name(), pos_integer(), non_neg_integer(), pos_integer()) -> pos_integer().
 start_processes(Name, Rate, Interval, NoOfProcesses) ->
-    % Master metrics
+    raise_event(Name, init),
     RatePerMinute = rate_per_minute(Rate, Interval),
     report_rate(Name, RatePerMinute),
     RealNoOfProcesses = min(Rate, NoOfProcesses),

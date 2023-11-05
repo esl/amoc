@@ -97,7 +97,7 @@ handle_cast(pause_process, State) ->
 handle_cast(resume_process, State) ->
     {noreply, State#state{pause = false}, {continue, maybe_run_fn}};
 handle_cast({schedule, RunnerPid}, #state{schedule_reversed = SchRev, name = Name} = State) ->
-    telemetry:execute([amoc, throttle, request], #{count => 1}, #{name => Name}),
+    amoc_throttle_controller:telemetry_event(Name, request),
     {noreply, State#state{schedule_reversed = [RunnerPid | SchRev]}, {continue, maybe_run_fn}};
 handle_cast({update, Interval, Rate}, State) ->
     NewState = merge_state(initial_state(Interval, Rate), State),
@@ -188,7 +188,7 @@ maybe_run_fn(State) ->
 run_fn(#state{schedule = [RunnerPid | T], name = Name, n = N} = State) ->
     erlang:monitor(process, RunnerPid),
     RunnerPid ! scheduled,
-    telemetry:execute([amoc, throttle, execute], #{count => 1}, #{name => Name}),
+    amoc_throttle_controller:telemetry_event(Name, execute),
     State#state{schedule = T, n = N - 1}.
 
 async_runner(Fun) ->
