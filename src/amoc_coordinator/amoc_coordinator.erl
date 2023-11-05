@@ -163,8 +163,8 @@ handle_event(Event, {timeout, Name, Pid}) ->
                          reset_coordinator -> reset;
                          coordinator_timeout -> timeout
                      end,
-    telemetry:execute([amoc, coordinator, event], #{count => 1},
-                      #{name => Name, type => TelemetryEvent}),
+    telemetry:execute([amoc, coordinator, TelemetryEvent],
+                       #{count => 1}, #{name => Name}),
     erlang:send(Pid, Event),
     {ok, {timeout, Name, Pid}};
 handle_event(Event, {worker, WorkerPid}) ->

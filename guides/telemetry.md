@@ -50,13 +50,13 @@ measurements: #{count => 1}
 metadata: #{name => atom()}
 ```
 
-## Coordinate
+## Coordinator
 
-Indicates when a coordinating event was raised, like a callback index being reached or a timeout being triggered
+Indicates when a coordinating event was raised, like a process being added for coordination or a timeout being triggered
 
 ### Event
 ```erlang
-event_name: [amoc, coordinator, event]
+event_name: [amoc, coordinator, start | stop | add | reset | timeout]
 measurements: #{count => 1}
-metadata: #{type => atom()}
+metadata: #{name => atom()}
 ```

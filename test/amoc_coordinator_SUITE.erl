@@ -23,7 +23,8 @@ init_per_suite(Config) ->
     meck:new(?TELEMETRY_HANDLER, [non_strict, no_link]),
     meck:expect(?TELEMETRY_HANDLER, handler, ['_', '_', '_', '_'], ok),
     application:start(telemetry),
-    TelemetryEvents = [[amoc, coordinator, Event] || Event <- [start, stop, event]],
+    TelemetryEvents = [[amoc, coordinator, Event] ||
+                           Event <- [start, stop, timeout, reset, add]],
     TelemetryHandler = fun ?TELEMETRY_HANDLER:handler/4,
     telemetry:attach_many(?TELEMETRY_HANDLER, TelemetryEvents,
                            TelemetryHandler, ?TELEMETRY_HANDLER_CONFIG),
@@ -134,8 +135,8 @@ reset_plan_without_timeout(_Config) ->
 
     nothing_after_tags(History4, [all1, all2]),
 
-    assert_telemetry_events(Name, [start, {N1, add}, reset, {N2, add},
-                                   reset, reset, stop]).
+    assert_telemetry_events(Name, [start, {N1, add}, reset,
+                                   {N2, add}, {2, reset}, stop]).
 
 
 execute_plan_with_timeout(_Config) ->
@@ -313,26 +314,20 @@ unfold_event_list(EventList) ->
         end || E <- EventList]).
 
 assert_telemetry_events(_Name, [], []) -> ok;
-assert_telemetry_events(_Name, NonemptyHistory, []) ->
-    ct:fail("unexpected telemetry events ~p", [NonemptyHistory]);
-assert_telemetry_events(_Name, [], NonemptyEventList) ->
-    ct:fail("missing telemetry events ~p", [NonemptyEventList]);
+assert_telemetry_events(_Name, History, EventList)
+  when length(History) > length(EventList) ->
+    ct:fail("unexpected telemetry events:~n ~p~n ~p", [History, EventList]);
+assert_telemetry_events(_Name, History, EventList)
+  when length(History) < length(EventList) ->
+    ct:fail("missing telemetry events:~n ~p~n ~p", [History, EventList]);
 assert_telemetry_events(Name, [{_Pid, Call, _Ret} | History], [Event | EventList]) ->
     assert_telemetry_handler_call(Name, Call, Event),
     assert_telemetry_events(Name, History, EventList).
 
 assert_telemetry_handler_call(Name, Call, Event) ->
-    EventName = case Event of
-                    start -> [amoc, coordinator, start];
-                    stop -> [amoc, coordinator, stop];
-                    _ -> [amoc, coordinator, event]
-                end,
+    EventName = [amoc, coordinator, Event],
     Measurements = #{count => 1},
-    EventMetadata = case Event of
-                        start -> #{name => Name};
-                        stop -> #{name => Name};
-                        _ -> #{name => Name, type => Event}
-                    end,
+    EventMetadata = #{name => Name},
     HandlerConfig = ?TELEMETRY_HANDLER_CONFIG,
     ExpectedHandlerCall = {?TELEMETRY_HANDLER, handler,
                            [EventName, Measurements,
