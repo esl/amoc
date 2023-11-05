@@ -6,6 +6,9 @@
 -compile(export_all).
 
 -define(MOCK_MOD, mock_mod).
+-define(TELEMETRY_HANDLER, telemetry_handler).
+-define(TELEMETRY_HANDLER_CONFIG, #{dummy_config => true}).
+
 
 all() ->
     [execute_plan_without_timeout,
@@ -17,14 +20,26 @@ init_per_suite(Config) ->
     meck:expect(?MOCK_MOD, f_1, ['_', '_'], ok),
     meck:expect(?MOCK_MOD, f_2, ['_', '_', '_'], ok),
     meck:expect(?MOCK_MOD, f_3, ['_', '_', '_', '_'], ok),
-    Config.
-
-init_per_testcase(_, Config) ->
-    meck:reset(?MOCK_MOD),
+    meck:new(?TELEMETRY_HANDLER, [non_strict, no_link]),
+    meck:expect(?TELEMETRY_HANDLER, handler, ['_', '_', '_', '_'], ok),
+    application:start(telemetry),
+    TelemetryEvents = [[amoc, coordinator, Event] || Event <- [start, stop, event]],
+    TelemetryHandler = fun ?TELEMETRY_HANDLER:handler/4,
+    telemetry:attach_many(?TELEMETRY_HANDLER, TelemetryEvents,
+                           TelemetryHandler, ?TELEMETRY_HANDLER_CONFIG),
     Config.
 
 end_per_suite(_Config) ->
+    application:stop(telemetry),
     meck:unload().
+
+init_per_testcase(_, Config) ->
+    meck:reset(?MOCK_MOD),
+    meck:reset(?TELEMETRY_HANDLER),
+    Config.
+
+end_per_testcase(_Config) ->
+    ok.
 
 execute_plan_without_timeout(_Config) ->
     N = 4, Name = ?FUNCTION_NAME,
@@ -44,9 +59,10 @@ execute_plan_without_timeout(_Config) ->
     History = meck:history(?MOCK_MOD),
     [?assertEqual(stop, check_item_calls(History, Item, Tag, N)) ||
         {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
-                        {All1, all1}, {All2}]],
+                        {All1, all1}, {All2, all2}]],
 
-    nothing_after_tags(History, [all1, all2]).
+    nothing_after_tags(History, [all1, all2]),
+    assert_telemetry_events(Name, [start, {N, add}, stop]).
 
 reset_plan_without_timeout(_Config) ->
     N1 = 5, N2 = 6, Name = ?FUNCTION_NAME,
@@ -57,16 +73,19 @@ reset_plan_without_timeout(_Config) ->
             All2 = {all, mocked_action(all2, 1)},
             Item3 = {3, mocked_action(item3, 1)}],
 
-    ?assertEqual(ok, amoc_coordinator:start(Name, Plan, infinity)),
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan, 1)), %% timeout is 1 second
     [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N1)],
 
     amoc_coordinator:reset(Name),
     meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', {reset, '_'}], 1000),
 
+    %% ensure that timeout doesn't occur after reset
+    ?assertError(timeout, meck:wait(?MOCK_MOD, f_1, ['_', {timeout, '_'}], 2000)),
+
     History1 = meck:history(?MOCK_MOD),
     [?assertEqual(reset, check_item_calls(History1, Item, Tag, N1)) ||
         {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
-                        {All1, all1}, {All2}]],
+                        {All1, all1}, {All2, all2}]],
 
     nothing_after_tags(History1, [all1, all2]),
 
@@ -76,16 +95,47 @@ reset_plan_without_timeout(_Config) ->
     amoc_coordinator:reset(Name),
     meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', {reset, '_'}], 1000),
 
+    %% ensure that timeout doesn't occur after reset
+    ?assertError(timeout, meck:wait(?MOCK_MOD, f_1, ['_', {timeout, '_'}], 2000)),
+
     History2 = meck:history(?MOCK_MOD),
     [?assertEqual(reset, check_item_calls(History2, Item, Tag, N2)) ||
         {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
-                        {All1, all1}, {All2}]],
+                        {All1, all1}, {All2, all2}]],
 
     nothing_after_tags(History2, [all1, all2]),
 
+    meck:reset(?MOCK_MOD),
+
+    %% reset can be triggered twice in a row, and all the handlers
+    %% are triggered twice in this case
+    amoc_coordinator:reset(Name),
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', {reset, '_'}], 1000),
+
+    %% ensure that timeout doesn't occur after reset
+    ?assertError(timeout, meck:wait(?MOCK_MOD, f_1, ['_', {timeout, '_'}], 2000)),
+
+    History3 = meck:history(?MOCK_MOD),
+    [?assertEqual(reset, check_item_calls(History3, Item, Tag, 0)) ||
+        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
+                        {All1, all1}, {All2, all2}]],
+
+    nothing_after_tags(History3, [all1, all2]),
+
+    meck:reset(?MOCK_MOD),
 
     amoc_coordinator:stop(Name),
-    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', {stop, '_'}], 1000).
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', {stop, '_'}], 1000),
+
+    History4 = meck:history(?MOCK_MOD),
+    [?assertEqual(stop, check_item_calls(History4, Item, Tag, 0)) ||
+        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
+                        {All1, all1}, {All2, all2}]],
+
+    nothing_after_tags(History4, [all1, all2]),
+
+    assert_telemetry_events(Name, [start, {N1, add}, reset, {N2, add},
+                                   reset, reset, stop]).
 
 
 execute_plan_with_timeout(_Config) ->
@@ -97,11 +147,16 @@ execute_plan_with_timeout(_Config) ->
             All2 = {all, mocked_action(all2, 1)},
             Item3 = {3, mocked_action(item3, 1)}],
 
-    ?assertEqual(ok, amoc_coordinator:start(Name, Plan, 1)),
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan, 1)), %% timeout is 1 second
+
+    %% ensure there's no timeout happens if no users are added yet.
+    ?assertError(timeout, meck:wait(?MOCK_MOD, f_1, ['_', {timeout, '_'}], 2000)),
+
     [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N1)],
 
     meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', {timeout, '_'}], 2000),
 
+    %% ensure that timeout occurs just once if no new users added.
     ?assertError(timeout, meck:wait(length(Plan) + 1, ?MOCK_MOD, f_1, ['_', {timeout, '_'}], 2000)),
 
     History1 = meck:history(?MOCK_MOD),
@@ -116,6 +171,7 @@ execute_plan_with_timeout(_Config) ->
 
     meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', {timeout, '_'}], 2000),
 
+    %% ensure that timeout occurs just once if no new users added.
     ?assertError(timeout, meck:wait(length(Plan) + 1, ?MOCK_MOD, f_1, ['_', {timeout, '_'}], 2000)),
 
     History2 = meck:history(?MOCK_MOD),
@@ -125,8 +181,20 @@ execute_plan_with_timeout(_Config) ->
 
     nothing_after_tags(History2, [all1, all2]),
 
+    meck:reset(?MOCK_MOD),
+
     amoc_coordinator:stop(Name),
-    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', {stop, '_'}], 1000).
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', {stop, '_'}], 1000),
+
+    History3 = meck:history(?MOCK_MOD),
+    [?assertEqual(stop, check_item_calls(History3, Item, Tag, 0)) ||
+        {Item, Tag} <- [{Item1, item1}, {Item2, item2}, {Item3, item3},
+                        {All1, all1}, {All2, all2}]],
+
+    nothing_after_tags(History2, [all1, all2]),
+
+    assert_telemetry_events(Name, [start, {N1, add}, timeout,
+                                   {N2, add}, timeout, stop]).
 
 
 %% Helpers
@@ -228,3 +296,45 @@ distinct_pairs(Acc, [Element1 | Tail]) ->
     %% Tail has at least 2 elements
     NewAcc = [{Element1, Element2} || Element2 <- Tail] ++ Acc,
     distinct_pairs(NewAcc, Tail).
+
+assert_telemetry_events(Name, EventList) ->
+    History = meck:history(?TELEMETRY_HANDLER),
+    ct:pal("meck history = ~p", [History]),
+    UnfoldedEventList = unfold_event_list(EventList),
+    assert_telemetry_events(Name, History, UnfoldedEventList),
+    ok.
+
+unfold_event_list(EventList) ->
+    lists:flatten(
+        [case E of
+            {N, Event} when is_integer(N) andalso N > 0 ->
+                [Event || _ <- lists:seq(1, N)];
+            Event -> Event
+        end || E <- EventList]).
+
+assert_telemetry_events(_Name, [], []) -> ok;
+assert_telemetry_events(_Name, NonemptyHistory, []) ->
+    ct:fail("unexpected telemetry events ~p", [NonemptyHistory]);
+assert_telemetry_events(_Name, [], NonemptyEventList) ->
+    ct:fail("missing telemetry events ~p", [NonemptyEventList]);
+assert_telemetry_events(Name, [{_Pid, Call, _Ret} | History], [Event | EventList]) ->
+    assert_telemetry_handler_call(Name, Call, Event),
+    assert_telemetry_events(Name, History, EventList).
+
+assert_telemetry_handler_call(Name, Call, Event) ->
+    EventName = case Event of
+                    start -> [amoc, coordinator, start];
+                    stop -> [amoc, coordinator, stop];
+                    _ -> [amoc, coordinator, event]
+                end,
+    Measurements = #{count => 1},
+    EventMetadata = case Event of
+                        start -> #{name => Name};
+                        stop -> #{name => Name};
+                        _ -> #{name => Name, type => Event}
+                    end,
+    HandlerConfig = ?TELEMETRY_HANDLER_CONFIG,
+    ExpectedHandlerCall = {?TELEMETRY_HANDLER, handler,
+                           [EventName, Measurements,
+                            EventMetadata, HandlerConfig]},
+    ?assertEqual(ExpectedHandlerCall, Call).

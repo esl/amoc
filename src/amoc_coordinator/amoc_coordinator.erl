@@ -24,7 +24,7 @@
 -define(IS_TIMEOUT(Timeout), (?IS_POS_INT(Timeout) orelse Timeout =:= infinity)).
 
 -type name() :: atom().
--type state() :: {worker, name(), pid()} | {timeout, name(), pid()}.
+-type state() :: {worker, pid()} | {timeout, name(), pid()}.
 
 -type coordination_data() :: {pid(), Data :: any()}.
 
@@ -74,6 +74,7 @@ start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
     Plan = normalize_coordination_plan(CoordinationPlan),
     case gen_event:start({local, Name}) of
         {ok, _} ->
+            telemetry:execute([amoc, coordinator, start], #{count => 1}, #{name => Name}),
             %% according to gen_event documentation:
             %%
             %%    When the event is received, the event manager calls
@@ -83,11 +84,12 @@ start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
             %% in reality the order is reversed, the last added handler
             %% is executed at first. so to ensure that all the items in
             %% the plan with NoOfUsers =:= all are executed in the very
-            %% end, we need to add them first.
+            %% end, we need to add them first. Also, the timeout handler
+            %% must be added last, so gen_event triggers it first.
             AllItemsHandlers = lists:reverse([Item || {all, _} = Item <- Plan]),
-            [gen_event:add_handler(Name, ?MODULE, {Name, Item}) || Item <- AllItemsHandlers],
-            [gen_event:add_handler(Name, ?MODULE, {Name, Item}) || {N, _} = Item <- Plan,
-                                                                   is_integer(N)],
+            [gen_event:add_handler(Name, ?MODULE, Item) || Item <- AllItemsHandlers],
+            [gen_event:add_handler(Name, ?MODULE, Item) || {N, _} = Item <- Plan,
+                                                           is_integer(N)],
             gen_event:add_handler(Name, ?MODULE, {timeout, Name, Timeout}),
             ok;
         {error, _} -> error
@@ -96,7 +98,8 @@ start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
 %% @doc Stops a coordinator.
 -spec stop(name()) -> ok.
 stop(Name) ->
-    gen_event:stop(Name).
+    gen_event:stop(Name),
+    telemetry:execute([amoc, coordinator, stop], #{count => 1}, #{name => Name}).
 
 %% @see add/3
 -spec add(name(), any()) -> ok.
@@ -137,9 +140,9 @@ init({timeout, Name, Timeout}) ->
                     end
                 end),
     {ok, {timeout, Name, Pid}};
-init({Name, CoordinationItem}) ->
+init(CoordinationItem) ->
     {ok, Pid} = amoc_coordinator_worker:start_link(CoordinationItem),
-    {ok, {worker, Name, Pid}}.
+    {ok, {worker, Pid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -152,19 +155,28 @@ init({Name, CoordinationItem}) ->
 %%--------------------------------------------------------------------
 -spec handle_event(Event :: term(), state()) -> {ok, state()}.
 handle_event(Event, {timeout, Name, Pid}) ->
+    %% there's only one "timeout" event handler for coordinator,
+    %% so calling telemetry:execute/3 here to ensure that it's
+    %% triggered just once per event.
+    TelemetryEvent = case Event of
+                         {coordinate, _} -> add;
+                         reset_coordinator -> reset;
+                         coordinator_timeout -> timeout
+                     end,
+    telemetry:execute([amoc, coordinator, event], #{count => 1},
+                      #{name => Name, type => TelemetryEvent}),
     erlang:send(Pid, Event),
     {ok, {timeout, Name, Pid}};
-handle_event(Event, {worker, Name, Pid}) ->
-    telemetry:execute([amoc, coordinator, event], #{count => 1}, #{name => Name, type => Event}),
+handle_event(Event, {worker, WorkerPid}) ->
     case Event of
         coordinator_timeout -> %% synchronous notification
-            amoc_coordinator_worker:timeout(Pid);
+            amoc_coordinator_worker:timeout(WorkerPid);
         reset_coordinator -> %% synchronous notification
-            amoc_coordinator_worker:reset(Pid);
-        {coordinate, Data} -> %% asnyc notification
-            amoc_coordinator_worker:add(Pid, Data)
+            amoc_coordinator_worker:reset(WorkerPid);
+        {coordinate, {Pid, Data}} when is_pid(Pid) -> %% async notification
+            amoc_coordinator_worker:add(WorkerPid, {Pid, Data})
     end,
-    {ok, {worker, Name, Pid}}.
+    {ok, {worker, WorkerPid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -191,7 +203,7 @@ handle_call(_Request, State) ->
 -spec terminate(any(), state()) -> ok.
 terminate(_, {timeout, _Name, Pid}) ->
     erlang:send(Pid, terminate), ok;
-terminate(_, {worker, _Name, Pid}) ->
+terminate(_, {worker, Pid}) ->
     %% synchronous notification
     amoc_coordinator_worker:stop(Pid), ok.
 
