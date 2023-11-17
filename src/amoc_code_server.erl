@@ -53,7 +53,7 @@
 %% the module info map used in the suite must have key names
 %% matched to the field names of this record.
 -record(uploaded_module, {module :: module(),
-                          beam_file :: file:filename(),
+                          beam_filename :: file:filename(),
                           binary :: binary(),
                           md5 :: binary()}).
 
@@ -187,15 +187,15 @@ get_module_type(Module) ->
     ok | {error, module_version_has_changed | no_beam_file_for_module |
                  module_is_not_loaded | code_path_collision}.
 add_module_internal(Module) ->
-case maybe_add_module(Module) of
-    ok -> ok;
-    {error, no_beam_file_for_module} ->
-        %% might happen if directory with beam file is not added to the code path
-        case maybe_add_code_path(Module) of
-            true -> maybe_add_module(Module);
-            false -> {error, no_beam_file_for_module}
-        end;
-    Error -> Error
+    case maybe_add_module(Module) of
+        ok -> ok;
+        {error, no_beam_file_for_module} ->
+            %% might happen if directory with beam file is not added to the code path
+            case maybe_add_code_path(Module) of
+                true -> maybe_add_module(Module);
+                false -> {error, no_beam_file_for_module}
+            end;
+        Error -> Error
     end.
 
 maybe_add_module(Module) ->
@@ -213,7 +213,7 @@ maybe_add_module(Module) ->
 maybe_store_uploaded_module(Module, Binary, Filename) ->
     MD5 = get_md5(Module),
     UploadedModule = #uploaded_module{module = Module, binary = Binary,
-                                      beam_file = Filename, md5 = MD5},
+                                      beam_filename = Filename, md5 = MD5},
     case ets:insert_new(uploaded_modules, UploadedModule) of
         true ->
             maybe_store_configurable_module(Module),
@@ -257,7 +257,7 @@ maybe_add_code_path(Module) ->
     end.
 
 upload_module_internal(#uploaded_module{module = Module, binary = Binary,
-                                        beam_file = Filename} = UM) ->
+                                        beam_filename = Filename} = UM) ->
     case code:is_loaded(Module) of
         false ->
             case code:load_binary(Module, Filename, Binary) of

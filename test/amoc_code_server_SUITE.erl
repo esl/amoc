@@ -157,9 +157,10 @@ module_md5_and_binary_test(Config) ->
     %% first suitable beam file in the code path. if it's not
     %% the same beam file as the loaded one, then the fetched
     %% binary is incorrect.
-    #{beam_file := BeamFileA, out_dir := OutDirA,
+    #{beam_filename := BeamFileA, out_dir := OutDirA,
       binary := BinaryA, module := Module} = ModuleInfoA,
-    #{binary := BinaryC, out_dir := OutDirC, beam_file := BeamFileC} = ModuleInfoC,
+    #{binary := BinaryC, out_dir := OutDirC,
+      beam_filename := BeamFileC} = ModuleInfoC,
     compare_module_info(ModuleInfoA, ModuleInfoC, EqualKeys),
     load_module(ModuleInfoA),
     ?assertEqual(error, code:get_object_code(Module)),
@@ -636,7 +637,7 @@ compile_and_load_module(#{working_dir := WorkingDir, module := Module,
     MD5 = Module:module_info(md5),
     % ct:pal("~p module MD5: ~p", [Module, MD5]),
     % ct:pal("~p module bin: ~p", [Module, erlang:md5(Binary)]),
-    ModuleInfo#{beam_file => BeamFile, erl_file => ErlFile,
+    ModuleInfo#{beam_filename => BeamFile, erl_file => ErlFile,
                 out_dir => OutDir, binary => Binary, md5 => MD5,
                 %% '$RECORD_NAME' key is required for consistency with internal
                 %% uploaded_module record defined at amoc_code_sever
@@ -675,7 +676,7 @@ unload_module(Module) when is_atom(Module) ->
     end.
 
 load_module(#{module := Module, binary := Binary,
-              beam_file := BeamFile} = ModuleInfo) ->
+              beam_filename := BeamFile} = ModuleInfo) ->
     unload_module(ModuleInfo),
     code:load_binary(Module, BeamFile, Binary).
 
@@ -684,14 +685,15 @@ invalidate_filename(#{module := Module} = ModuleInfo) ->
     %% this DummyBeamFilename path is intentionally invalid, so
     %% amoc_code_server couldn't add a directory into code path
     DummyBeamFilename = ?DUMMY_CODE_PATH ++ ModuleName ++ ".beam",
-    ModuleInfo#{beam_file := DummyBeamFilename}.
+    ModuleInfo#{beam_filename := DummyBeamFilename}.
 
-assert_invalid_filename(#{module := Module, beam_file := ?DUMMY_CODE_PATH ++ _ = Path}) ->
+assert_invalid_filename(#{beam_filename := ?DUMMY_CODE_PATH ++ _ = Path,
+                          module := Module}) ->
     ?assertMatch({file, Path}, code:is_loaded(Module));
 assert_invalid_filename(Module) when is_atom(Module) ->
     ?assertMatch({file, ?DUMMY_CODE_PATH ++ _}, code:is_loaded(Module)).
 
-assert_module_loaded(#{beam_file := BeamFileA, module := Module, md5 := MD5}) ->
+assert_module_loaded(#{beam_filename := BeamFileA, module := Module, md5 := MD5}) ->
     ?assertEqual(MD5, Module:module_info(md5)),
     ?assertEqual({file, BeamFileA}, code:is_loaded(Module)),
     ?assertEqual(BeamFileA, code:which(Module)).
