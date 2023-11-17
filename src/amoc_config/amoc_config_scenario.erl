@@ -67,7 +67,7 @@ get_current_configuration() ->
 -spec get_configuration(module()) ->
     {ok, module_configuration()} | error().
 get_configuration(Module) ->
-    ConfigurableModules = amoc_scenario:list_configurable_modules(),
+    ConfigurableModules = amoc_code_server:list_configurable_modules(),
     AllConfigurableModules = [Module | ConfigurableModules],
     PipelineActions = [
         {fun compose_configuration/1, [AllConfigurableModules]},

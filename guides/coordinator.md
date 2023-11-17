@@ -37,7 +37,7 @@ It’s guaranteed that all the *Coordination Actions* with `all` are executed af
 
 ## Example
 
-This scenario will demonstrate how do the `users` interact with `amoc_coordinator`:
+This scenario shows how the `users` interact with `amoc_coordinator`:
 
 ```erlang
 -module(example).
@@ -114,7 +114,7 @@ User = 3
 Three new users showed up
 
 User = 4
-% We have 4 and 4 rem 2 == 0 therefore users added to amoc_coordinator so all of the {3, _} actions are triggered:
+% We have 4 and 4 rem 2 == 0 therefore users added to amoc_coordinator so all of the {2, _} actions are triggered:
 Two new users showed up: Event = {coordinate,2}; User1 = {<0.1144.0>,4}; User2 = {<0.1143.0>,3}
 Two new users showed up: Event = {coordinate,2}; ListOfUsers = [{<0.1144.0>,4},{<0.1143.0>,3}]
 Two new users showed up: Event = {coordinate,2}

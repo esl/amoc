@@ -1,7 +1,5 @@
 x-amoc-defaults: &amoc-defaults
-  build:
-    context: ../
-    dockerfile: Dockerfile
+  image: "amoc:latest"
   networks:
     - amoc-test-network
   volumes:
@@ -10,7 +8,6 @@ x-amoc-defaults: &amoc-defaults
       target: /extra_code_paths
   environment:
     AMOC_NODES: "['amoc@amoc-master']"
-    AMOC_EXTRA_CODE_PATHS: '["/extra_code_paths/test1", "/extra_code_paths/test2"]'
   healthcheck:
     test: "amoc status"
 
@@ -18,6 +15,8 @@ services:
   amoc-master:
     <<: *amoc-defaults
     hostname: "amoc-master"
+    environment:
+      AMOC_EXTRA_CODE_PATHS: '["/extra_code_paths/path1", "/extra_code_paths/path2"]'
   amoc-worker-1: &amoc-worker
     <<: *amoc-defaults
     hostname: "amoc-worker-1"

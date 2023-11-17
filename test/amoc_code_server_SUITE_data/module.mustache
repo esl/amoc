@@ -1,0 +1,14 @@
+
+%% this narrowed-down template allows generation of the module
+%% with one and the same MD5 but a different binary returned
+%% by the code:get_object_code/1 interface.
+
+-module({{module_name}}).
+
+{{tag}}
+
+-export([some_function/0]).
+
+some_function() -> ok.
+
+another_function() -> ok.

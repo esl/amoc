@@ -91,7 +91,7 @@ end_per_testcase(_, Config) ->
 
 parse_scenario_settings(_) ->
     mock_ets_tables(),
-    ets:insert(amoc_scenarios, {amoc_controller, configurable}),
+    ets:insert(configurable_modules, {amoc_controller, configurable}),
     ScenarioSettings = [{interarrival, 500},
                         {var1, def1}],
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, ScenarioSettings),
@@ -244,7 +244,7 @@ update_settings_undef_param(_) ->
 
 implicit_variable_redefinition(_) ->
     mock_ets_tables(),
-    ets:insert(amoc_scenarios, {?MODULE, configurable}),
+    ets:insert(configurable_modules, {?MODULE, configurable}),
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, []),
     ?assertEqual({error, parameter_overriding, {var0, ?MODULE, ?MODULE}}, Ret),
     assert_no_update_calls(),
@@ -296,7 +296,7 @@ invalid_module_attributes(_) ->
 
 mock_ets_tables() ->
     EtsOptions = [named_table, protected, {read_concurrency, true}],
-    amoc_scenarios = ets:new(amoc_scenarios, EtsOptions),
+    configurable_modules = ets:new(configurable_modules, EtsOptions),
     amoc_config_utils:create_amoc_config_ets().
 
 assert_no_update_calls() ->

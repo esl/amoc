@@ -1,20 +1,13 @@
 ARG otp_vsn=25.3
-FROM erlang:${otp_vsn}-slim AS builder
+FROM erlang:${otp_vsn}
 MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 
-WORKDIR /amoc_build
+WORKDIR /amoc
+COPY ./ ./
 
-COPY ./rebar.config ./rebar.lock ./
-RUN rebar3 deps && rebar3 compile -d
+RUN make clean
+RUN make rel
 
-COPY ./integration_test integration_test
-COPY ./scenarios scenarios
-COPY ./priv priv
-COPY ./rel rel
-COPY ./src src
-
-RUN rebar3 as demo release
-
-ENV PATH "/amoc_build/_build/demo/rel/amoc/bin:${PATH}"
+ENV PATH "/amoc/_build/default/rel/amoc/bin:${PATH}"
 
 CMD ["amoc", "foreground"]

@@ -3,22 +3,8 @@
 %% Licensed under the Apache License, Version 2.0 (see LICENSE file)
 %%==============================================================================
 -module(amoc_scenario).
-%% API
--export([start_link/0,
-         install_module/2,
-         remove_module/1,
-         does_scenario_exist/1,
-         list_scenario_modules/0,
-         list_uploaded_modules/0,
-         list_configurable_modules/0]).
 
--behaviour(gen_server).
-%% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2]).
-
--define(TABLE, amoc_scenarios).
--define(PRIV_DIR, code:priv_dir(amoc)).
--define(EBIN_DIR, filename:join(code:priv_dir(amoc), "scenarios_ebin")).
+-export([init/1, terminate/2, start/3]).
 
 %%-------------------------------------------------------------------------
 %% behaviour definition
@@ -27,192 +13,66 @@
 
 -type user_id() :: pos_integer().
 -type state() :: any().
--type sourcecode() :: binary().
 
 -callback init() -> {ok, state()} | ok | {error, Reason :: term()}.
 -callback start(user_id(), state()) -> any().
 -callback start(user_id()) -> any().
 -callback terminate(state()) -> any().
+-callback terminate() -> any().
 
-%% either start/1 or start/2 must be exported from the behaviour module
+%% either start/1 or start/2 must be exported from the behavior module.
+%% if scenario module exports both functions, start/2 is used.
 -optional_callbacks([start/1, start/2]).
--optional_callbacks([terminate/1]).
+
+%% terminate/0,1 callbacks are optional.
+%% if scenario module exports both functions, terminate/1 is used.
+-optional_callbacks([terminate/0, terminate/1]).
 
 %%-------------------------------------------------------------------------
 %% API
 %%-------------------------------------------------------------------------
--spec start_link() -> {ok, pid()} | ignore | {error, term()}.
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+-spec init(amoc:scenario()) -> {ok, state()} | {error, Reason :: term()}.
+init(Scenario) ->
+    apply_safely(Scenario, init, []).
 
--spec install_module(module(), sourcecode()) ->
-    ok | {error, [Errors :: string()], [Warnings :: string()]}.
-install_module(Module, ModuleSource) ->
-    gen_server:call(?MODULE, {add_module, Module, ModuleSource}).
-
--spec remove_module(module()) ->
-    ok | {error, [Errors :: string()], [Warnings :: string()]}.
-remove_module(Module) ->
-    gen_server:call(?MODULE, {remove_module, Module}).
-
--spec does_scenario_exist(module()) -> boolean().
-does_scenario_exist(Scenario) ->
-    [{Scenario, scenario}] =:= ets:lookup(?TABLE, Scenario).
-
--spec list_scenario_modules() -> [module()].
-list_scenario_modules() ->
-    [S || [S] <- ets:match(?TABLE, {'$1', scenario})].
-
--spec list_uploaded_modules() -> [{module(), sourcecode()}].
-list_uploaded_modules() ->
-    ets:tab2list(uploaded_modules).
-
--spec list_configurable_modules() -> [module()].
-list_configurable_modules() ->
-    [S || [S] <- ets:match(?TABLE, {'$1', configurable})].
-
-%%-------------------------------------------------------------------------
-%% gen_server callbacks
-%%-------------------------------------------------------------------------
--spec init([]) -> {ok, state()}.
-init([]) ->
-    start_scenarios_ets(),
-    ok = add_code_paths(),
-    find_scenario_modules(),
-    {ok, ok}.
-
--spec handle_call(any(), any(), state()) -> {reply, any(), state()}.
-handle_call({add_module, Module, ModuleSource}, _, State) ->
-    Reply = add_module(Module, ModuleSource),
-    {reply, Reply, State};
-handle_call({remove_module, Module}, _, State) ->
-    Reply = do_remove_module(Module),
-    {reply, Reply, State};
-handle_call(_, _, State) ->
-    {reply, {error, not_implemented}, State}.
-
--spec handle_cast(any(), state()) -> {noreply, state()}.
-handle_cast(_, State) ->
-    {noreply, State}.
-
-%%-------------------------------------------------------------------------
-%%  local functions
-%%-------------------------------------------------------------------------
--spec start_scenarios_ets() -> term().
-start_scenarios_ets() ->
-    EtsOptions = [named_table, protected, {read_concurrency, true}],
-    ets:new(?TABLE, EtsOptions),
-    ets:new(uploaded_modules, EtsOptions).
-
--spec add_code_paths() -> ok | {error, {bad_directories, [file:filename()]}}.
-add_code_paths() ->
-    true = code:add_pathz(?EBIN_DIR),
-    AdditionalCodePaths = amoc_config_env:get(extra_code_paths, []),
-    Res = [{code:add_pathz(Path), Path} || Path <- [?EBIN_DIR | AdditionalCodePaths]],
-    case [Dir || {{error, bad_directory}, Dir} <- Res] of
-        [] -> ok;
-        BadDirectories -> {error, {bad_directories, BadDirectories}}
-    end.
-
--spec find_scenario_modules() -> [module()].
-find_scenario_modules() ->
-    ErtsPath = code:lib_dir(),
-    AllPaths = [Path || Path <- code:get_path(), not lists:prefix(ErtsPath, Path)],
-    AllBeamFiles = [File || Path <- AllPaths, File <- filelib:wildcard("*.beam", Path)],
-    AllModules = [list_to_atom(filename:rootname(BeamFile)) || BeamFile <- AllBeamFiles],
-    ok = code:ensure_modules_loaded(AllModules),
-    [maybe_store_module(Module) || Module <- erlang:loaded()].
-
--spec maybe_store_module(module()) -> any().
-maybe_store_module(Module) ->
-    case get_module_type(Module) of
-        scenario ->
-            ets:insert(?TABLE, {Module, scenario});
-        configurable ->
-            ets:insert(?TABLE, {Module, configurable});
-        ordinary ->
+-spec terminate(amoc:scenario(), state()) -> {ok, any()} | {error, Reason :: term()}.
+terminate(Scenario, State) ->
+    case {erlang:function_exported(Scenario, terminate, 1),
+          erlang:function_exported(Scenario, terminate, 0)} of
+        {true, _} ->
+            %% since we ignore Scenario:terminate/1 return value
+            %% we can use apply_safely/3 function
+            apply_safely(Scenario, terminate, [State]);
+        {_, true} ->
+            %% since we ignore Scenario:terminate/0 return value
+            %% we can use apply_safely/3 function
+            apply_safely(Scenario, terminate, []);
+        _ ->
             ok
     end.
 
--spec get_module_type(module()) -> scenario | configurable | ordinary.
-get_module_type(Module) ->
-    case erlang:function_exported(Module, module_info, 1) of
-        false ->
-            %% This can happen with the mocked (meck:new/2) and
-            %% later unloaded (meck:unload/1) module. So this
-            %% clause is required to pass the tests.
-            ordinary;
-        true ->
-            ModuleAttributes = apply(Module, module_info, [attributes]),
-            lists:foldl(fun({behaviour, [?MODULE]}, _) -> scenario;
-                           ({behavior, [?MODULE]}, _) -> scenario;
-                           ({required_variable, _}, ordinary) -> configurable;
-                           (_, Ret) -> Ret
-                        end, ordinary, ModuleAttributes)
+-spec start(amoc:scenario(), user_id(), state()) -> any().
+start(Scenario, Id, State) ->
+    case {erlang:function_exported(Scenario, start, 2),
+          erlang:function_exported(Scenario, start, 1)} of
+        {true, _} ->
+            Scenario:start(Id, State);
+        {_, true} ->
+            Scenario:start(Id);
+        {false, false} ->
+            error("the scenario module must export either start/2 or start/1 function")
     end.
 
--spec add_module(module(), sourcecode()) ->
-    ok | {error, [Errors :: string()], [Warnings :: string()]}.
-add_module(Module, ModuleSource) ->
-    case erlang:module_loaded(Module) of
-        true ->
-            case ets:lookup(uploaded_modules, Module) of
-                [{Module, ModuleSource}] -> ok;
-                _ -> {error, ["module with such name already exists"], []}
-            end;
-        false ->
-            ScenarioPath = scenario_path_name(Module),
-            write_scenario_to_file(ModuleSource, ScenarioPath),
-            case compile_and_load_scenario(ScenarioPath) of
-                {ok, Module} ->
-                    maybe_store_module(Module),
-                    propagate_module(Module, ModuleSource),
-                    ets:insert(uploaded_modules, {Module, ModuleSource}),
-                    ok;
-                Error -> Error
-            end
-    end.
-
--spec do_remove_module(module()) ->
-    ok | {error, [Errors :: string()], [Warnings :: string()]}.
-do_remove_module(Module) ->
-    case erlang:module_loaded(Module) andalso
-         ets:member(?TABLE, Module) of
-        true ->
-            ets:delete(?TABLE, Module),
-            propagate_remove_module(Module),
-            ets:delete(uploaded_modules, Module),
-            ok;
-        false ->
-                {error, ["module with such name does not exist"], []}
-    end.
-
--spec propagate_module(module(), sourcecode()) -> any().
-propagate_module(Module, ModuleSource) ->
-    Nodes = amoc_cluster:all_nodes() -- [node()],
-    rpc:multicall(Nodes, amoc_scenario, install_module, [Module, ModuleSource]).
-
--spec propagate_remove_module(module()) -> any().
-propagate_remove_module(Module) ->
-    Nodes = amoc_cluster:all_nodes() -- [node()],
-    rpc:multicall(Nodes, amoc_scenario, remove_module, [Module]).
-
--spec scenario_path_name(module()) -> file:filename().
-scenario_path_name(Module) -> %% w/o ".erl" extension
-    filename:join([?PRIV_DIR, "scenarios", atom_to_list(Module)]).
-
--spec write_scenario_to_file(sourcecode(), file:filename()) -> ok.
-write_scenario_to_file(ModuleSource, ScenarioPath) ->
-    ok = file:write_file(ScenarioPath ++ ".erl", ModuleSource, [write]).
-
--spec compile_and_load_scenario(string()) -> {ok, module()} | {error, [string()], [string()]}.
-compile_and_load_scenario(ScenarioPath) ->
-    CompilationFlags = [{outdir, ?EBIN_DIR}, return_errors, report_errors, verbose],
-    case compile:file(ScenarioPath, CompilationFlags) of
-        {ok, Module} ->
-            {module, Module} = code:load_file(Module),
-            {ok, Module};
-        {error, Errors, Warnings} ->
-            file:delete(ScenarioPath ++ ".erl"),
-            {error, Errors, Warnings}
+%% ------------------------------------------------------------------
+%% internal functions
+%% ------------------------------------------------------------------
+-spec apply_safely(atom(), atom(), [term()]) -> {ok | error, term()}.
+apply_safely(M, F, A) ->
+    try erlang:apply(M, F, A) of
+        {ok, RetVal} -> {ok, RetVal};
+        {error, Error} -> {error, Error};
+        Result -> {ok, Result}
+    catch
+        Class:Exception:Stacktrace ->
+            {error, {Class, Exception, Stacktrace}}
     end.

@@ -29,15 +29,5 @@ stop(Pid, Force) when is_pid(Pid) ->
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     process_flag(trap_exit, true),
-    ScenarioFun = fun() -> perform_scenario(Scenario, Id, State) end,
+    ScenarioFun = fun() -> {amoc_scenario:start(Scenario, Id, State), #{}} end,
     telemetry:span([amoc, scenario, user], #{}, ScenarioFun).
-
--spec perform_scenario(amoc:scenario(), amoc_scenario:user_id(), state()) -> {term(), map()}.
-perform_scenario(Scenario, Id, State) ->
-    Ret = case erlang:function_exported(Scenario, start, 2) of
-              true ->
-                  Scenario:start(Id, State);
-              false ->
-                  Scenario:start(Id)
-          end,
-    {Ret, #{}}.

@@ -4,44 +4,73 @@ source "$(dirname "$0")/helper.sh"
 enable_strict_mode
 cd "${git_root}/integration_test"
 
-scenario_name="dummy_scenario"
+modules=( "dummy_scenario" "dummy_helper" )
 
-#############################
-## amoc REST API functions ##
-#############################
 function get_scenarios() {
-    amoc_eval "$1" "amoc_scenario:list_scenario_modules()."
+    amoc_eval "$1" "amoc_code_server:list_scenario_modules()."
 }
 
-function list_scenarios_by_port() {
-    local result="$(get_scenarios "$1")"
-    echo "Scenarios on the ${1} node: ${result}"
+function get_helpers() {
+    amoc_eval "$1" "amoc_code_server:list_configurable_modules()."
 }
 
-function ensure_scenarios_installed() {
-    local result="$(get_scenarios "$1")"
-    echo "Scenarios on the ${1} node: ${result}"
+function list_scenarios_and_helpers() {
+    local scenarios="$(get_scenarios "$1")"
+    local helpers="$(get_helpers "$1")"
+    echo "Scenarios on the ${1} node: ${scenarios}"
+    echo "Configurable helpers on the ${1} node: ${helpers}"
+}
+
+function erlang_list() {
+    local ret=( "[" )
+    local element
+    if [ "$#" -gt 0 ]; then
+        ret+=( "$1" )
+        shift 1
+        for element in "$@"; do
+            ret+=( "," "$element" )
+        done
+    fi
+    ret+=( "]" )
+    echo "${ret[@]}"
+}
+
+function ensure_modules_loaded() {
+    local node="$1"
     shift 1
-    echo "$result" | contain "$@"
+    local modules="$(erlang_list "$@")"
+    amoc_eval "$node" "[code:ensure_loaded(M) || M <- ${modules}]."
 }
 
-function upload_module() {
-    local filename="$2"
-    docker_compose cp "$2" "${1}:/tmp/erlang_module"
-    eval_cmd=( "{ok, FileContent} = file:read_file(\"/tmp/erlang_module\"),"
-               "amoc_scenario:install_module(${filename%.erl}, FileContent)." )
-    amoc_eval "${1}" "${eval_cmd[*]}"
+function add_module() {
+    local node="${1}"
+    local module
+    shift 1
+    for module in "$@"; do
+        echo "adding module '${module}' for distribution from the node '${node}'"
+        amoc_eval "${node}" "amoc_code_server:add_module(${module})."
+    done
 }
 
-list_scenarios_by_port amoc-master
-list_scenarios_by_port amoc-worker-1
-list_scenarios_by_port amoc-worker-2
+function distribute_modules() {
+    amoc_eval "${1}" "amoc_code_server:distribute_modules('amoc@${2}')."
+}
 
-echo "Installing scenario and helper module on the amoc-master node"
-scenario_put="$(upload_module amoc-master "${scenario_name}.erl")"
-echo "Response for '${scenario_name}.erl': ${scenario_put}"
-helper_put="$(upload_module amoc-master "dummy_helper.erl")"
-echo "Response for 'dummy_helper.erl': ${helper_put}"
+ensure_modules_loaded amoc-master "${modules[@]}" | contains "${modules[@]}"
+ensure_modules_loaded amoc-worker-1 "${modules[@]}" | doesnt_contain "${modules[@]}"
+ensure_modules_loaded amoc-worker-2 "${modules[@]}" | doesnt_contain "${modules[@]}"
 
-ensure_scenarios_installed amoc-worker-1 ${scenario_name}
-ensure_scenarios_installed amoc-worker-2 ${scenario_name}
+list_scenarios_and_helpers amoc-worker-2 | doesnt_contain "${modules[@]}"
+list_scenarios_and_helpers amoc-worker-1 | doesnt_contain "${modules[@]}"
+
+echo "Distributing scenario and helper module from the amoc-master node"
+## amoc_controller is added to the list as an example of module
+## that already exists on all the slave amoc nodes
+add_module amoc-master "${modules[@]}" amoc_controller
+distribute_modules amoc-master amoc-worker-1 | contains "${modules[@]}" amoc_controller
+
+ensure_modules_loaded amoc-worker-1 "${modules[@]}" | contains "${modules[@]}"
+ensure_modules_loaded amoc-worker-2 "${modules[@]}" | doesnt_contain "${modules[@]}"
+
+list_scenarios_and_helpers amoc-worker-1 | contains "${modules[@]}"
+list_scenarios_and_helpers amoc-worker-2 | doesnt_contain "${modules[@]}"

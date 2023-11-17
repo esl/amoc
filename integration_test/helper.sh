@@ -10,19 +10,26 @@ function enable_strict_mode() {
     IFS=$'\n\t'
 }
 
-function create_code_path() {
-    dir="${git_root}/integration_test/extra_code_paths/${1}"
-    [ -d "$dir" ] || return 1
-    erl_file="${dir}/${1}.erl"
-    dummy_scenario="${git_root}/integration_test/dummy_scenario.erl"
-    sed "s/-module(.*)./-module(${1})./" "$dummy_scenario" > "$erl_file"
-    erlc -o "$dir" "$erl_file"
+function compile_file() {
+    local erl_file="$(realpath "$1")"
+    local output_dir="$(dirname "$erl_file")"
+    erlc -o "$output_dir" "$erl_file"
 }
 
-function contain() {
+function contains() {
     local pipeline='cat -'
     for pattern in "$@"; do
         pipeline+=" | tee >(grep -q -e \"$pattern\"; echo \"+\$?\")"
+    done
+    pipeline+=' >/dev/null'
+    local output="$(eval "$pipeline")"
+    test "$(($output))" -eq 0
+}
+
+function doesnt_contain() {
+    local pipeline='cat -'
+    for pattern in "$@"; do
+        pipeline+=" | tee >(grep -q -v -e \"$pattern\"; echo \"+\$?\")"
     done
     pipeline+=' >/dev/null'
     local output="$(eval "$pipeline")"
@@ -53,7 +60,7 @@ function wait_for_cmd() {
 ######################
 docker_compose() {
     local compose_file="${git_root}/integration_test/docker-compose.yml"
-    docker compose -p "amoc-demo-cluster" -f "$compose_file" "$@"
+    docker compose -p "amoc-test-cluster" -f "$compose_file" "$@"
 }
 
 function amoc_eval() {
@@ -64,22 +71,12 @@ function amoc_eval() {
 }
 
 function container_is_healthy() {
-   docker_compose ps $1 | contain "healthy"
+   docker_compose ps $1 | contains "healthy"
 }
 
 function wait_for_healthcheck() {
     local container=$1
     wait_for_cmd 60 container_is_healthy "$container"
-}
-
-function metrics_reported() {
-    local graphite_query="target=summarize(*.amoc.users.size,'1hour','max')&from=-1h&format=json"
-    local result="$(curl -s "http://localhost:8080/render/?${graphite_query}")"
-    echo "$result" | contain "$@"
-}
-
-function wait_for_metrics() {
-     wait_for_cmd 60 metrics_reported "$@"
 }
 
 ######################

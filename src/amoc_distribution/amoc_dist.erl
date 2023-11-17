@@ -158,13 +158,8 @@ setup_slave_node(Node) ->
 
 -spec propagate_uploaded_modules(node()) -> {ok, any()} | {error, any()}.
 propagate_uploaded_modules(Node) ->
-    UploadedModules = amoc_scenario:list_uploaded_modules(),
-    Result = [{Module, propagate_module(Node, Module, SourceCode)}
-              || {Module, SourceCode} <- UploadedModules],
+    Result = amoc_code_server:distribute_modules(Node),
     maybe_error(Result).
-
-propagate_module(Node, Module, SourceCode) ->
-    rpc:call(Node, amoc_scenario, install_module, [Module, SourceCode]).
 
 -spec add_users(pos_integer(), [node()]) -> {ok, any()} | {error, any()}.
 add_users(Count, Nodes) ->
