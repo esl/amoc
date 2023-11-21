@@ -9,13 +9,9 @@
 
 -export([parse_value/1]).
 
--ifdef(TEST).
-%% exported for testing only
+%% format/2 is exported for testing purposes
+%% it is also re-used by amoc-arsenal
 -export([format/2]).
--else.
--ignore_xref([format/2]).
--dialyzer({nowarn_function, [format/2]}).
--endif.
 
 %% ------------------------------------------------------------------
 %% API
