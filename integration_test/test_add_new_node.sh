@@ -3,8 +3,7 @@
 source "$(dirname "$0")/helper.sh"
 enable_strict_mode
 
-docker_compose up -d amoc-worker-3
-wait_for_healthcheck amoc-worker-3
+docker_compose up --wait --wait-timeout 100 amoc-worker-3
 
 amoc_eval amoc-worker-3 "amoc_controller:get_status()." | contains dummy_scenario running
 amoc_eval amoc-worker-3 "binary_to_list(amoc_config:get(test))." | contains "test_value"
