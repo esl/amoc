@@ -22,9 +22,11 @@ function contains_all() {
     for pattern in "$@"; do
         ret="$(echo "$output" | grep -L -e "$pattern" | wc -l)"
         if [ "$ret" -ne "0" ]; then
-            [ "$(($acc))" -eq "0" ] && echo "output: '${output}'"
+            [ "$(($acc))" -eq "0" ] && {
+                echo "contains_all FAILED"
+                echo "stdin: '${output}'"; }
             echo "pattern is missing: '${pattern}'"
-        fi > /dev/tty
+        fi >&2
         acc+="+${ret}"
     done
     test "$(($acc))" -eq 0
@@ -36,9 +38,11 @@ function doesnt_contain_any() {
     for pattern in "$@"; do
         ret="$(echo "$output" | grep -l -e "$pattern" | wc -l || true)"
         if [ "$ret" -ne "0" ]; then
-            [ "$(($acc))" -eq "0" ] && echo "output: '${output}'"
+            [ "$(($acc))" -eq "0" ] && {
+                echo "doesnt_contain_any FAILED"
+                echo "stdin: '${output}'"; }
             echo "pattern is present: '${pattern}'"
-        fi > /dev/tty
+        fi >&2
         acc+="+${ret}"
     done
     test "$(($acc))" -eq 0
