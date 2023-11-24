@@ -16,7 +16,7 @@ function compile_file() {
     erlc -o "$output_dir" "$erl_file"
 }
 
-function contains() {
+function contains_all() {
     local output="$(cat -)"
     local ret= acc=0
     for pattern in "$@"; do
@@ -30,7 +30,7 @@ function contains() {
     test "$(($acc))" -eq 0
 }
 
-function doesnt_contain() {
+function doesnt_contain_any() {
     local output="$(cat -)"
     local ret= acc=0
     for pattern in "$@"; do
