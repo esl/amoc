@@ -16,43 +16,36 @@ function compile_file() {
     erlc -o "$output_dir" "$erl_file"
 }
 
-function contains() {
-    local pipeline='cat -'
+function contains_all() {
+    local output="$(cat -)"
+    local ret= acc=0
     for pattern in "$@"; do
-        pipeline+=" | tee >(grep -q -e \"$pattern\"; echo \"+\$?\")"
+        ret="$(echo "$output" | grep -L -e "$pattern" | wc -l)"
+        if [ "$ret" -ne "0" ]; then
+            [ "$(($acc))" -eq "0" ] && {
+                echo "contains_all FAILED"
+                echo "stdin: '${output}'"; }
+            echo "pattern is missing: '${pattern}'"
+        fi >&2
+        acc+="+${ret}"
     done
-    pipeline+=' >/dev/null'
-    local output="$(eval "$pipeline")"
-    test "$(($output))" -eq 0
+    test "$(($acc))" -eq 0
 }
 
-function doesnt_contain() {
-    local pipeline='cat -'
+function doesnt_contain_any() {
+    local output="$(cat -)"
+    local ret= acc=0
     for pattern in "$@"; do
-        pipeline+=" | tee >(grep -q -v -e \"$pattern\"; echo \"+\$?\")"
+        ret="$(echo "$output" | grep -l -e "$pattern" | wc -l || true)"
+        if [ "$ret" -ne "0" ]; then
+            [ "$(($acc))" -eq "0" ] && {
+                echo "doesnt_contain_any FAILED"
+                echo "stdin: '${output}'"; }
+            echo "pattern is present: '${pattern}'"
+        fi >&2
+        acc+="+${ret}"
     done
-    pipeline+=' >/dev/null'
-    local output="$(eval "$pipeline")"
-    test "$(($output))" -eq 0
-}
-
-function wait_for_cmd() {
-    local timeout="${1:-0}"
-    local cmd="${2:-true}"
-    shift 2
-    local full_cmd=("$cmd" "$@")
-    echo "Waiting for '${full_cmd[@]}'"
-    for i in $(seq 0 "${timeout}"); do
-        if "${full_cmd[@]}"; then
-            [ "$i" -ne 0 ] && echo
-            echo "Waiting is done after $i seconds"
-            return 0
-        fi
-        echo -n "."
-        sleep 1
-    done
-    echo -e "\nKilled by timeout"
-    return 1
+    test "$(($acc))" -eq 0
 }
 
 ######################
@@ -68,15 +61,6 @@ function amoc_eval() {
     local service="$1"
     shift 1
     docker_compose exec -T "$service" "$exec_path" eval "$@"
-}
-
-function container_is_healthy() {
-   docker_compose ps $1 | contains "healthy"
-}
-
-function wait_for_healthcheck() {
-    local container=$1
-    wait_for_cmd 60 container_is_healthy "$container"
 }
 
 ######################

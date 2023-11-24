@@ -56,21 +56,21 @@ function distribute_modules() {
     amoc_eval "${1}" "amoc_code_server:distribute_modules('amoc@${2}')."
 }
 
-ensure_modules_loaded amoc-master "${modules[@]}" | contains "${modules[@]}"
-ensure_modules_loaded amoc-worker-1 "${modules[@]}" | doesnt_contain "${modules[@]}"
-ensure_modules_loaded amoc-worker-2 "${modules[@]}" | doesnt_contain "${modules[@]}"
+ensure_modules_loaded amoc-master "${modules[@]}" | contains_all "${modules[@]}"
+ensure_modules_loaded amoc-worker-1 "${modules[@]}" | doesnt_contain_any "${modules[@]}"
+ensure_modules_loaded amoc-worker-2 "${modules[@]}" | doesnt_contain_any "${modules[@]}"
 
-list_scenarios_and_helpers amoc-worker-2 | doesnt_contain "${modules[@]}"
-list_scenarios_and_helpers amoc-worker-1 | doesnt_contain "${modules[@]}"
+list_scenarios_and_helpers amoc-worker-2 | doesnt_contain_any "${modules[@]}"
+list_scenarios_and_helpers amoc-worker-1 | doesnt_contain_any "${modules[@]}"
 
 echo "Distributing scenario and helper module from the amoc-master node"
 ## amoc_controller is added to the list as an example of module
 ## that already exists on all the slave amoc nodes
 add_module amoc-master "${modules[@]}" amoc_controller
-distribute_modules amoc-master amoc-worker-1 | contains "${modules[@]}" amoc_controller
+distribute_modules amoc-master amoc-worker-1 | contains_all "${modules[@]}" amoc_controller
 
-ensure_modules_loaded amoc-worker-1 "${modules[@]}" | contains "${modules[@]}"
-ensure_modules_loaded amoc-worker-2 "${modules[@]}" | doesnt_contain "${modules[@]}"
+ensure_modules_loaded amoc-worker-1 "${modules[@]}" | contains_all "${modules[@]}"
+ensure_modules_loaded amoc-worker-2 "${modules[@]}" | doesnt_contain_any "${modules[@]}"
 
-list_scenarios_and_helpers amoc-worker-1 | contains "${modules[@]}"
-list_scenarios_and_helpers amoc-worker-2 | doesnt_contain "${modules[@]}"
+list_scenarios_and_helpers amoc-worker-1 | contains_all "${modules[@]}"
+list_scenarios_and_helpers amoc-worker-2 | doesnt_contain_any "${modules[@]}"
