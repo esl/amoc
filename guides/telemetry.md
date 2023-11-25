@@ -2,12 +2,19 @@ Amoc also exposes the following telemetry events:
 
 ## Scenario
 
+A telemetry span of a full scenario execution globally (i.e. the exported `init/0` function):
+```erlang
+event_name: [amoc, scenario, run, _]
+measurements: #{} %% As described in `telemetry:span/3`
+metadata: #{scenario => module()} %% Plus as described in `telemetry:span/3`
+```
+
 A telemetry span of a full scenario execution for a user (i.e. the exported `start/1,2` function):
 ```erlang
 event_name: [amoc, scenario, user, _]
 measurements: #{} %% As described in `telemetry:span/3`
 metadata: #{scenario => module(),
-            user_id => non_neg_integer()}
+            user_id => non_neg_integer()} %% Plus as described in `telemetry:span/3`
 ```
 
 ## Controller

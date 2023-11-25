@@ -35,7 +35,7 @@
 init(Scenario) ->
     apply_safely(Scenario, init, []).
 
--spec terminate(amoc:scenario(), state()) -> {ok, any()} | {error, Reason :: term()}.
+-spec terminate(amoc:scenario(), state()) -> ok | {ok, any()} | {error, Reason :: term()}.
 terminate(Scenario, State) ->
     case {erlang:function_exported(Scenario, terminate, 1),
           erlang:function_exported(Scenario, terminate, 0)} of
