@@ -30,4 +30,4 @@ init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     process_flag(trap_exit, true),
     ScenarioFun = fun() -> {amoc_scenario:start(Scenario, Id, State), #{}} end,
-    telemetry:span([amoc, scenario, user], #{}, ScenarioFun).
+    telemetry:span([amoc, scenario, user], #{scenario => Scenario, user_id => Id}, ScenarioFun).
