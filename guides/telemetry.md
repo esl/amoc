@@ -31,42 +31,40 @@ metadata: #{monotonic_time => integer(), scenario => module(), type => add | rem
 ### Init
 
 Raised when a throttle mechanism is initialised.
-
 ```erlang
 event_name: [amoc, throttle, init]
 measurements: #{count => 1}
-metadata: #{name => atom()}
+metadata: #{monotonic_time => integer(), name => atom()}
 ```
 
 ### Rate
 
 Raised when a throttle mechanism is initialised or its configured rate is changed.
 This event is raised only on the master node.
-
 ```erlang
 event_name: [amoc, throttle, rate]
 measurements: #{rate => non_neg_integer()}
-metadata: #{name => atom()}
+metadata: #{monotonic_time => integer(), name => atom()}
 ```
 
 ### Request
 
 Raised when a process client requests to be allowed pass through a throttled mechanism.
-
+This event is raised only on the master node.
 ```erlang
 event_name: [amoc, throttle, request]
 measurements: #{count => 1}
-metadata: #{name => atom()}
+metadata: #{monotonic_time => integer(), name => atom()}
 ```
 
 ### Execute
 
 Raised when a process client is allowed to execute after a throttled mechanism.
-
+This event is raised only on the master node.
 ```erlang
 event_name: [amoc, throttle, execute]
 measurements: #{count => 1}
-metadata: #{name => atom()}
+metadata: #{monotonic_time => integer(), name => atom()}
 ```
 
 ## Coordinator
