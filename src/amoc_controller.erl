@@ -101,13 +101,11 @@ update_settings(Settings) ->
 -spec add_users(amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     ok | {error, term()}.
 add_users(StartId, EndId) ->
-    telemetry:execute([amoc, controller, users], #{count => EndId - StartId + 1}, #{type => add}),
     %% adding the exact range of the users
     gen_server:call(?SERVER, {add, StartId, EndId}).
 
 -spec remove_users(user_count(), boolean()) -> {ok, user_count()}.
 remove_users(Count, ForceRemove) ->
-    telemetry:execute([amoc, controller, users], #{count => Count}, #{type => remove}),
     %% trying to remove Count users, this action is async!!!
     gen_server:call(?SERVER, {remove, Count, ForceRemove}).
 
@@ -239,8 +237,12 @@ handle_update_settings(_Settings, #state{status = Status}) ->
 handle_add(StartId, EndId, #state{last_user_id = LastId,
                                   create_users = ScheduledUsers,
                                   status       = running,
+                                  scenario     = Scenario,
                                   tref         = TRef} = State) when StartId =< EndId,
                                                                      LastId < StartId ->
+    TimeStamp = erlang:monotonic_time(),
+    telemetry:execute([amoc, controller, users], #{count => EndId - StartId + 1},
+                      #{monotonic_time => TimeStamp, scenario => Scenario, type => add}),
     NewUsers = lists:seq(StartId, EndId),
     NewScheduledUsers = lists:append(ScheduledUsers, NewUsers),
     NewTRef = maybe_start_timer(TRef),
@@ -252,7 +254,10 @@ handle_add(_StartId, _EndId, #state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
 -spec handle_remove(user_count(), boolean(), state()) -> handle_call_res().
-handle_remove(Count, ForceRemove, #state{status = running}) ->
+handle_remove(Count, ForceRemove, #state{status = running, scenario = Scenario}) ->
+    TimeStamp = erlang:monotonic_time(),
+    telemetry:execute([amoc, controller, users], #{count => Count},
+                      #{monotonic_time => TimeStamp, scenario => Scenario, type => remove}),
     Pids = case ets:match_object(?USERS_TABLE, '$1', Count) of
                {Objects, _} -> [Pid || {_Id, Pid} <- Objects];
                '$end_of_table' -> []
