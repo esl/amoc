@@ -73,5 +73,5 @@ Indicates when a coordinating event was raised, like a process being added for c
 ```erlang
 event_name: [amoc, coordinator, start | stop | add | reset | timeout]
 measurements: #{count => 1}
-metadata: #{name => atom()}
+metadata: #{monotonic_time => integer(), name => atom()}
 ```
