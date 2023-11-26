@@ -204,7 +204,14 @@ maybe_raise_event(Name, Event) ->
     end.
 
 raise_event(Name, Event) when Event =:= request; Event =:= execute; Event =:= init ->
-    telemetry:execute([amoc, throttle, Event], #{count => 1}, #{name => Name}).
+    telemetry:execute([amoc, throttle, Event],
+                      #{count => 1},
+                      #{monotonic_time => erlang:monotonic_time(), name => Name}).
+
+report_rate(Name, RatePerMinute) ->
+    telemetry:execute([amoc, throttle, rate],
+                      #{rate => RatePerMinute},
+                      #{monotonic_time => erlang:monotonic_time(), name => Name}).
 
 -spec change_rate_and_stop_plan(name(), state()) -> state().
 change_rate_and_stop_plan(Name, State) ->
@@ -329,6 +336,3 @@ run_cmd(Pid, pause) ->
     amoc_throttle_process:pause(Pid);
 run_cmd(Pid, resume) ->
     amoc_throttle_process:resume(Pid).
-
-report_rate(Name, RatePerMinute) ->
-    telemetry:execute([amoc, throttle, rate], #{rate => RatePerMinute}, #{name => Name}).
