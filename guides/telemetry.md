@@ -19,11 +19,11 @@ metadata: #{scenario => module(),
 
 ## Controller
 
-Indicates the number of users added or removed
+Indicates the number of users manually added or removed
 ```erlang
 event_name: [amoc, controller, users]
 measurements: #{count => non_neg_integer()}
-metadata: #{type => add | remove}
+metadata: #{monotonic_time => integer(), scenario => module(), type => add | remove}
 ```
 
 ## Throttle
