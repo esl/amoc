@@ -74,7 +74,8 @@ start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
     Plan = normalize_coordination_plan(CoordinationPlan),
     case gen_event:start({local, Name}) of
         {ok, _} ->
-            telemetry:execute([amoc, coordinator, start], #{count => 1}, #{name => Name}),
+            telemetry:execute([amoc, coordinator, start], #{count => 1},
+                              #{monotonic_time => erlang:monotonic_time(), name => Name}),
             %% according to gen_event documentation:
             %%
             %%    When the event is received, the event manager calls
@@ -99,7 +100,8 @@ start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
 -spec stop(name()) -> ok.
 stop(Name) ->
     gen_event:stop(Name),
-    telemetry:execute([amoc, coordinator, stop], #{count => 1}, #{name => Name}).
+    telemetry:execute([amoc, coordinator, stop], #{count => 1},
+                      #{monotonic_time => erlang:monotonic_time(), name => Name}).
 
 %% @see add/3
 -spec add(name(), any()) -> ok.
@@ -163,8 +165,8 @@ handle_event(Event, {timeout, Name, Pid}) ->
                          reset_coordinator -> reset;
                          coordinator_timeout -> timeout
                      end,
-    telemetry:execute([amoc, coordinator, TelemetryEvent],
-                       #{count => 1}, #{name => Name}),
+    telemetry:execute([amoc, coordinator, TelemetryEvent], #{count => 1},
+                      #{monotonic_time => erlang:monotonic_time(), name => Name}),
     erlang:send(Pid, Event),
     {ok, {timeout, Name, Pid}};
 handle_event(Event, {worker, WorkerPid}) ->

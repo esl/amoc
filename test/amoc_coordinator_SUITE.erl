@@ -327,9 +327,8 @@ assert_telemetry_events(Name, [{_Pid, Call, _Ret} | History], [Event | EventList
 assert_telemetry_handler_call(Name, Call, Event) ->
     EventName = [amoc, coordinator, Event],
     Measurements = #{count => 1},
-    EventMetadata = #{name => Name},
     HandlerConfig = ?TELEMETRY_HANDLER_CONFIG,
-    ExpectedHandlerCall = {?TELEMETRY_HANDLER, handler,
-                           [EventName, Measurements,
-                            EventMetadata, HandlerConfig]},
-    ?assertEqual(ExpectedHandlerCall, Call).
+    ?assertMatch(
+       {?TELEMETRY_HANDLER, handler,
+        [EventName, Measurements,
+         #{name := Name, monotonic_time := _}, HandlerConfig]}, Call).
