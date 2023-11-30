@@ -181,7 +181,8 @@ handle_info(_Msg, State) ->
 %% ------------------------------------------------------------------
 -spec handle_start_scenario(module(), amoc_config:settings(), state()) ->
     {handle_call_res(), state()}.
-handle_start_scenario(Scenario, Settings, #state{status = idle} = State) ->
+handle_start_scenario(Scenario, Settings, #state{status = Status} = State)
+  when Status =:= idle; Status =:= finished ->
     case init_scenario(Scenario, Settings) of
         {ok, ScenarioState} ->
             NewState = State#state{scenario       = Scenario,
