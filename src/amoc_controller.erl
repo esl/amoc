@@ -136,11 +136,9 @@ init([]) ->
 -spec handle_call(any(), any(), state()) -> {reply, handle_call_res(), state()}.
 handle_call({start_scenario, Scenario, Settings}, _From, State) ->
     {RetValue, NewState} = handle_start_scenario(Scenario, Settings, State),
-    process_flag(priority, high),
     {reply, RetValue, NewState};
 handle_call(stop_scenario, _From, State) ->
     {RetValue, NewState} = handle_stop_scenario(State),
-    process_flag(priority, normal),
     {reply, RetValue, NewState};
 handle_call({update_settings, Settings}, _From, State) ->
     RetValue = handle_update_settings(Settings, State),
@@ -186,6 +184,7 @@ handle_start_scenario(Scenario, Settings, #state{status = idle} = State) ->
     Ref = erlang:make_ref(),
     case init_scenario(Scenario, Settings) of
         {ok, ScenarioState} ->
+            process_flag(priority, high),
             NewState = State#state{scenario       = Scenario,
                                    scenario_state = ScenarioState,
                                    scenario_start = StartTime,
@@ -320,12 +319,14 @@ terminate_scenario(Scenario, ScenarioState, StartTime, Ref) ->
                               #{duration => StopTime - StartTime, monotonic_time => StopTime},
                               #{telemetry_span_context => Ref, scenario => Scenario,
                                 kind => Class, reason => Reason, stacktrace => Stacktrace}),
+            process_flag(priority, normal),
             Ret;
         Ret ->
             StopTime = erlang:monotonic_time(),
             telemetry:execute([amoc, scenario, run, stop],
                               #{duration => StopTime - StartTime, monotonic_time => StopTime},
                               #{telemetry_span_context => Ref, scenario => Scenario}),
+            process_flag(priority, normal),
             Ret
     end.
 
