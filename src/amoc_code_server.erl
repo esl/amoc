@@ -204,6 +204,8 @@ maybe_add_module(Module) ->
             {error, module_is_not_loaded};
         {{file, _BeamFile}, error} ->
             {error, no_beam_file_for_module};
+        {{file, ""}, {Module, Binary, Filename}} ->
+            maybe_store_uploaded_module(Module, Binary, Filename);
         {{file, BeamFile}, {Module, _Binary, Filename}} when BeamFile =/= Filename ->
             {error, code_path_collision};
         {{file, BeamFile}, {Module, Binary, BeamFile}} ->
