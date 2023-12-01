@@ -203,6 +203,9 @@ handle_start_scenario(_Scenario, _Settings, #state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
 -spec handle_stop_scenario(state()) -> {handle_call_res(), state()}.
+handle_stop_scenario(#state{no_of_users = 0, status = running} = State) ->
+    terminate_scenario(State),
+    {ok, State#state{status = finished}};
 handle_stop_scenario(#state{status = running} = State) ->
     terminate_all_users(),
     {ok, State#state{status = terminating}};
@@ -310,9 +313,12 @@ init_scenario(Scenario, Settings) ->
         {error, Type, Reason} -> {error, {Type, Reason}}
     end.
 
--spec terminate_scenario(amoc:scenario(), amoc_scenario:state(), integer(), reference()) ->
+-spec terminate_scenario(state()) ->
     ok | {ok, any()} | {error, any()}.
-terminate_scenario(Scenario, ScenarioState, StartTime, Ref) ->
+terminate_scenario(#state{scenario = Scenario,
+                          scenario_state = ScenarioState,
+                          scenario_start = StartTime,
+                          scenario_ref = Ref}) ->
     case amoc_scenario:terminate(Scenario, ScenarioState) of
         {error, {Class, Reason, Stacktrace}} = Ret ->
             StopTime = erlang:monotonic_time(),
@@ -367,10 +373,8 @@ terminate_all_users({Objects, Continuation}) ->
 terminate_all_users('$end_of_table') -> ok.
 
 -spec dec_no_of_users(state()) -> state().
-dec_no_of_users(#state{scenario = Scenario, scenario_state = ScenarioState,
-                       scenario_start = StartTime, scenario_ref = Ref,
-                       no_of_users = 1, status = terminating} = State) ->
-    terminate_scenario(Scenario, ScenarioState, StartTime, Ref),
+dec_no_of_users(#state{no_of_users = 1, status = terminating} = State) ->
+    terminate_scenario(State),
     State#state{no_of_users = 0, status = finished};
 dec_no_of_users(#state{no_of_users = N} = State) ->
     State#state{no_of_users = N - 1}.
