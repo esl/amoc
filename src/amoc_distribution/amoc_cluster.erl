@@ -6,8 +6,6 @@
 -behaviour(gen_server).
 -define(SERVER, ?MODULE).
 
--include_lib("kernel/include/logger.hrl").
-
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
@@ -133,7 +131,8 @@ handle_call(_Request, _From, State) ->
 
 -spec handle_cast(any(), state()) -> {noreply, state()}.
 handle_cast({connect_nodes, Nodes}, State) ->
-    ?LOG_INFO("{connect_nodes, ~p}, state: ~p", [Nodes, state_to_map(State)]),
+    telemetry:execute([amoc, cluster, connect_nodes], #{count => length(Nodes)},
+                      #{nodes => Nodes, state => state_to_map(State)}),
     NewState = handle_connect_nodes(Nodes, State),
     schedule_timer(NewState),
     {noreply, NewState};
@@ -148,11 +147,14 @@ handle_info(timeout, State) ->
     schedule_timer(NewState),
     {noreply, NewState};
 handle_info({nodedown, Node}, #state{master = Node} = State) ->
-    ?LOG_ERROR("Master node ~p is down. Halting.", [Node]),
+    telemetry:execute([amoc, cluster, master_node_down],
+                      #{count => 1},
+                      #{node => Node, state => state_to_map(State)}),
     erlang:halt(),
     {noreply, State};
 handle_info({nodedown, Node}, State) ->
-    ?LOG_ERROR("node ~p is down.", [Node]),
+    telemetry:execute([amoc, cluster, nodedown], #{count => 1},
+                      #{node => Node, state => state_to_map(State)}),
     {noreply, merge(connection_lost, [Node], State)};
 handle_info(_Info, State) ->
     {noreply, State}.
