@@ -168,11 +168,11 @@ handle_cast(_Msg, State) ->
 
 -spec handle_info(any(), state()) -> {noreply, state()}.
 handle_info(start_user, State) ->
-    NewSate = handle_start_user(State),
-    {noreply, NewSate};
+    NewState = handle_start_user(State),
+    {noreply, NewState};
 handle_info({'DOWN', _, process, Pid, _}, State) ->
-    NewSate = handle_stop_user(Pid, State),
-    {noreply, NewSate};
+    NewState = handle_stop_user(Pid, State),
+    {noreply, NewState};
 handle_info(_Msg, State) ->
     {noreply, State}.
 
