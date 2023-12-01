@@ -4,7 +4,6 @@
 %%==============================================================================
 -module(amoc_config).
 
--include_lib("kernel/include/logger.hrl").
 -include("amoc_config.hrl").
 
 -export([get/1, get/2]).
@@ -21,13 +20,17 @@ get(Name) ->
 get(Name, Default) when is_atom(Name) ->
     case ets:lookup(amoc_config, Name) of
         [] ->
-            ?LOG_ERROR("no scenario setting ~p", [Name]),
+            telemetry:execute([amoc, config, get], #{},
+                              #{log_class => error, msg => <<"no scenario setting">>,
+                                scenario => Name}),
             throw({invalid_setting, Name});
         [#module_parameter{name = Name, value = undefined}] ->
             Default;
         [#module_parameter{name = Name, value = Value}] ->
             Value;
         InvalidLookupRet ->
-            ?LOG_ERROR("invalid lookup return value ~p ~p", [Name, InvalidLookupRet]),
+            telemetry:execute([amoc, config, get], #{},
+                              #{log_class => error, msg => <<"invalid lookup return value">>,
+                                scenario => Name, return => InvalidLookupRet}),
             throw({invalid_lookup_ret_value, InvalidLookupRet})
     end.

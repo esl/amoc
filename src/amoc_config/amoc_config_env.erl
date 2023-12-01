@@ -11,8 +11,6 @@
 
 -export([get/1, get/2]).
 
--include_lib("kernel/include/logger.hrl").
-
 -define(DEFAULT_PARSER_MODULE, amoc_config_parser).
 
 -callback(parse_value(string()) -> {ok, amoc_config:value()} | {error, any()}).
@@ -38,12 +36,11 @@ get_os_env(Name, Default) ->
     case parse_value(Value, Default) of
         {ok, Term} -> Term;
         {error, Error} ->
-            ?LOG_ERROR("cannot parse environment variable, using default value.~n"
-                          "  parsing error:  '~p'~n"
-                          "  variable name:  '$~s'~n"
-                          "  variable value: '~s'~n"
-                          "  default value:  '~p'~n",
-                       [Error, EnvName, Value, Default]),
+            telemetry:execute(
+              [amoc, config, env], #{error => 1},
+              #{log_class => error, error => Error, variable_name => EnvName,
+                variable_value => Value, default_value => Default,
+                msg => <<"cannot parse environment variable, using default value">>}),
             Default
     end.
 
