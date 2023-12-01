@@ -7,7 +7,8 @@
 -export([do/3,
          add/1,
          remove/2,
-         stop/0]).
+         stop/0,
+         reset/0]).
 
 -export_type([scenario/0]).
 -type scenario() :: module().
@@ -54,6 +55,17 @@ stop() ->
         ok ->
             amoc_controller:stop_scenario();
         Error -> Error
+    end.
+
+-spec reset() -> ok | {error, term()}.
+reset() ->
+    case is_running_locally() of
+        ok ->
+            application:stop(?MODULE),
+            application:ensure_all_started(?MODULE),
+            ok;
+        Error ->
+            Error
     end.
 
 %% ------------------------------------------------------------------
