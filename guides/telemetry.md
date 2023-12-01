@@ -87,3 +87,13 @@ event_name: [amoc, coordinator, start | stop | add | reset | timeout]
 measurements: #{count => 1}
 metadata: #{monotonic_time => integer(), name => atom()}
 ```
+
+## Config
+
+### Internal events
+There are related to bad configuration events, they might deserve logging
+```erlang
+event_name: [amoc, config, get | verify | env]
+measurements: #{}
+metadata: #{log_class => syslog_level(), _ => _}
+```
