@@ -196,6 +196,10 @@ handle_start_scenario(_Scenario, _Settings, #state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
 -spec handle_stop_scenario(state()) -> {handle_call_res(), state()}.
+handle_stop_scenario(#state{scenario = Scenario, scenario_state = ScenarioState,
+                            no_of_users = 0, status = running} = State) ->
+    amoc_scenario:terminate(Scenario, ScenarioState),
+    {ok, State#state{status = finished}};
 handle_stop_scenario(#state{status = running} = State) ->
     terminate_all_users(),
     {ok, State#state{status = terminating}};
