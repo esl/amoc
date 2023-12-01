@@ -185,7 +185,8 @@ handle_start_scenario(Scenario, Settings, #state{status = Status} = State)
   when Status =:= idle; Status =:= finished ->
     case init_scenario(Scenario, Settings) of
         {ok, ScenarioState} ->
-            NewState = State#state{scenario       = Scenario,
+            NewState = State#state{last_user_id   = 0,
+                                   scenario       = Scenario,
                                    scenario_state = ScenarioState,
                                    status         = running},
             {ok, NewState};
