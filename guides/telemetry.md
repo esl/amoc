@@ -78,6 +78,16 @@ measurements: #{count := 1}
 metadata: #{monotonic_time := integer(), name := atom()}
 ```
 
+### Throttle process internals
+
+Events related to internals of the throttle processes, these might expose unstable conditions you
+might want to log or reconfigure:
+```erlang
+event_name: [amoc, throttle, process]
+measurements: #{msg := binary(), process := pid()}
+metadata: #{monotonic_time := integer(), name := atom(), printable_state => map()}
+```
+
 ## Coordinator
 
 Indicates when a coordinating event was raised, like a process being added for coordination or a timeout being triggered
