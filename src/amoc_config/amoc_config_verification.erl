@@ -8,7 +8,6 @@
 %% API
 -export([process_scenario_config/2]).
 
--include_lib("kernel/include/logger.hrl").
 -include("amoc_config.hrl").
 
 %% @doc Applies the processing as provided by the `required_variable' list to the provided scenario config
@@ -40,12 +39,17 @@ verify(Fun, Value) ->
         {true, NewValue} -> {true, NewValue};
         {false, Reason} -> {false, {verification_failed, Reason}};
         Ret ->
-            ?LOG_ERROR("invalid verification method ~p(~p), return value : ~p",
-                       [Fun, Value, Ret]),
+            telemetry:execute([amoc, config, verify], #{error => 1},
+                              #{log_class => error, verification_method => Fun,
+                                verification_arg => Value, verification_return => Ret,
+                                msg => <<"invalid verification method">>}),
             {false, {invalid_verification_return_value, Ret}}
     catch
         C:E:S ->
-            ?LOG_ERROR("invalid verification method ~p(~p), exception: ~p ~p ~p",
-                       [Fun, Value, C, E, S]),
+            telemetry:execute([amoc, config, verify], #{error => 1},
+                              #{log_class => error, verification_method => Fun,
+                                verification_arg => Value,
+                                kind => C, reason => E, stacktrace => S,
+                                msg => <<"invalid verification method">>}),
             {false, {exception_during_verification, {C, E, S}}}
     end.
