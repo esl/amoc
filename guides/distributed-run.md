@@ -11,24 +11,31 @@ and start scenarios on all known nodes (except master).
 ```erlang
 amoc_dist:do(my_scenario, 100, Settings).
 ```
+```elixir
+:amoc_dist.do(:my_scenario, 100, settings).
+```
 
-Start `my_scenario` spawning 100 amoc users with IDs from the range [1,100] inclusive.
+Start `my_scenario` spawning 100 amoc users with IDs from the range `[1, 100]` inclusive.
 In this case sessions are going to be distributed across all nodes except master.
 
 `Settings` is an optional proplist with scenario options that can be extracted using amoc_config module.
-The values provided in this list shadow OS and APP environment variables. Note that these settings will be propagated
- automatically among all the nodes in the amoc cluster.
-
+The values provided in this list shadow OS and APP environment variables.
+Note that these settings will be propagated automatically among all the nodes in the amoc cluster.
 
 ```erlang
 amoc_dist:add(50).
+```
+```elixir
+:amoc_dist.add(50).
 ```
 Add 50 more users to the currently started scenario.
 
 ```erlang
 amoc_dist:remove(50, Force).
 ```
-
+```elixir
+:amoc_dist.remove(50, force).
+```
 Remove 50 sessions. 
 
 Where ``Force`` is a boolean of value:
@@ -36,10 +43,9 @@ Where ``Force`` is a boolean of value:
 * ``true``  - to kill the user processes using ``supervisor:terminate_child/2`` function
 * ``false`` - to send ``exit(User,shutdown)`` signal to the user process (can be ignored by the user)
 
-All the users are ``temporary`` children of the ``simple_one_for_one`` supervisor with the ``shutdown`` 
-key set to ``2000``.
+All the users are `temporary` children of the `simple_one_for_one` supervisor with the `shutdown` key set to `2000`.
 
-Also all the user processes trap exit signal.
+Also all the user processes trap exits.
 
 
 ## Don't stop scenario on exit

@@ -29,16 +29,29 @@ In the same manner you can also define your own entries to configure the scenari
 
 The ``amoc_config:get/1`` and ``amoc_config:get/2`` interfaces can be used to get
 parameters required for your scenario, however every scenario must declare (using
-`-required_variable(...)` attributes) all the required parameters in advance. For more
-information, see the example [scenario module](../integration_test/dummy_scenario.erl)
+`-required_variable(...)`/`@required_variable ...` attributes) all the required parameters in advance.
+For more information, see the example [scenario module](../integration_test/dummy_scenario.erl)
 
 Scenario configuration also can be set/updated at runtime using an API.
 
 ```erlang
--required_variable(#{name => Name, description => Description,
-                     default_value => Value,
-                     update => UpdateFn,
-                     verification => VerificationFn}).
+-required_variable(
+    #{name => Name, description => Description,
+      default_value => Value,
+      update => UpdateMfa,
+      verification => VerificationMfa}
+  ).
+```
+```elixir
+  ## Note that the attribute needs to be marked as persisted
+  ## for the Elixir compiler to store it in the generated BEAM file.
+  Module.register_attribute(__MODULE__, :required_variable, persist: true)
+  @required_variable [
+    %{:name => name, :description => description,
+      :default_value => 6,
+      :update => updateMfa,
+      :verification => verificationMfa}
+  ]
 ```
 where
 
@@ -80,7 +93,7 @@ An action to take when the value of this variable is updated. It is triggered at
 
 ## Reasonale
 
-NB: the reason why the `-required_variable(...)` is preferred over the usual behaviour
+The reason why the `-required_variable(...)` is preferred over the usual behaviour
 callback is because the orchestration tools can easily extract the attributes even
 without the compilation, while configuring via a callback, requires a successful
 compilation of the module. As an example, a module:

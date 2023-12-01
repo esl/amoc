@@ -6,13 +6,23 @@
 ----------------------------------------------------------------------------------------------
 A Murder of Crows, aka amoc, is a simple framework for running massively parallel tests in a distributed environment.
 
-It can be used as a rebar3 dependency:
+It can be used as a `rebar3` dependency:
 
 ```erlang
 {deps, [
     {amoc, "3.0.0-rc1"}
 ]}.
 ```
+
+or in `mix`:
+```elixir
+defp deps() do
+  [
+    {:amoc, "~> 3.0.0-rc1"}
+  ]
+end
+```
+
 [MongooseIM](https://github.com/esl/MongooseIM) is continuously being load tested with Amoc.
 All the XMPP scenarios can be found [here](https://github.com/esl/amoc-arsenal-xmpp).
 
