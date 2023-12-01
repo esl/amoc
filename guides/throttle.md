@@ -41,7 +41,7 @@ user_loop(Id) ->
 
 ```
 Here a system should be under a continuous load of 100 messages per minute.
-Note that if we used something like `amoc_throttle:run(messages_rate, fun() -> send_message(Id) end)` instead of `send_and_wait/2` the system would be flooded with requests.
+Note that if we used something like `amoc_throttle:run(messages_rate, fun() -> send_message(Id) end)` instead of `amoc_throttle:send_and_wait/2` the system would be flooded with requests.
 
 A test may of course be much more complicated.
 For example it can have the load changing in time.
