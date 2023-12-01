@@ -108,3 +108,13 @@ event_name: [amoc, config, get | verify | env]
 measurements: #{}
 metadata: #{log_class => syslog_level(), _ => _}
 ```
+
+## Cluster
+
+### Internal events
+There are related to clustering events
+```erlang
+event_name: [amoc, cluster, connect_nodes | nodedown | master_node_down]
+measurements: #{count => non_neg_integer()},
+metadata: #{node => node(), nodes => nodes(), state => map()}
+```
