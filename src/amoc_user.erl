@@ -10,7 +10,7 @@
 -type state() :: term().
 
 -spec start_link(amoc:scenario(), amoc_scenario:user_id(), state()) ->
-    {ok, pid()}.
+    {ok, pid()} | {error, term()}.
 start_link(Scenario, Id, State) ->
     proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
 
