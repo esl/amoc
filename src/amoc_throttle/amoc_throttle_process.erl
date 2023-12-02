@@ -30,7 +30,7 @@
                 max_n :: non_neg_integer(),
                 name :: atom(),
                 n :: integer(),
-                interval = 0 :: non_neg_integer(),  %%ms
+                interval = 0 :: amoc_throttle:interval(),  %%ms
                 delay_between_executions = 0 :: non_neg_integer(),  %%ms
                 tref :: timer:tref() | undefined,
                 schedule = [] :: [pid()],
@@ -41,7 +41,7 @@
 %% Exported functions
 %%------------------------------------------------------------------------------
 
--spec start(atom(), non_neg_integer(), pos_integer()) -> {ok, pid()}.
+-spec start(atom(), amoc_throttle:interval(), amoc_throttle:rate()) -> {ok, pid()}.
 start(Name, Interval, Rate) ->
     gen_server:start(?MODULE, [Name, Interval, Rate], []).
 
@@ -54,7 +54,7 @@ run(Pid, Fun) ->
     RunnerPid = spawn(fun() -> async_runner(Fun) end),
     gen_server:cast(Pid, {schedule, RunnerPid}).
 
--spec update(pid(), non_neg_integer(), pos_integer()) -> ok.
+-spec update(pid(), amoc_throttle:interval(), amoc_throttle:rate()) -> ok.
 update(Pid, Interval, Rate) ->
     gen_server:cast(Pid, {update, Interval, Rate}).
 
@@ -73,6 +73,7 @@ get_state(Pid) ->
 %%------------------------------------------------------------------------------
 %% gen_server behaviour
 %%------------------------------------------------------------------------------
+
 -spec init(list()) -> {ok, state(), timeout()}.
 init([Name, Interval, Rate]) ->
     InitialState = initial_state(Interval, Rate),
@@ -126,6 +127,7 @@ format_status(_Opt, [_PDict, State]) ->
 %%------------------------------------------------------------------------------
 %% internal functions
 %%------------------------------------------------------------------------------
+
 initial_state(Interval, 0) ->
     ?LOG_ERROR("invalid rate, must be higher than zero"),
     initial_state(Interval, 1);

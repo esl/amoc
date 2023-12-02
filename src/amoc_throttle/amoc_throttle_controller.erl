@@ -22,8 +22,8 @@
 -define(MASTER_SERVER, {?SERVER, amoc_cluster:master_node()}).
 
 -record(throttle_info, {
-    rate :: non_neg_integer(),
-    interval :: non_neg_integer(),
+    rate :: amoc_throttle:rate(),
+    interval :: amoc_throttle:interval(),
     no_of_procs :: pos_integer(),
     active :: boolean(),
     change_plan :: change_rate_plan() | undefined
@@ -34,27 +34,29 @@
     no_of_steps :: non_neg_integer(),
     timer :: timer:tref()}).
 
--type name() :: atom().
+-type name() :: amoc_throttle:name().
 -type change_rate_plan() :: #change_rate_plan{}.
 -type throttle_info() :: #throttle_info{}.
 -type state() :: #{name() => throttle_info()}.
+
 %%%===================================================================
 %%% API
 %%%===================================================================
+
 -spec(start_link() ->
     {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
     pg:start_link(),
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec(ensure_throttle_processes_started(name(), non_neg_integer(),
-                                        non_neg_integer(), pos_integer()) ->
+-spec(ensure_throttle_processes_started(name(), amoc_throttle:rate(),
+                                        amoc_throttle:interval(), pos_integer()) ->
     {ok, started_throttle_processes} |
     {ok, throttle_processes_already_started} |
     {error, any()}).
-ensure_throttle_processes_started(Name, Interval, Rate, NoOfProcesses) ->
+ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses) ->
     maybe_raise_event(Name, init),
-    gen_server:call(?MASTER_SERVER, {start_processes, Name, Interval, Rate, NoOfProcesses}).
+    gen_server:call(?MASTER_SERVER, {start_processes, Name, Rate, Interval, NoOfProcesses}).
 
 -spec run(name(), fun(() -> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
@@ -79,12 +81,12 @@ pause(Name) ->
 resume(Name) ->
     gen_server:call(?MASTER_SERVER, {resume, Name}).
 
--spec change_rate(name(), pos_integer(), non_neg_integer()) -> ok | {error, any()}.
+-spec change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval()) -> ok | {error, any()}.
 change_rate(Name, Rate, Interval) ->
     gen_server:call(?MASTER_SERVER, {change_rate, Name, Rate, Interval}).
 
--spec change_rate_gradually(name(), pos_integer(), pos_integer(),
-                            non_neg_integer(), pos_integer(), pos_integer()) ->
+-spec change_rate_gradually(name(), amoc_throttle:rate(), amoc_throttle:rate(),
+                            amoc_throttle:interval(), pos_integer(), pos_integer()) ->
     ok | {error, any()}.
 change_rate_gradually(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps) ->
     gen_server:call(?MASTER_SERVER, {change_rate_gradually, Name, LowRate, HighRate,
@@ -106,19 +108,19 @@ telemetry_event(Name, Event) when Event =:= request; Event =:= execute ->
 init([]) ->
     {ok, #{}}.
 
--spec handle_call({start_processes, name(), pos_integer(), non_neg_integer(), pos_integer()},
+-spec handle_call({start_processes, name(), pos_integer(), amoc_throttle:interval(), pos_integer()},
                   From :: {pid(), Tag :: term()}, state()) ->
                      {reply, {ok, started}, state()} |
                      {reply, {error, wrong_no_of_procs}, state()};
                  ({pause | resume | stop}, From :: {pid(), Tag :: term()}, state()) ->
                      {reply, ok, state()} |
                      {reply, Error :: any(), state()};
-                 ({change_rate, name(), pos_integer(), non_neg_integer()},
+                 ({change_rate, name(), amoc_throttle:rate(), amoc_throttle:interval()},
                   From :: {pid(), Tag :: term()}, state()) ->
                      {reply, ok, state()} |
                      {reply, {error, any()}, state()};
-                 ({change_rate_gradually, name(), pos_integer(), pos_integer(), non_neg_integer(),
-                   pos_integer(), pos_integer()},
+                 ({change_rate_gradually, name(), amoc_throttle:rate(), amoc_throttle:rate(),
+                   amoc_throttle:interval(), pos_integer(), pos_integer()},
                   From :: {pid(), Tag :: term()}, state()) ->
                      {reply, ok, state()} |
                      {reply, {error, any()}, state()}.
@@ -238,12 +240,13 @@ continue_plan(Name, State) ->
     NewPlan = Plan#change_rate_plan{no_of_steps = NoOfSteps - 1},
     State#{Name => Info#throttle_info{rate = NewRate, change_plan = NewPlan}}.
 
--spec rate_per_minute(pos_integer(), non_neg_integer()) -> non_neg_integer().
+-spec rate_per_minute(amoc_throttle:rate(), amoc_throttle:interval()) -> amoc_throttle:rate().
 rate_per_minute(_, 0) -> 0;
 rate_per_minute(Rate, Interval) ->
     (Rate * 60000) div Interval.
 
--spec start_processes(name(), pos_integer(), non_neg_integer(), pos_integer()) -> pos_integer().
+-spec start_processes(name(), amoc_throttle:rate(), amoc_throttle:interval(), pos_integer()) ->
+    pos_integer().
 start_processes(Name, Rate, Interval, NoOfProcesses) ->
     raise_event(Name, init),
     RatePerMinute = rate_per_minute(Rate, Interval),
@@ -263,7 +266,7 @@ get_throttle_process(Name) ->
             {ok, lists:nth(N, List)}
     end.
 
--spec maybe_change_rate(name(), pos_integer(), non_neg_integer(), throttle_info()) ->
+-spec maybe_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval(), throttle_info()) ->
     {ok, non_neg_integer()} | {error, any()}.
 maybe_change_rate(Name, Rate, Interval, Info) ->
     CurrentRatePerMin = rate_per_minute(Info#throttle_info.rate, Info#throttle_info.interval),
@@ -274,7 +277,7 @@ maybe_change_rate(Name, Rate, Interval, Info) ->
         _ -> {error, cannot_change_rate}
     end.
 
--spec do_change_rate(name(), pos_integer(), non_neg_integer()) ->
+-spec do_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval()) ->
     {ok, non_neg_integer()} | {error, any()}.
 do_change_rate(Name, Rate, Interval) ->
     case pg:get_members(Name) of
@@ -286,8 +289,9 @@ do_change_rate(Name, Rate, Interval) ->
             {ok, RatePerMinute}
     end.
 
--spec start_gradual_rate_change(name(), pos_integer(), pos_integer(), non_neg_integer(),
-                                pos_integer(), pos_integer(), throttle_info()) ->
+-spec start_gradual_rate_change(
+        name(), amoc_throttle:rate(), amoc_throttle:rate(),
+        amoc_throttle:interval(), pos_integer(), pos_integer(), throttle_info()) ->
     throttle_info().
 start_gradual_rate_change(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps, Info) ->
     {ok, LowRate} = do_change_rate(Name, LowRate, RateInterval),
