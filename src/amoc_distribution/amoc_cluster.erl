@@ -1,7 +1,6 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
+%% @private
+%% @see amoc_dist
+%% @copyright 2023 Erlang Solutions Ltd.
 -module(amoc_cluster).
 -behaviour(gen_server).
 -define(SERVER, ?MODULE).
@@ -46,9 +45,11 @@
 -type new_connection_handler() :: fun((node()) -> ok).
 
 -type merge_type() :: connected | slave | failed_to_connect | connection_lost.
+
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
+
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
     Nodes = amoc_config_env:get(nodes, []),
