@@ -1,7 +1,8 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
+%% @copyright 2023 Erlang Solutions Ltd.
+%% @doc API module for running locally, in a non-distributed environment
+%%
+%% Use `amoc_dist' module to run scenarios in a distributed environment
+%% @end
 -module(amoc).
 
 -export([do/3,
@@ -10,13 +11,10 @@
          stop/0,
          reset/0]).
 
--export_type([scenario/0]).
 -type scenario() :: module().
+-export_type([scenario/0]).
 
-%% ------------------------------------------------------------------
-%% API for the local scenario execution, use amoc_dist module to run
-%% scenarios in a distributed environment
-%% ------------------------------------------------------------------
+%% @doc Start a scenario with the given number of users and configuration
 -spec do(scenario(), non_neg_integer(), amoc_config:settings()) ->
     ok | {error, term()}.
 do(Scenario, Count, Settings) ->
@@ -32,6 +30,7 @@ do(Scenario, Count, Settings) ->
         Error -> Error
     end.
 
+%% @doc Dynamically add more users to a currently running scenario
 -spec add(pos_integer()) -> ok | {error, any()}.
 add(Count) when is_integer(Count), Count > 0 ->
     case is_running_locally() of
@@ -41,6 +40,11 @@ add(Count) when is_integer(Count), Count > 0 ->
         Error -> Error
     end.
 
+%% @doc Dynamically remove more users from a currently running scenario, optionally forcibly
+%%
+%% Forcing user removal means that all users will be signal to exit in parallel,
+%% and will forcibly be killed after a short timeout (2 seconds),
+%% whether they have exited already or not.
 -spec remove(pos_integer(), boolean()) -> {ok, non_neg_integer()} | {error, any()}.
 remove(Count, ForceRemove) when is_integer(Count), Count > 0 ->
     case is_running_locally() of
@@ -49,6 +53,7 @@ remove(Count, ForceRemove) when is_integer(Count), Count > 0 ->
         Error -> Error
     end.
 
+%% @doc Stop a running scenario
 -spec stop() -> ok | {error, any()}.
 stop() ->
     case is_running_locally() of
@@ -57,6 +62,7 @@ stop() ->
         Error -> Error
     end.
 
+%% @doc Restart the whole amoc supervision tree
 -spec reset() -> ok | {error, term()}.
 reset() ->
     case is_running_locally() of
