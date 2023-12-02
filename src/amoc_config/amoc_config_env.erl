@@ -1,12 +1,15 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
-%% This module can be used directly only for the readonly env init parameters.
-%% do not use it for the scenarios/helpers configuration, amoc_config module
-%% must be used instead! This allows to provide configuration via REST API in
-%% a JSON format
-%%==============================================================================
+%% @see amoc_config
+%% @copyright 2023 Erlang Solutions Ltd.
+%% @doc This module defines a behaviour to parse values as extracted from environment variables.
+%%
+%% The default implementation is `amoc_config_parser', which implements Erlang parsing.
+%% This way plain strings in valid Erlang syntax can be passed by env-vars
+%% and transformed into full Erlang terms.
+%%
+%% This module is to be used directly only for the read-only env init parameters,
+%% do not use it for the scenarios/helpers configuration, the amoc_config module
+%% must be used instead! This allows to provide configuration via REST API in a JSON format
+%% @end
 -module(amoc_config_env).
 
 -export([get/1, get/2]).
