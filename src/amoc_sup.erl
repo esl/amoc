@@ -30,9 +30,9 @@ start_link() ->
           [ChildSpec :: supervisor:child_spec()]
     }}.
 init([]) ->
-    {ok, {{one_for_one, 5, 10},
+    {ok, {{rest_for_one, 5, 10},
           [
-              ?CHILD(amoc_users_sup, supervisor),
+              ?CHILD(amoc_users_sup, worker),
               ?CHILD(amoc_controller, worker),
               ?CHILD(amoc_cluster, worker),
               ?CHILD(amoc_code_server, worker),
