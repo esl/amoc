@@ -28,8 +28,12 @@
 -type state() :: #state{}.
 %% Internal state of the node's controller
 -type handle_call_res() :: ok | {ok, term()} | {error, term()}.
+-type running_status() :: #{scenario := amoc:scenario(),
+                            currently_running_users := user_count(),
+                            highest_user_id := last_user_id()}.
+%% Details about the scenario currently running
 -type amoc_status() :: idle |
-                       {running, amoc:scenario(), user_count(), last_user_id()} |
+                       {running, running_status()} |
                        {terminating, amoc:scenario()} |
                        {finished, amoc:scenario()} |
                        {error, any()} |
@@ -259,7 +263,7 @@ handle_remove(_Count, _ForceRemove, #state{status = Status}) ->
 -spec handle_status(state()) -> amoc_status().
 handle_status(#state{status = running, scenario = Scenario,
                      no_of_users = N, last_user_id = LastId}) ->
-    {running, Scenario, N, LastId};
+    {running, #{scenario => Scenario, currently_running_users => N, highest_user_id => LastId}};
 handle_status(#state{status = terminating, scenario = Scenario}) ->
     {terminating, Scenario};
 handle_status(#state{status = finished, scenario = Scenario}) ->
