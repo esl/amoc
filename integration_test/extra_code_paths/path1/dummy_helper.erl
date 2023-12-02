@@ -12,7 +12,7 @@ test_amoc_dist() ->
         Slaves = amoc_cluster:slave_nodes(),
         %% check the status of the nodes
         disabled = rpc:call(Master, amoc_controller, get_status, []),
-        [{running, dummy_scenario, _, _} = rpc:call(Node, amoc_controller, get_status, [])
+        [{running, #{scenario := dummy_scenario}} = rpc:call(Node, amoc_controller, get_status, [])
          || Node <- Slaves],
         %% check user ids
         {N1, Nodes1, Ids1, Max1} = get_users_info(Slaves),

@@ -82,7 +82,11 @@ start_scenario_runs_fine(_) ->
 start_scenario_check_status(_) ->
     do_start_scenario(testing_scenario, regular_vars()),
     Status = amoc_controller:get_status(),
-    ?assertMatch({running, testing_scenario, 0, 0}, Status).
+    ?assertMatch(
+       {running, #{scenario := testing_scenario,
+                   currently_running_users := 0,
+                   highest_user_id := 0}},
+       Status).
 
 add_users_to_started_scenario(_) ->
     do_start_scenario(testing_scenario, regular_vars()),
@@ -178,5 +182,7 @@ other_vars_to_keep_quiet() ->
 
 wait_until_scenario_has_users(Scenario, Current, HighestId) ->
     WaitUntilFun = fun amoc_controller:get_status/0,
-    WaitUntilValue = {running, Scenario, Current, HighestId},
+    WaitUntilValue = {running, #{scenario => Scenario,
+                                 currently_running_users => Current,
+                                 highest_user_id => HighestId}},
     async_helper:wait_until(WaitUntilFun, WaitUntilValue).
