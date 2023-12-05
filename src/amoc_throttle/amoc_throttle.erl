@@ -1,7 +1,5 @@
-%%==============================================================================
-%% @doc This module allows to synchronize the users and act on groups of them.
 %% @copyright 2023 Erlang Solutions Ltd.
-%%==============================================================================
+%% @doc This module allows to synchronize the users and act on groups of them.
 -module(amoc_throttle).
 
 %% API
@@ -18,26 +16,34 @@
          change_rate_gradually/6,
          stop/1]).
 
--define(DEFAULT_INTERVAL, 60000).%% one minute
+-define(DEFAULT_NO_PROCESSES, 10).
+-define(DEFAULT_INTERVAL, 60000). %% one minute
+
 -type name() :: atom().
+-type rate() :: pos_integer().
+-type interval() :: non_neg_integer().
+%% In milliseconds, defaults to 60000 (one minute) when not given.
+%% An interval of 0 means no delay at all, only the number of simultaneous executions will be
+%% controlled, which corresponds to the number of processes started
+-export_type([name/0, rate/0, interval/0]).
 
 %% @see start/4
--spec start(name(), pos_integer()) -> ok | {error, any()}.
+-spec start(name(), rate()) -> ok | {error, any()}.
 start(Name, Rate) ->
     start(Name, Rate, ?DEFAULT_INTERVAL).
 
 %% @see start/4
--spec start(name(), pos_integer(), non_neg_integer()) -> ok | {error, any()}.
+-spec start(name(), rate(), non_neg_integer()) -> ok | {error, any()}.
 start(Name, Rate, Interval) ->
-    start(Name, Rate, Interval, 10).
+    start(Name, Rate, Interval, ?DEFAULT_NO_PROCESSES).
 
-%% @doc Starts the throttle mechanism for a given `Name' with a given `Rate'.
+%% @doc Starts the throttle mechanism for a given `Name' with a given `Rate' per `Interval'.
 %%
 %% The optional arguments are an `Interval' (default is one minute) and a ` NoOfProcesses' (default is 10).
 %% `Name' is needed to identify the rate as a single test can have different rates for different tasks.
 %% `Interval' is given in milliseconds and can be changed to a different value for convenience or higher granularity.
 %% It also accepts a special value of `0' which limits the number of parallel executions associated with `Name' to `Rate'.
--spec start(name(), pos_integer(), non_neg_integer(), pos_integer()) -> ok | {error, any()}.
+-spec start(name(), rate(), interval(), pos_integer()) -> ok | {error, any()}.
 start(Name, Rate, Interval, NoOfProcesses) ->
     amoc_throttle_controller:ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses).
 
@@ -57,24 +63,24 @@ resume(Name) ->
 %%
 %% Can change whether Amoc throttle limits `Name' to parallel executions or to `Rate' per `Interval',
 %% according to the given `Interval' value.
--spec change_rate(name(), pos_integer(), non_neg_integer()) -> ok | {error, any()}.
+-spec change_rate(name(), rate(), interval()) -> ok | {error, any()}.
 change_rate(Name, Rate, Interval) ->
     amoc_throttle_controller:change_rate(Name, Rate, Interval).
 
 %% @doc Allows to set a plan of gradual rate changes for a given `Name'.
 %%
-%% `Rate' will be changed from `From' to `To' in a series of consecutive steps.
-%% `From' does not need to be lower than `To', rates can be changed downwards.
+%% `Rate' will be changed from `FromRate' to `ToRate' in a series of consecutive steps.
+%% Note that `FromRate' does not need to be lower than `ToRate', rates can be changed downwards.
+%%
 %% The rate is calculated at each step in relation to the `RateInterval', which can also be `0'.
-%% Each step will take the `StepInterval' time in milliseconds.
-%% There will be `NoOfSteps' steps.
-%% Be aware that, at first, the rate will be changed to `From' per `RateInterval' and this is not considered a step.
--spec change_rate_gradually(name(), pos_integer(), pos_integer(),
-                            non_neg_integer(), pos_integer(), pos_integer()) ->
+%% There will be `NoOfSteps' steps, each taking `StepInterval' time in milliseconds.
+%%
+%% Be aware that, at first, the rate will be changed to `FromRate' per `RateInterval' and this is not considered a step.
+-spec change_rate_gradually(name(), rate(), rate(), interval(), pos_integer(), pos_integer()) ->
     ok | {error, any()}.
-change_rate_gradually(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps) ->
-    amoc_throttle_controller:change_rate_gradually(Name, LowRate, HighRate, RateInterval,
-                                                   StepInterval, NoOfSteps).
+change_rate_gradually(Name, FromRate, ToRate, RateInterval, StepInterval, NoOfSteps) ->
+    amoc_throttle_controller:change_rate_gradually(
+      Name, FromRate, ToRate, RateInterval, StepInterval, NoOfSteps).
 
 %% @doc Executes a given function `Fn' when it does not exceed the rate for `Name'.
 %%
@@ -119,6 +125,7 @@ run(Name, Fn) ->
     amoc_throttle_controller:run(Name, Fn).
 
 %% @doc Sends a given message `Msg' to a given `Pid' when the rate for `Name' allows for that.
+%%
 %% May be used to schedule tasks.
 -spec send(name(), pid(), any()) -> ok | {error, any()}.
 send(Name, Pid, Msg) ->

@@ -1,9 +1,8 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
-%% this module is responsible for processing scenario configuration
-%%==============================================================================
+%% @see amoc_config
+%% @copyright 2023 Erlang Solutions Ltd.
+%% @doc This module is responsible for processing scenario configuration.
+%% It applies the verification function provided in the `required_variable' parameter to the respective value
+%% @end
 -module(amoc_config_verification).
 
 %% API
@@ -12,7 +11,7 @@
 -include_lib("kernel/include/logger.hrl").
 -include("amoc_config.hrl").
 
-
+%% @doc Applies the processing as provided by the `required_variable' list to the provided scenario config
 -spec process_scenario_config(module_configuration(), settings()) ->
     {ok, module_configuration()} | error().
 process_scenario_config(Config, Settings) ->

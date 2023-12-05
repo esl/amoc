@@ -1,7 +1,6 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
+%% @see amoc_config
+%% @copyright 2023 Erlang Solutions Ltd.
+%% @doc TODO
 -module(amoc_config).
 
 -include_lib("kernel/include/logger.hrl").

@@ -1,7 +1,5 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
+%% @copyright 2023 Erlang Solutions Ltd.
+%% @doc Wrapper around the defined scenario
 -module(amoc_scenario).
 
 -export([init/1, terminate/2, start/3]).
@@ -11,31 +9,34 @@
 %%-------------------------------------------------------------------------
 -export_type([user_id/0, state/0]).
 
--type user_id() :: pos_integer().
--type state() :: any().
+-type user_id() :: pos_integer(). %% Unique integer ID of every actor spawned
+-type state() :: term(). %% The state of the scenario as returned by `init/0'
 
--callback init() -> {ok, state()} | ok | {error, Reason :: term()}.
+-callback init() -> ok | {ok, state()} | {error, Reason :: term()}.
 -callback start(user_id(), state()) -> any().
+%% `start/2' is preferred over `start/1'. At least one of them is required.
 -callback start(user_id()) -> any().
 -callback terminate(state()) -> any().
+%% `terminate/1' is preferred over `terminate/0'
 -callback terminate() -> any().
 
-%% either start/1 or start/2 must be exported from the behavior module.
-%% if scenario module exports both functions, start/2 is used.
 -optional_callbacks([start/1, start/2]).
-
-%% terminate/0,1 callbacks are optional.
-%% if scenario module exports both functions, terminate/1 is used.
 -optional_callbacks([terminate/0, terminate/1]).
 
 %%-------------------------------------------------------------------------
 %% API
 %%-------------------------------------------------------------------------
+
+%% @doc Applies the `Scenario:init/0' callback
 -spec init(amoc:scenario()) -> {ok, state()} | {error, Reason :: term()}.
 init(Scenario) ->
     apply_safely(Scenario, init, []).
 
--spec terminate(amoc:scenario(), state()) -> {ok, any()} | {error, Reason :: term()}.
+%% @doc Applies the `Scenario:terminate/0,1' callback
+%%
+%% `Scenario:terminate/0' and `Scenario:terminate/1' callbacks are optional.
+%% If the scenario module exports both functions, `Scenario:terminate/1' is used.
+-spec terminate(amoc:scenario(), state()) -> ok | {ok, any()} | {error, Reason :: term()}.
 terminate(Scenario, State) ->
     case {erlang:function_exported(Scenario, terminate, 1),
           erlang:function_exported(Scenario, terminate, 0)} of
@@ -51,6 +52,10 @@ terminate(Scenario, State) ->
             ok
     end.
 
+%% @doc Applies the `Scenario:start/1,2' callback
+%%
+%% Either `Scenario:start/1' or `Scenario:start/2' must be exported from the behaviour module.
+%% if scenario module exports both functions, `Scenario:start/2' is used.
 -spec start(amoc:scenario(), user_id(), state()) -> any().
 start(Scenario, Id, State) ->
     case {erlang:function_exported(Scenario, start, 2),
@@ -66,6 +71,7 @@ start(Scenario, Id, State) ->
 %% ------------------------------------------------------------------
 %% internal functions
 %% ------------------------------------------------------------------
+
 -spec apply_safely(atom(), atom(), [term()]) -> {ok | error, term()}.
 apply_safely(M, F, A) ->
     try erlang:apply(M, F, A) of

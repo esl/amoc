@@ -1,7 +1,9 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
+%% @copyright 2023 Erlang Solutions Ltd.
+%% @doc Main controller of a node, responsible for the scenario and the users
+%%
+%% Note that this module should be rarely used, APIs are fully exposed by `amoc' and `amoc_dist'
+%% for local or distributed environments respectively.
+%% @end
 -module(amoc_controller).
 -behaviour(gen_server).
 
@@ -24,17 +26,21 @@
                 tref :: timer:tref() | undefined}).
 
 -type state() :: #state{}.
+%% Internal state of the node's controller
 -type handle_call_res() :: ok | {ok, term()} | {error, term()}.
 -type amoc_status() :: idle |
                        {running, amoc:scenario(), user_count(), last_user_id()} |
                        {terminating, amoc:scenario()} |
                        {finished, amoc:scenario()} |
                        {error, any()} |
-                       disabled. %% amoc_controller is disabled for the master node
-
+                       disabled.
+%% Status of the node, note that amoc_controller is disabled for the master node
 -type user_count() :: non_neg_integer().
+%% Number of users currently running in the node
 -type last_user_id() :: non_neg_integer().
+%% Highest user id registered in the node
 -type interarrival() :: non_neg_integer().
+%% Time to wait in between spawning new users
 
 %% ------------------------------------------------------------------
 %% Types Exports
@@ -57,20 +63,17 @@
 %% ------------------------------------------------------------------
 %% Parameters verification functions
 %% ------------------------------------------------------------------
--export([maybe_update_interarrival_timer/2,
-         positive_integer/1]).
+-export([maybe_update_interarrival_timer/2, positive_integer/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
--export([init/1,
-         handle_call/3,
-         handle_cast/2,
-         handle_info/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
+%% @private
 -spec start_link() -> {ok, pid()}.
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
@@ -115,20 +118,25 @@ get_status() ->
 disable() ->
     gen_server:call(?SERVER, disable).
 
+%% @private
 -spec positive_integer(any()) -> boolean().
 positive_integer(Interarrival) ->
     is_integer(Interarrival) andalso Interarrival > 0.
 
+%% @private
+-spec maybe_update_interarrival_timer(interarrival, term()) -> ok.
 maybe_update_interarrival_timer(interarrival, _) ->
     gen_server:cast(?SERVER, maybe_update_interarrival_timer).
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
+%% @private
 -spec init([]) -> {ok, state()}.
 init([]) ->
     start_tables(),
     {ok, #state{}}.
 
+%% @private
 %% We set the priority to high after starting the scenario,
 %% and then reset priority to normal after terminating it.
 %% The most important part is precise timing for users spawning/removal,
@@ -160,12 +168,14 @@ handle_call(disable, _From, State) ->
 handle_call(_Request, _From, State) ->
     {reply, {error, not_implemented}, State}.
 
+%% @private
 -spec handle_cast(any(), state()) -> {noreply, state()}.
 handle_cast(maybe_update_interarrival_timer, State) ->
     {noreply, maybe_update_interarrival_timer(State)};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+%% @private
 -spec handle_info(any(), state()) -> {noreply, state()}.
 handle_info(start_user, State) ->
     NewSate = handle_start_user(State),

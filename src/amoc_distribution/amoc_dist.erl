@@ -1,7 +1,5 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
+%% @copyright 2023 Erlang Solutions Ltd.
+%% @doc API module to run tests in a distributed environment
 -module(amoc_dist).
 
 -export([do/3,
@@ -17,9 +15,12 @@
 -compile({no_auto_import, [ceil/1]}).
 
 -type cluster_state() :: idle | running | stopped.
+
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
+
+%% @doc Start a scenario with the given number of users and configuration
 -spec do(amoc:scenario(), non_neg_integer(), amoc_config:settings()) ->
     {ok, any()} | {error, any()}.
 do(Scenario, Count, Settings) ->
@@ -29,10 +30,13 @@ do(Scenario, Count, Settings) ->
         {Error, _} -> Error
     end.
 
+%% @doc Dynamically add more users to a currently running scenario, in all nodes
+%% @see add/2
 -spec add(pos_integer()) -> {ok, any()} | {error, any()}.
 add(Count) ->
     add(Count, amoc_cluster:slave_nodes()).
 
+%% @doc Dynamically add more users to a currently running scenario, in the specified nodes
 -spec add(pos_integer(), [node()]) -> {ok, any()} | {error, any()}.
 add(Count, Nodes) when is_integer(Count), Count > 0 ->
     case check_nodes(Nodes) of
@@ -40,10 +44,19 @@ add(Count, Nodes) when is_integer(Count), Count > 0 ->
         Error -> Error
     end.
 
+%% @doc Dynamically remove more users from a currently running scenario,
+%% optionally forcibly, in all nodes
+%% @see remove/3
 -spec remove(pos_integer(), boolean()) -> {ok, any()} | {error, any()}.
 remove(Count, ForceRemove) ->
     remove(Count, ForceRemove, amoc_cluster:slave_nodes()).
 
+%% @doc Dynamically remove more users from a currently running scenario,
+%% optionally forcibly, in the specified nodes
+%%
+%% Forcing user removal means that all users will be signal to exit in parallel,
+%% and will forcibly be killed after a short timeout (2 seconds),
+%% whether they have exited already or not.
 -spec remove(pos_integer(), boolean(), [node()]) -> {ok, any()} | {error, any()}.
 remove(Count, ForceRemove, Nodes) when is_integer(Count), Count > 0 ->
     case check_nodes(Nodes) of
@@ -51,6 +64,8 @@ remove(Count, ForceRemove, Nodes) when is_integer(Count), Count > 0 ->
         Error -> Error
     end.
 
+%% @doc Update the settings of a currently running scenario, in all nodes
+%% @see update_settings/2
 -spec update_settings(amoc_config:settings()) -> {ok, any()} | {error, any()}.
 update_settings(Settings) ->
     Ret = update_settings(Settings, amoc_cluster:slave_nodes()),
@@ -60,6 +75,7 @@ update_settings(Settings) ->
     end,
     Ret.
 
+%% @doc Update the settings of a currently running scenario, in the specified nodes
 -spec update_settings(amoc_config:settings(), [node()]) -> {ok, any()} | {error, any()}.
 update_settings(Settings, Nodes) ->
     case check_nodes(Nodes) of
@@ -67,10 +83,12 @@ update_settings(Settings, Nodes) ->
         Error -> Error
     end.
 
+%% @doc Stop a running scenario in the whole cluster
 -spec stop() -> {ok, any()} | {error, any()}.
 stop() ->
     stop_cluster().
 
+%% @doc Get the scenario running status in the cluster
 -spec get_state() -> cluster_state().
 get_state() ->
     case {amoc_cluster:master_node(), get_param(state)} of
@@ -78,9 +96,11 @@ get_state() ->
         {_, {ok, State}} -> State;
         {Node, undefined} -> rpc:call(Node, ?MODULE, ?FUNCTION_NAME, [])
     end.
+
 %% ------------------------------------------------------------------
 %% Local functions
 %% ------------------------------------------------------------------
+
 -spec get_param(any()) -> {ok, any()} | undefined.
 get_param(Key) ->
     try persistent_term:get({amoc_dist, Key}) of

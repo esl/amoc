@@ -1,10 +1,7 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
+%% @private
+%% @copyright 2023 Erlang Solutions Ltd.
 -module(amoc_users_sup).
 -behaviour(supervisor).
-
 
 -export([start_link/0, stop_child/2, stop_children/2]).
 -export([init/1]).
@@ -24,19 +21,21 @@ stop_child(Pid, false) when is_pid(Pid) ->
     exit(Pid, shutdown), %% do it in the same way as supervisor!!!
     ok.
 
+%% @doc Stop users, possibly in parallel
+%%
+%% Stopping users one by one using supervisor:terminate_child/2 is
+%% not an option because terminate_child requests are queued and
+%% processed by the supervisor sequentially, and if the user process ignores
+%% the `exit(Child, shutdown)' signal, that causes a `?SHUTDOWN_TIMEOUT' delay
+%% before it's killed by `exit(Child, kill)'. So an attempt to remove N
+%% users may take take `N * ?SHUTDOWN_TIMEOUT' milliseconds, which is
+%% not acceptable. So let's do the same thing as the supervisor but in
+%% parallel, so it won't result in a huge delay.
 -spec stop_children([pid()], boolean()) -> ok.
 stop_children(Pids, false) ->
     [stop_child(Pid, false) || Pid <- Pids],
     ok;
 stop_children(Pids, true) ->
-    %% stopping users one by one using supervisor:terminate_child/2 is
-    %% not an option because terminate_child requests are queued and
-    %% processed by supervisor sequentially. and if user process ignores
-    %% exit(Child,shutdown) signal that causes ?SHUTDOWN_TIMEOUT delay
-    %% before it's killed by exit(Child,kill). so attempt to remove N
-    %% users may take take N*?SHUTDOWN_TIMEOUT milliseconds, which is
-    %% not acceptable. so let's do the same thing as supervisor but in
-    %% parallel, so it won't result in huge delay.
     spawn(
         fun() ->
             [exit(Pid, shutdown) || Pid <- Pids],
@@ -58,5 +57,4 @@ init([]) ->
                shutdown => ?SHUTDOWN_TIMEOUT,
                type => worker,
                modules => [amoc_user]},
-
     {ok, {SupFlags, [AChild]}}.

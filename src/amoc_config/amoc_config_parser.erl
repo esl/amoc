@@ -1,9 +1,9 @@
-%%==============================================================================
-%% Copyright 2023 Erlang Solutions Ltd.
-%% Licensed under the Apache License, Version 2.0 (see LICENSE file)
-%%==============================================================================
-%% This module implements the default parser for the amoc_config_env module
-%%==============================================================================
+%% @see amoc_config
+%% @see amoc_config_env
+%% @copyright 2023 Erlang Solutions Ltd.
+%% @doc This module defines a behaviour to parse values as extracted from environment variables.
+%% This module implements the default parser for the `amoc_config_env' module
+%% @end
 -module(amoc_config_parser).
 -behaviour(amoc_config_env).
 
