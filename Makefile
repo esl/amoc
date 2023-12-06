@@ -29,13 +29,16 @@ ct:
 	##     make ct SUITE=some_test_SUITE,another_test_SUITE
 	##     SUITE=some_test_SUITE make ct
 	##     SUITE=some_test_SUITE,another_test_SUITE make ct
-	@ echo $(REBAR) ct --verbose $(SUITE_OPTS)
-	@ $(REBAR) ct --verbose $(SUITE_OPTS)
+	@ echo $(REBAR) ct -c --verbose $(SUITE_OPTS)
+	@ $(REBAR) ct -c --verbose $(SUITE_OPTS)
 
 lint:
 	$(REBAR) as elvis lint
 
-test: compile xref dialyzer ct lint
+test: compile xref dialyzer ct lint codecov
+
+codecov:
+	$(REBAR) as test codecov analyze
 
 integration_test:
 	./integration_test/stop_test_cluster.sh

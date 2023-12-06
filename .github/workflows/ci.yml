@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: ${{ matrix.test-type }} test on OTP ${{matrix.otp}}
+    name: ${{ matrix.test-type }} test on OTP ${{matrix.otp_vsn}}
     strategy:
       matrix:
         otp_vsn: ['25.3', '24.3']
@@ -23,6 +23,11 @@ jobs:
           rebar3-version: ${{ matrix.rebar_vsn }}
       - if: matrix.test-type == 'regular'
         run: make test
+      - if: matrix.test-type == 'regular'
+        name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       - if: matrix.test-type == 'integration'
         run: make integration_test
         env:

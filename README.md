@@ -2,6 +2,7 @@
 [![](https://github.com/esl/amoc/workflows/CI/badge.svg)](https://github.com/esl/amoc/actions?query=workflow%3ACI)
 [![Hex](http://img.shields.io/hexpm/v/amoc.svg)](https://hex.pm/packages/amoc)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/amoc/)
+[![codecov](https://codecov.io/github/esl/amoc/graph/badge.svg?token=R1zXAjO7H7)](https://codecov.io/github/esl/amoc)
 
 ----------------------------------------------------------------------------------------------
 A Murder of Crows, aka amoc, is a simple framework for running massively parallel tests in a distributed environment.
