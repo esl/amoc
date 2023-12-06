@@ -13,27 +13,32 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% these attributes and functions are required for the testing purposes %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--required_variable(#{name => var0, description => "var0"}).
--required_variable(#{name => var1, description => "var1", default_value => def1}).
+-required_variable(#{name => config_attrs_var0,
+                     description => "config_attrs_var0"}).
+-required_variable(#{name => config_attrs_var1,
+                     description => "config_attrs_var1",
+                     default_value => def1}).
 -required_variable([
-    #{name => var2, description => "var2", default_value => def2, verification => none},
-    #{name => var3, description => "var3", default_value => def3,
-      verification => [def3, another_atom]},
-    #{name => var4, description => "var4", default_value => def4,
-      verification => {?MODULE, verify_value, 1}},
-    #{name => var4b, description => "var4b", default_value => def4b,
-      verification => fun ?MODULE:verify_value/1}
+    #{name => config_attrs_var2, description => "config_attrs_var2",
+      default_value => def2, verification => none},
+    #{name => config_attrs_var3, description => "config_attrs_var3",
+      default_value => def3, verification => [def3, another_atom]},
+    #{name => config_attrs_var4, description => "config_attrs_var4",
+      default_value => def4, verification => {?MODULE, verify_value, 1}},
+    #{name => config_attrs_var4b, description => "config_attrs_var4b",
+      default_value => def4b, verification => fun ?MODULE:verify_value/1}
 ]).
--required_variable(#{name => var5, description => "var5", default_value => def5,
-                     update => read_only}).
--required_variable(#{name => var6, description => "var6", default_value => def6,
-                     verification => none, update => none}).
+-required_variable(#{name => config_attrs_var5, description => "config_attrs_var5",
+                     default_value => def5, update => read_only}).
+-required_variable(#{name => config_attrs_var6, description => "config_attrs_var6",
+                     default_value => def6, verification => none, update => none}).
 -required_variable([
-    #{name => var7, description => "var7", default_value => def7,
-      verification => none, update => {?MODULE, update_value, 2}}
+    #{name => config_attrs_var7, description => "config_attrs_var7",
+      default_value => def7, verification => none, update => {?MODULE, update_value, 2}}
 ]).
--required_variable(#{name => var7b, description => "var7b", default_value => def7,
-                     verification => none, update => fun ?MODULE:update_value/2}).
+-required_variable(#{name => config_attrs_var7b, description => "config_attrs_var7b",
+                     default_value => def7, verification => none,
+                     update => fun ?MODULE:update_value/2}).
 
 %% verification functions
 -export([verify_value/1]).
@@ -53,23 +58,23 @@ all() ->
 get_module_attributes(_) ->
     Result = amoc_config_attributes:get_module_attributes(required_variable, ?MODULE),
     ExpectedResult = [
-        #{name => var0, description => "var0"},
-        #{name => var1, description => "var1", default_value => def1},
-        #{name => var2, description => "var2", default_value => def2,
+        #{name => config_attrs_var0, description => "config_attrs_var0"},
+        #{name => config_attrs_var1, description => "config_attrs_var1", default_value => def1},
+        #{name => config_attrs_var2, description => "config_attrs_var2", default_value => def2,
           verification => none},
-        #{name => var3, description => "var3", default_value => def3,
+        #{name => config_attrs_var3, description => "config_attrs_var3", default_value => def3,
           verification => [def3, another_atom]},
-        #{name => var4, description => "var4", default_value => def4,
+        #{name => config_attrs_var4, description => "config_attrs_var4", default_value => def4,
           verification => {?MODULE, verify_value, 1}},
-        #{name => var4b, description => "var4b", default_value => def4b,
+        #{name => config_attrs_var4b, description => "config_attrs_var4b", default_value => def4b,
           verification => fun ?MODULE:verify_value/1},
-        #{name => var5, description => "var5", default_value => def5,
+        #{name => config_attrs_var5, description => "config_attrs_var5", default_value => def5,
           update => read_only},
-        #{name => var6, description => "var6", default_value => def6,
+        #{name => config_attrs_var6, description => "config_attrs_var6", default_value => def6,
           verification => none, update => none},
-        #{name => var7, description => "var7", default_value => def7,
+        #{name => config_attrs_var7, description => "config_attrs_var7", default_value => def7,
           verification => none, update => {?MODULE, update_value, 2}},
-        #{name => var7b, description => "var7b", default_value => def7,
+        #{name => config_attrs_var7b, description => "config_attrs_var7b", default_value => def7,
           verification => none, update => fun ?MODULE:update_value/2}],
     ?assertEqual(ExpectedResult, Result).
 
@@ -81,47 +86,47 @@ get_module_configuration(_) ->
     UpdateNone = fun amoc_config_attributes:none/2,
     VerificationNone = fun amoc_config_attributes:none/1,
     ?assertMatch(
-        [#module_parameter{name = var0, mod = ?MODULE, value = undefined,
+        [#module_parameter{name = config_attrs_var0, mod = ?MODULE, value = undefined,
                            verification_fn = VerificationNone, update_fn = read_only},
-         #module_parameter{name = var1, mod = ?MODULE, value = def1,
+         #module_parameter{name = config_attrs_var1, mod = ?MODULE, value = def1,
                            verification_fn = VerificationNone, update_fn = read_only},
-         #module_parameter{name = var2, mod = ?MODULE, value = def2,
+         #module_parameter{name = config_attrs_var2, mod = ?MODULE, value = def2,
                            verification_fn = VerificationNone, update_fn = read_only},
-         #module_parameter{name = var3, mod = ?MODULE, value = def3,
+         #module_parameter{name = config_attrs_var3, mod = ?MODULE, value = def3,
                            update_fn = read_only}, %% verification_fn is checked in
                                                    %% 'one_of_function' test case.
-         #module_parameter{name = var4, mod = ?MODULE, value = def4,
+         #module_parameter{name = config_attrs_var4, mod = ?MODULE, value = def4,
                            verification_fn = VerifyValueFN, update_fn = read_only},
-         #module_parameter{name = var4b, mod = ?MODULE, value = def4b,
+         #module_parameter{name = config_attrs_var4b, mod = ?MODULE, value = def4b,
                            verification_fn = VerifyValueFN, update_fn = read_only},
-         #module_parameter{name = var5, mod = ?MODULE, value = def5,
+         #module_parameter{name = config_attrs_var5, mod = ?MODULE, value = def5,
                            verification_fn = VerificationNone, update_fn = read_only},
-         #module_parameter{name = var6, mod = ?MODULE, value = def6,
+         #module_parameter{name = config_attrs_var6, mod = ?MODULE, value = def6,
                            verification_fn = VerificationNone, update_fn = UpdateNone},
-         #module_parameter{name = var7, mod = ?MODULE, value = def7,
+         #module_parameter{name = config_attrs_var7, mod = ?MODULE, value = def7,
                            verification_fn = VerificationNone, update_fn = UpdateValueFN},
-         #module_parameter{name = var7b, mod = ?MODULE, value = def7,
+         #module_parameter{name = config_attrs_var7b, mod = ?MODULE, value = def7,
                            verification_fn = VerificationNone, update_fn = UpdateValueFN}],
         Config).
 
 errors_reporting(_) ->
-    InvalidParam0 = #{name => "invalid_var0", description => "var0"},
+    InvalidParam0 = #{name => "invalid_var0", description => "config_attrs_var0"},
     InvalidParam1 = #{name => invalid_var1, description => [$a, -2]},
-    InvalidParam2 = #{name => invalid_var2, description => "var2",
+    InvalidParam2 = #{name => invalid_var2, description => "config_attrs_var2",
                       verification => <<"invalid_verification_method">>},
-    ValidParam3 = #{name => valid_var3, description => "var3", default_value => def3,
+    ValidParam3 = #{name => valid_var3, description => "config_attrs_var3", default_value => def3,
                     verification => [def3, another_atom]},
-    InvalidParam4 = #{name => invalid_var4, description => "var4",
+    InvalidParam4 = #{name => invalid_var4, description => "config_attrs_var4",
                       verification => {erlang, not_exported_function, 1}},
-    InvalidParam4b = #{name => invalid_var4b, description => "var4b",
+    InvalidParam4b = #{name => invalid_var4b, description => "config_attrs_var4b",
                       verification => fun erlang:not_exported_function/1},
-    InvalidParam5 = #{name => invalid_var5, description => "var5",
+    InvalidParam5 = #{name => invalid_var5, description => "config_attrs_var5",
                       update => invalid_update_method},
-    InvalidParam6 = #{name => invalid_var6, description => "var6",
+    InvalidParam6 = #{name => invalid_var6, description => "config_attrs_var6",
                       update => fun invalid_module:not_exported_function/2},
-    InvalidParam7 = #{name => invalid_var7, description => "var7",
+    InvalidParam7 = #{name => invalid_var7, description => "config_attrs_var7",
                       update => fun update_value/2}, %% local function
-    InvalidParam7b = #{name => invalid_var7, description => "var7b",
+    InvalidParam7b = #{name => invalid_var7, description => "config_attrs_var7b",
                       update => fun update_value/2}, %% local function
     Attributes = [InvalidParam0, InvalidParam1, InvalidParam2, ValidParam3, InvalidParam4,
                   InvalidParam4b, InvalidParam5, InvalidParam6, InvalidParam7, InvalidParam7b],
@@ -141,7 +146,7 @@ errors_reporting(_) ->
 
 one_of_function(_) ->
     OneOf = [def3, another_atom],
-    Param = #{name => var0, description => "var0", default_value => def0,
+    Param = #{name => config_attrs_var0, description => "config_attrs_var0", default_value => def0,
               verification => OneOf},
     {ok, [#module_parameter{verification_fn = OneOfFN}]} =
         amoc_config_attributes:process_module_attributes(?MODULE, [Param]),

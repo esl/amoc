@@ -21,24 +21,26 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% declaring required variables %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--required_variable(#{name => var0, description => "var0"}).
-%% without overriding, verification  of var1 should fail.
--required_variable(#{name => var1, description => "var1",
+-required_variable(#{name => config_scenario_var0, description => "config_scenario_var0"}).
+%% without overriding, verification  of config_scenario_var1 should fail.
+-required_variable(#{name => config_scenario_var1, description => "config_scenario_var1",
                      verification => [unused_value]}).
--required_variable(#{name => var2, description => "var2", default_value => def2}).
+-required_variable(#{name => config_scenario_var2, description => "config_scenario_var2",
+                     default_value => def2}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %% overriding variables %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
--override_variable([#{name => var1, description => "var1", default_value => val1,
-                     verification => fun ?MOCK_MOD:verify_fun/1},
-                    #{name => var2, description => "var2", default_value => val2,
-                      verification => [new_val2, val2],
+-override_variable([#{name => config_scenario_var1, description => "config_scenario_var1",
+                      default_value => val1, verification => fun ?MOCK_MOD:verify_fun/1},
+                    #{name => config_scenario_var2, description => "config_scenario_var2",
+                      default_value => val2, verification => [new_val2, val2],
                       update => {?MOCK_MOD, update_mfa, 2}}]).
-%% var3 is not declared with -required_variable(...), but it's fine.
--override_variable(#{name => var3, description => "var3", default_value => def3}).
--override_variable(#{name => var3, description => "var3", default_value => val3,
-                     update => fun ?MOCK_MOD:update_fun/2,
+%% config_scenario_var3 is not declared with -required_variable(...), but it's fine.
+-override_variable(#{name => config_scenario_var3, description => "config_scenario_var3",
+                     default_value => def3}).
+-override_variable(#{name => config_scenario_var3, description => "config_scenario_var3",
+                     default_value => val3, update => fun ?MOCK_MOD:update_fun/2,
                      verification => {?MOCK_MOD, verify_mfa, 1}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -93,7 +95,7 @@ parse_scenario_settings(_) ->
     mock_ets_tables(),
     ets:insert(configurable_modules, {amoc_controller, configurable}),
     ScenarioSettings = [{interarrival, 500},
-                        {var1, def1}],
+                        {config_scenario_var1, def1}],
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, ScenarioSettings),
     ?assertEqual(ok, Ret),
     %% check verification function calls
@@ -104,13 +106,13 @@ parse_scenario_settings(_) ->
     %% undefined variable
     ?assertThrow({invalid_setting, undefined_var}, amoc_config:get(undefined_var)),
     %% undefined value
-    ?assertEqual(undefined, amoc_config:get(var0)),
-    ?assertEqual(some_value, amoc_config:get(var0, some_value)),
+    ?assertEqual(undefined, amoc_config:get(config_scenario_var0)),
+    ?assertEqual(some_value, amoc_config:get(config_scenario_var0, some_value)),
     %% defined (in settings) value
-    ?assertEqual(def1, amoc_config:get(var1)),
-    ?assertEqual(def1, amoc_config:get(var1, some_value)),
+    ?assertEqual(def1, amoc_config:get(config_scenario_var1)),
+    ?assertEqual(def1, amoc_config:get(config_scenario_var1, some_value)),
     %% overwritten variable
-    ?assertEqual(val2, amoc_config:get(var2)),
+    ?assertEqual(val2, amoc_config:get(config_scenario_var2)),
     %% configurable module variable (defined in amoc_controller)
     ?assertEqual(500, amoc_config:get(interarrival)).
 
@@ -119,21 +121,21 @@ update_settings(_) ->
 
     %% update 2 parameters and check all values and
     %% verification/update function calls
-    ScenarioSettings = [{var3, new_val3},
-                        {var2, new_val2}],
+    ScenarioSettings = [{config_scenario_var3, new_val3},
+                        {config_scenario_var2, new_val2}],
     Ret = amoc_config_scenario:update_settings(ScenarioSettings),
     ?assertEqual(ok, Ret),
     %% updated variables
-    ?assertEqual(new_val2, amoc_config:get(var2)),
-    ?assertEqual(new_val3, amoc_config:get(var3)),
+    ?assertEqual(new_val2, amoc_config:get(config_scenario_var2)),
+    ?assertEqual(new_val3, amoc_config:get(config_scenario_var3)),
     %% unchanged variables
-    ?assertEqual(undefined, amoc_config:get(var0)),
-    ?assertEqual(val1, amoc_config:get(var1)),
+    ?assertEqual(undefined, amoc_config:get(config_scenario_var0)),
+    ?assertEqual(val1, amoc_config:get(config_scenario_var1)),
     %% execution of update functions is done asynchronously
     %% and execution of verification functions is synchronous
     meck:wait(?MOCK_MOD, verify_mfa, [new_val3], ?VERIFY_TIMEOUT),
-    meck:wait(?MOCK_MOD, update_fun, [var3, new_val3], ?UPDATE_TIMEOUT),
-    meck:wait(?MOCK_MOD, update_mfa, [var2, new_val2], ?UPDATE_TIMEOUT),
+    meck:wait(?MOCK_MOD, update_fun, [config_scenario_var3, new_val3], ?UPDATE_TIMEOUT),
+    meck:wait(?MOCK_MOD, update_mfa, [config_scenario_var2, new_val2], ?UPDATE_TIMEOUT),
     ?assertEqual(3, length(meck:history(?MOCK_MOD))).
 
 update_just_one_parameter(_) ->
@@ -141,25 +143,25 @@ update_just_one_parameter(_) ->
 
     %% update only 1 parameter and check that update
     %% function is call for that parameter
-    ?assertEqual(ok, amoc_config_scenario:update_settings([{var2, new_val2}])),
+    ?assertEqual(ok, amoc_config_scenario:update_settings([{config_scenario_var2, new_val2}])),
     %% updated variables
-    ?assertEqual(new_val2, amoc_config:get(var2)),
+    ?assertEqual(new_val2, amoc_config:get(config_scenario_var2)),
     %% execution of update functions is done asynchronously
     %% and execution of verification functions is synchronous
-    meck:wait(?MOCK_MOD, update_mfa, [var2, new_val2], ?UPDATE_TIMEOUT),
+    meck:wait(?MOCK_MOD, update_mfa, [config_scenario_var2, new_val2], ?UPDATE_TIMEOUT),
     ?assertError(timeout, meck:wait(?MOCK_MOD, verify_fun, 2, ?VERIFY_TIMEOUT)),
     ?assertEqual(1, length(meck:history(?MOCK_MOD))),
     meck:reset(?MOCK_MOD),
 
     %% update another parameter and check that update
     %% function is call for it
-    ?assertEqual(ok, amoc_config_scenario:update_settings([{var3, new_val3}])),
+    ?assertEqual(ok, amoc_config_scenario:update_settings([{config_scenario_var3, new_val3}])),
     %% updated variables
-    ?assertEqual(new_val3, amoc_config:get(var3)),
+    ?assertEqual(new_val3, amoc_config:get(config_scenario_var3)),
     %% execution of update functions is done asynchronously
     %% and execution of verification functions is synchronous
     meck:wait(?MOCK_MOD, verify_mfa, [new_val3], ?VERIFY_TIMEOUT),
-    meck:wait(?MOCK_MOD, update_fun, [var3, new_val3], ?UPDATE_TIMEOUT),
+    meck:wait(?MOCK_MOD, update_fun, [config_scenario_var3, new_val3], ?UPDATE_TIMEOUT),
     ?assertEqual(2, length(meck:history(?MOCK_MOD))),
     meck:reset(?MOCK_MOD),
 
@@ -173,12 +175,12 @@ update_parameters_with_the_same_values(_) ->
 
     %% update 2 parameters with inital values, check that values are unchanged
     %% and no verification/update functions called
-    ScenarioSettings = [{var3, val3},
-                        {var2, val2}],
+    ScenarioSettings = [{config_scenario_var3, val3},
+                        {config_scenario_var2, val2}],
     ?assertEqual(ok, amoc_config_scenario:update_settings(ScenarioSettings)),
     %% updated variables
-    ?assertEqual(val2, amoc_config:get(var2)),
-    ?assertEqual(val3, amoc_config:get(var3)),
+    ?assertEqual(val2, amoc_config:get(config_scenario_var2)),
+    ?assertEqual(val3, amoc_config:get(config_scenario_var3)),
 
     assert_no_update_calls(),
     assert_no_verify_calls(),
@@ -186,28 +188,28 @@ update_parameters_with_the_same_values(_) ->
     %% update 2 parameters but only one with the new value, check the value is
     %% changed and no verification/update functions are called only for that
     %% parameter
-    ScenarioSettings2 = [{var3, new_val3},
-                        {var2, val2}],
+    ScenarioSettings2 = [{config_scenario_var3, new_val3},
+                        {config_scenario_var2, val2}],
     ?assertEqual(ok, amoc_config_scenario:update_settings(ScenarioSettings2)),
     %% updated variables
-    ?assertEqual(val2, amoc_config:get(var2)),
-    ?assertEqual(new_val3, amoc_config:get(var3)),
+    ?assertEqual(val2, amoc_config:get(config_scenario_var2)),
+    ?assertEqual(new_val3, amoc_config:get(config_scenario_var3)),
 
     meck:wait(?MOCK_MOD, verify_mfa, [new_val3], ?VERIFY_TIMEOUT),
-    meck:wait(?MOCK_MOD, update_fun, [var3, new_val3], ?UPDATE_TIMEOUT),
+    meck:wait(?MOCK_MOD, update_fun, [config_scenario_var3, new_val3], ?UPDATE_TIMEOUT),
     ?assertEqual(2, length(meck:history(?MOCK_MOD))).
 
 update_settings_readonly(_) ->
     set_initial_configuration(),
     Table = ets:tab2list(amoc_config),
     %% updating readonly parameters
-    ScenarioSettings = [{var0, val0},
-                        {var1, val1}, %% the same value as set initially
-                        {var3, val3}],
+    ScenarioSettings = [{config_scenario_var0, val0},
+                        {config_scenario_var1, val1}, %% the same value as set initially
+                        {config_scenario_var3, val3}],
     ReadOnlyRet = amoc_config_scenario:update_settings(ScenarioSettings),
     ?assertEqual({error, readonly_parameters,
-                  [{var0, ?MODULE},
-                   {var1, ?MODULE}]},
+                  [{config_scenario_var0, ?MODULE},
+                   {config_scenario_var1, ?MODULE}]},
                  ReadOnlyRet),
     is_equal_list(Table, ets:tab2list(amoc_config)),
     assert_no_update_calls(),
@@ -217,11 +219,11 @@ update_settings_invalid_value(_) ->
     set_initial_configuration(),
     Table = ets:tab2list(amoc_config),
     %% invalid value
-    ScenarioSettings2 = [{var3, new_val3},
-                         {var2, invalid_val2}],
+    ScenarioSettings2 = [{config_scenario_var3, new_val3},
+                         {config_scenario_var2, invalid_val2}],
     InvalidValueRet = amoc_config_scenario:update_settings(ScenarioSettings2),
     ?assertEqual({error, parameters_verification_failed,
-                  [{var2, invalid_val2,
+                  [{config_scenario_var2, invalid_val2,
                     {verification_failed, {not_one_of, [new_val2, val2]}}}]},
                  InvalidValueRet),
     is_equal_list(Table, ets:tab2list(amoc_config)),
@@ -233,7 +235,7 @@ update_settings_undef_param(_) ->
     %% reset initial verification calls.
     meck:reset(?MOCK_MOD),
     %% adding undefined parameter in settings
-    ScenarioSettings3 = [{var3, new_val3},
+    ScenarioSettings3 = [{config_scenario_var3, new_val3},
                          {invalid_var2, val2}],
     UndefParamRet = amoc_config_scenario:update_settings(ScenarioSettings3),
     ?assertEqual({error, undefined_parameters, [invalid_var2]}, UndefParamRet),
@@ -246,14 +248,14 @@ implicit_variable_redefinition(_) ->
     mock_ets_tables(),
     ets:insert(configurable_modules, {?MODULE, configurable}),
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, []),
-    ?assertEqual({error, parameter_overriding, {var0, ?MODULE, ?MODULE}}, Ret),
+    ?assertEqual({error, parameter_overriding, {config_scenario_var0, ?MODULE, ?MODULE}}, Ret),
     assert_no_update_calls(),
     assert_no_verify_calls().
 
 invalid_settings(_) ->
     mock_ets_tables(),
     ScenarioSettings = [{invalid_var1, invalid_value},
-                        {var2, new_val2},
+                        {config_scenario_var2, new_val2},
                         {invalid_var2, invalid_value}],
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, ScenarioSettings),
     ?assertEqual({error, undefined_parameters, [invalid_var2, invalid_var1]}, Ret),
@@ -262,10 +264,10 @@ invalid_settings(_) ->
 
 invalid_value(_) ->
     mock_ets_tables(),
-    ScenarioSettings = [{var2, invalid_value}],
+    ScenarioSettings = [{config_scenario_var2, invalid_value}],
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, ScenarioSettings),
     ?assertEqual({error, parameters_verification_failed,
-                  [{var2, invalid_value,
+                  [{config_scenario_var2, invalid_value,
                     {verification_failed, {not_one_of, [new_val2, val2]}}}]},
                  Ret),
     %% check verification function calls, verification
