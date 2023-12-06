@@ -10,7 +10,7 @@
 -define(SERVER, ?MODULE).
 
 -required_variable(#{name => interarrival, default_value => 50,
-                     verification => {?MODULE, positive_integer, 1},
+                     verification => {?MODULE, non_neg_integer, 1},
                      description => "a delay between creating the processes for two "
                                     "consecutive users (ms, def: 50ms)",
                      update => {?MODULE, maybe_update_interarrival_timer, 2}}).
@@ -65,7 +65,7 @@
 %% ------------------------------------------------------------------
 %% Parameters verification functions
 %% ------------------------------------------------------------------
--export([maybe_update_interarrival_timer/2, positive_integer/1]).
+-export([maybe_update_interarrival_timer/2, non_neg_integer/1]).
 
 -export([zero_users_running/0]).
 
@@ -122,9 +122,9 @@ disable() ->
     gen_server:call(?SERVER, disable).
 
 %% @private
--spec positive_integer(any()) -> boolean().
-positive_integer(Interarrival) ->
-    is_integer(Interarrival) andalso Interarrival > 0.
+-spec non_neg_integer(any()) -> boolean().
+non_neg_integer(Interarrival) ->
+    is_integer(Interarrival) andalso Interarrival >= 0.
 
 %% @private
 -spec maybe_update_interarrival_timer(interarrival, term()) -> ok.
@@ -193,6 +193,9 @@ handle_cast(_Msg, State) ->
 handle_info(start_user, State) ->
     NewSate = handle_start_user(State),
     {noreply, NewSate};
+handle_info(start_all_users, State) ->
+    NewSate = handle_start_all_users(State),
+    {noreply, NewSate};
 handle_info(_Msg, State) ->
     {noreply, State}.
 
@@ -251,8 +254,7 @@ handle_add(StartId, EndId, #state{last_user_id = LastId,
     NewUsers = lists:seq(StartId, EndId),
     NewScheduledUsers = lists:append(ScheduledUsers, NewUsers),
     NewTRef = maybe_start_timer(TRef),
-    {ok, State#state{create_users = NewScheduledUsers, tref = NewTRef,
-                     last_user_id = EndId}};
+    {ok, State#state{create_users = NewScheduledUsers, tref = NewTRef, last_user_id = EndId}};
 handle_add(_StartId, _EndId, #state{status = running} = State) ->
     {{error, invalid_range}, State};
 handle_add(_StartId, _EndId, #state{status = Status} = State) ->
@@ -289,10 +291,17 @@ handle_disable(#state{status = Status} = State) ->
 handle_start_user(#state{create_users   = [UserId | T],
                          scenario       = Scenario,
                          scenario_state = ScenarioState} = State) ->
-    start_user(Scenario, UserId, ScenarioState),
+    amoc_users_sup:start_child(Scenario, UserId, ScenarioState),
     State#state{create_users = T};
 handle_start_user(#state{create_users = [], tref = TRef} = State) ->
     State#state{tref = maybe_stop_timer(TRef)}.
+
+-spec handle_start_all_users(state()) -> state().
+handle_start_all_users(#state{create_users = []} = State) ->
+    handle_start_user(State);
+handle_start_all_users(State) ->
+    NewState = handle_start_user(State),
+    handle_start_all_users(NewState).
 
 %% ------------------------------------------------------------------
 %% helpers
@@ -321,12 +330,6 @@ handle_zero_users_running(#state{status = terminating} = State) ->
 handle_zero_users_running(State) ->
     State.
 
--spec maybe_start_timer(timer:tref() | undefined) -> timer:tref().
-maybe_start_timer(undefined) ->
-    {ok, TRef} = timer:send_interval(interarrival(), start_user),
-    TRef;
-maybe_start_timer(TRef) -> TRef.
-
 -spec maybe_stop_timer(timer:tref() | undefined) -> undefined.
 maybe_stop_timer(undefined) ->
     undefined;
@@ -334,12 +337,8 @@ maybe_stop_timer(TRef) ->
     {ok, cancel} = timer:cancel(TRef),
     undefined.
 
--spec start_user(amoc:scenario(), amoc_scenario:user_id(), any()) -> term().
-start_user(Scenario, Id, ScenarioState) ->
-    amoc_users_sup:start_child(Scenario, Id, ScenarioState).
-
--spec interarrival() -> interarrival().
-interarrival() ->
+-spec get_interarrival() -> interarrival().
+get_interarrival() ->
     amoc_config:get(interarrival).
 
 -spec maybe_update_interarrival_timer(state()) -> state().
@@ -347,5 +346,19 @@ maybe_update_interarrival_timer(#state{tref = undefined} = State) ->
     State;
 maybe_update_interarrival_timer(#state{tref = TRef} = State) ->
     {ok, cancel} = timer:cancel(TRef),
-    {ok, NewTRef} = timer:send_interval(interarrival(), start_user),
+    Value = get_interarrival(),
+    NewTRef = do_interarrival(Value),
     State#state{tref = NewTRef}.
+
+-spec maybe_start_timer(timer:tref() | undefined) -> timer:tref().
+maybe_start_timer(undefined) ->
+    Value = get_interarrival(),
+    do_interarrival(Value);
+maybe_start_timer(TRef) -> TRef.
+
+do_interarrival(0) ->
+    self() ! start_all_users,
+    undefined;
+do_interarrival(Value) ->
+    {ok, NewTRef} = timer:send_interval(Value, start_user),
+    NewTRef.
