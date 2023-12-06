@@ -32,6 +32,7 @@ all_tests() ->
      stop_running_scenario_with_no_users_immediately_terminates,
      stop_running_scenario_with_users_stays_in_finished,
      stop_running_scenario_with_users_eventually_terminates,
+     interarrival_equal_zero_starts_all_users_at_once,
      scenario_with_state_and_crashing_in_terminate_run_fine
     ].
 
@@ -156,6 +157,14 @@ stop_running_scenario_with_users_eventually_terminates(_) ->
     WaitUntilValue = {finished, testing_scenario},
     async_helper:wait_until(WaitUntilFun, WaitUntilValue).
 
+interarrival_equal_zero_starts_all_users_at_once(_) ->
+    Vars = [{interarrival, 0}, {testing_var1, def1} | other_vars_to_keep_quiet()],
+    do_start_scenario(testing_scenario, Vars),
+    NumOfUsers = 1000,
+    amoc_controller:add_users(1, NumOfUsers),
+    Extra = #{time_left => 25, sleep_time => 5},
+    wait_until_scenario_has_users(testing_scenario, NumOfUsers, NumOfUsers, Extra).
+
 scenario_with_state_and_crashing_in_terminate_run_fine(_) ->
     do_start_scenario(testing_scenario_with_state, regular_vars_with_state()),
     NumOfUsers = 10,
@@ -184,8 +193,11 @@ other_vars_to_keep_quiet() ->
     [{config_scenario_var1, unused_value}].
 
 wait_until_scenario_has_users(Scenario, Current, Total) ->
+    wait_until_scenario_has_users(Scenario, Current, Total, #{}).
+
+wait_until_scenario_has_users(Scenario, Current, Total, Extra) ->
     WaitUntilFun = fun amoc_controller:get_status/0,
     WaitUntilValue = {running, #{scenario => Scenario,
                                  currently_running_users => Current,
                                  highest_user_id => Total}},
-    async_helper:wait_until(WaitUntilFun, WaitUntilValue).
+    async_helper:wait_until(WaitUntilFun, WaitUntilValue, Extra).
