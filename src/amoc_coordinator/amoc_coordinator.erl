@@ -74,8 +74,7 @@ start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
     Plan = normalize_coordination_plan(CoordinationPlan),
     case gen_event:start({local, Name}) of
         {ok, _} ->
-            telemetry:execute([amoc, coordinator, start], #{count => 1},
-                              #{monotonic_time => erlang:monotonic_time(), name => Name}),
+            amoc_telemetry:execute([coordinator, start], #{count => 1}, #{name => Name}),
             %% according to gen_event documentation:
             %%
             %%    When the event is received, the event manager calls
@@ -100,8 +99,7 @@ start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
 -spec stop(name()) -> ok.
 stop(Name) ->
     gen_event:stop(Name),
-    telemetry:execute([amoc, coordinator, stop], #{count => 1},
-                      #{monotonic_time => erlang:monotonic_time(), name => Name}).
+    amoc_telemetry:execute([coordinator, stop], #{count => 1}, #{name => Name}).
 
 %% @see add/3
 -spec add(name(), any()) -> ok.
@@ -158,15 +156,14 @@ init(CoordinationItem) ->
 -spec handle_event(Event :: term(), state()) -> {ok, state()}.
 handle_event(Event, {timeout, Name, Pid}) ->
     %% there's only one "timeout" event handler for coordinator,
-    %% so calling telemetry:execute/3 here to ensure that it's
+    %% so calling amoc_telemetry:execute/3 here to ensure that it's
     %% triggered just once per event.
     TelemetryEvent = case Event of
                          {coordinate, _} -> add;
                          reset_coordinator -> reset;
                          coordinator_timeout -> timeout
                      end,
-    telemetry:execute([amoc, coordinator, TelemetryEvent], #{count => 1},
-                      #{monotonic_time => erlang:monotonic_time(), name => Name}),
+    amoc_telemetry:execute([coordinator, TelemetryEvent], #{count => 1}, #{name => Name}),
     erlang:send(Pid, Event),
     {ok, {timeout, Name, Pid}};
 handle_event(Event, {worker, WorkerPid}) ->

@@ -202,6 +202,7 @@ handle_start_scenario(Scenario, Settings, #state{status = idle} = State) ->
                                    scenario_start = StartTime,
                                    scenario_ref   = Ref,
                                    status         = running},
+            %% This simulates a span
             telemetry:execute([amoc, scenario, run, start],
                               #{monotonic_time => StartTime, system_time => erlang:system_time()},
                               #{telemetry_span_context => Ref, scenario => Scenario}),
@@ -240,9 +241,8 @@ handle_add(StartId, EndId, #state{last_user_id = LastId,
                                   scenario     = Scenario,
                                   tref         = TRef} = State) when StartId =< EndId,
                                                                      LastId < StartId ->
-    TimeStamp = erlang:monotonic_time(),
-    telemetry:execute([amoc, controller, users], #{count => EndId - StartId + 1},
-                      #{monotonic_time => TimeStamp, scenario => Scenario, type => add}),
+    amoc_telemetry:execute([controller, users], #{count => EndId - StartId + 1},
+                           #{scenario => Scenario, type => add}),
     NewUsers = lists:seq(StartId, EndId),
     NewScheduledUsers = lists:append(ScheduledUsers, NewUsers),
     NewTRef = maybe_start_timer(TRef),
@@ -255,9 +255,8 @@ handle_add(_StartId, _EndId, #state{status = Status} = State) ->
 
 -spec handle_remove(user_count(), boolean(), state()) -> handle_call_res().
 handle_remove(Count, ForceRemove, #state{status = running, scenario = Scenario}) ->
-    TimeStamp = erlang:monotonic_time(),
-    telemetry:execute([amoc, controller, users], #{count => Count},
-                      #{monotonic_time => TimeStamp, scenario => Scenario, type => remove}),
+    amoc_telemetry:execute([controller, users], #{count => Count},
+                           #{scenario => Scenario, type => remove}),
     Pids = case ets:match_object(?USERS_TABLE, '$1', Count) of
                {Objects, _} -> [Pid || {_Id, Pid} <- Objects];
                '$end_of_table' -> []
@@ -332,6 +331,7 @@ terminate_scenario(#state{scenario = Scenario,
                           scenario_ref = Ref}) ->
     case amoc_scenario:terminate(Scenario, ScenarioState) of
         {error, {Class, Reason, Stacktrace}} = Ret ->
+            %% This simulates a span
             StopTime = erlang:monotonic_time(),
             telemetry:execute([amoc, scenario, run, exception],
                               #{duration => StopTime - StartTime, monotonic_time => StopTime},
@@ -339,6 +339,7 @@ terminate_scenario(#state{scenario = Scenario,
                                 kind => Class, reason => Reason, stacktrace => Stacktrace}),
             Ret;
         Ret ->
+            %% This simulates a span
             StopTime = erlang:monotonic_time(),
             telemetry:execute([amoc, scenario, run, stop],
                               #{duration => StopTime - StartTime, monotonic_time => StopTime},
