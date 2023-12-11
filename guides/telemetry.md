@@ -84,8 +84,12 @@ Events related to internals of the throttle processes, these might expose unstab
 might want to log or reconfigure:
 ```erlang
 event_name: [amoc, throttle, process]
-measurements: #{msg := binary(), process := pid()}
-metadata: #{monotonic_time := integer(), name := atom(), printable_state => map()}
+measurements: #{logger:level() => 1}
+metadata: #{log_level := logger:level(),
+            msg := binary(),
+            rate => non_neg_integer(),
+            state => map(),
+            _ => _}
 ```
 
 ## Coordinator
@@ -105,8 +109,8 @@ metadata: #{monotonic_time := integer(), name := atom()}
 There are related to bad configuration events, they might deserve logging
 ```erlang
 event_name: [amoc, config, get | verify | env]
-measurements: #{}
-metadata: #{log_class => syslog_level(), _ => _}
+measurements: #{logger:level() => 1}
+metadata: #{log_level => logger:level(), setting => atom(), msg => binary(), _ => _}
 ```
 
 ## Cluster
@@ -116,5 +120,5 @@ There are related to clustering events
 ```erlang
 event_name: [amoc, cluster, connect_nodes | nodedown | master_node_down]
 measurements: #{count => non_neg_integer()},
-metadata: #{node => node(), nodes => nodes(), state => map()}
+metadata: #{nodes => nodes(), state => map()}
 ```

@@ -19,17 +19,16 @@ get(Name) ->
 get(Name, Default) when is_atom(Name) ->
     case ets:lookup(amoc_config, Name) of
         [] ->
-            telemetry:execute([amoc, config, get], #{},
-                              #{log_class => error, msg => <<"no scenario setting">>,
-                                scenario => Name}),
+            amoc_telemetry:execute_log(
+              error, [config, get], #{setting => Name}, <<"no scenario setting">>),
             throw({invalid_setting, Name});
         [#module_parameter{name = Name, value = undefined}] ->
             Default;
         [#module_parameter{name = Name, value = Value}] ->
             Value;
         InvalidLookupRet ->
-            telemetry:execute([amoc, config, get], #{},
-                              #{log_class => error, msg => <<"invalid lookup return value">>,
-                                scenario => Name, return => InvalidLookupRet}),
+            amoc_telemetry:execute_log(
+              error, [config, get], #{setting => Name, return => InvalidLookupRet},
+              <<"invalid lookup return value">>),
             throw({invalid_lookup_ret_value, InvalidLookupRet})
     end.

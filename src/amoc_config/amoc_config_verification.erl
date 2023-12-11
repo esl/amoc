@@ -39,17 +39,17 @@ verify(Fun, Value) ->
         {true, NewValue} -> {true, NewValue};
         {false, Reason} -> {false, {verification_failed, Reason}};
         Ret ->
-            telemetry:execute([amoc, config, verify], #{error => 1},
-                              #{log_class => error, verification_method => Fun,
-                                verification_arg => Value, verification_return => Ret,
-                                msg => <<"invalid verification method">>}),
+            amoc_telemetry:execute_log(
+              error, [config, verify],
+              #{verification_method => Fun, verification_arg => Value, verification_return => Ret},
+              <<"invalid verification method">>),
             {false, {invalid_verification_return_value, Ret}}
     catch
         C:E:S ->
-            telemetry:execute([amoc, config, verify], #{error => 1},
-                              #{log_class => error, verification_method => Fun,
-                                verification_arg => Value,
-                                kind => C, reason => E, stacktrace => S,
-                                msg => <<"invalid verification method">>}),
+            amoc_telemetry:execute_log(
+              error, [config, verify],
+              #{verification_method => Fun, verification_arg => Value,
+                kind => C, reason => E, stacktrace => S},
+              <<"invalid verification method">>),
             {false, {exception_during_verification, {C, E, S}}}
     end.

@@ -132,8 +132,7 @@ handle_call(_Request, _From, State) ->
 
 -spec handle_cast(any(), state()) -> {noreply, state()}.
 handle_cast({connect_nodes, Nodes}, State) ->
-    telemetry:execute([amoc, cluster, connect_nodes], #{count => length(Nodes)},
-                      #{nodes => Nodes, state => state_to_map(State)}),
+    execute_nodes(connect_nodes, Nodes, state_to_map(State)),
     NewState = handle_connect_nodes(Nodes, State),
     schedule_timer(NewState),
     {noreply, NewState};
@@ -148,14 +147,11 @@ handle_info(timeout, State) ->
     schedule_timer(NewState),
     {noreply, NewState};
 handle_info({nodedown, Node}, #state{master = Node} = State) ->
-    telemetry:execute([amoc, cluster, master_node_down],
-                      #{count => 1},
-                      #{node => Node, state => state_to_map(State)}),
+    execute_nodes(master_node_down, [Node], state_to_map(State)),
     erlang:halt(),
     {noreply, State};
 handle_info({nodedown, Node}, State) ->
-    telemetry:execute([amoc, cluster, nodedown], #{count => 1},
-                      #{node => Node, state => state_to_map(State)}),
+    execute_nodes(nodedown, [Node], state_to_map(State)),
     {noreply, merge(connection_lost, [Node], State)};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -284,3 +280,8 @@ maybe_set_master(Node, #state{new_connection_action = Action}) ->
     %% to avoid a possibility of the amoc_cluster deadlock while
     %% running the Action call set_master_node/2 asynchronously
     spawn(fun() -> set_master_node(Node, Action) end).
+
+-spec execute_nodes(atom(), [node()], #{any() => any()}) -> ok.
+execute_nodes(Name, Nodes, State) ->
+    PrefixedName = [amoc, cluster, Name],
+    telemetry:execute(PrefixedName, #{count => length(Nodes)}, #{nodes => Nodes, state => State}).

@@ -39,11 +39,11 @@ get_os_env(Name, Default) ->
     case parse_value(Value, Default) of
         {ok, Term} -> Term;
         {error, Error} ->
-            telemetry:execute(
-              [amoc, config, env], #{error => 1},
-              #{log_class => error, error => Error, variable_name => EnvName,
-                variable_value => Value, default_value => Default,
-                msg => <<"cannot parse environment variable, using default value">>}),
+            amoc_telemetry:execute_log(
+              error, [config, env],
+              #{error => Error, variable_name => EnvName,
+                variable_value => Value, default_value => Default},
+                <<"cannot parse environment variable, using default value">>),
             Default
     end.
 

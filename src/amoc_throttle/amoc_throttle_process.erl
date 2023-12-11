@@ -129,10 +129,10 @@ format_status(_Opt, [_PDict, State]) ->
 initial_state(Name, Interval, Rate) when Rate >= 0 ->
     NewRate = case {Rate =:= 0, Rate < 5} of
                   {true, _} ->
-                      internal_event(<<"invalid rate, must be higher than zero">>, Name),
+                      internal_error(<<"invalid rate, must be higher than zero">>, Name, Rate),
                       1;
                   {_, true} ->
-                      internal_event(<<"too low rate, please reduce NoOfProcesses">>, Name),
+                      internal_error(<<"too low rate, please reduce NoOfProcesses">>, Name, Rate),
                       Rate;
                   {_, false} ->
                       Rate
@@ -140,7 +140,7 @@ initial_state(Name, Interval, Rate) when Rate >= 0 ->
     Delay = case {Interval, Interval div NewRate, Interval rem NewRate} of
                 {0, _, _} -> 0; %% limit only No of simultaneous executions
                 {_, I, _} when I < 10 ->
-                    internal_event(<<"too high rate, please increase NoOfProcesses">>, Name),
+                    internal_error(<<"too high rate, please increase NoOfProcesses">>, Name, Rate),
                     10;
                 {_, DelayBetweenExecutions, 0} -> DelayBetweenExecutions;
                 {_, DelayBetweenExecutions, _} -> DelayBetweenExecutions + 1
@@ -202,26 +202,29 @@ async_runner(Fun) ->
 timeout(State) ->
     State#state.interval + ?DEFAULT_MSG_TIMEOUT.
 
-inc_n(#state{n = N, max_n = MaxN} = State) ->
+inc_n(#state{name = Name, n = N, max_n = MaxN} = State) ->
     NewN = N + 1,
     case MaxN < NewN of
         true ->
-            internal_event(<<"throttle proccess has invalid N">>, State),
+            PrintableState = printable_state(State),
+            Msg = <<"throttle proccess has invalid N">>,
+            amoc_telemetry:execute_log(
+              error, [throttle, process], #{name => Name, n => NewN, state => PrintableState}, Msg),
             State#state{n = MaxN};
         false ->
             State#state{n = NewN}
     end.
 
+-spec internal_event(binary(), state()) -> any().
 internal_event(Msg, #state{name = Name} = State) ->
     PrintableState = printable_state(State),
-    telemetry:execute([amoc, throttle, process],
-                      #{msg => Msg, process => self()},
-                      #{printable_state => PrintableState,
-                        monotonic_time => erlang:monotonic_time(), name => Name});
-internal_event(Msg, Name) when is_atom(Name) ->
-    telemetry:execute([amoc, throttle, process],
-                      #{msg => Msg, process => self()},
-                      #{monotonic_time => erlang:monotonic_time(), name => Name}).
+    amoc_telemetry:execute_log(
+      debug, [throttle, process], #{self => self(), name => Name, state => PrintableState}, Msg).
+
+-spec internal_error(binary(), atom(), non_neg_integer()) -> any().
+internal_error(Msg, Name, Rate) ->
+    amoc_telemetry:execute_log(
+      error, [throttle, process], #{name => Name, rate => Rate}, Msg).
 
 printable_state(#state{} = State) ->
     Fields = record_info(fields, state),
