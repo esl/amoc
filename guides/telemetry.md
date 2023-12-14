@@ -2,11 +2,18 @@ Amoc also exposes the following telemetry events:
 
 ## Scenario
 
-A telemetry span of a full scenario execution globally (i.e. the exported `init/0` function):
+Indicates the start of a scenario after having successfully return from the `init/0` callback:
 ```erlang
-event_name: [amoc, scenario, run, _]
-measurements: #{} %% As described in `telemetry:span/3`
-metadata: #{scenario := module()} %% Plus as described in `telemetry:span/3`
+event_name: [amoc, scenario, start]
+measurements: #{count := 1}
+metadata: #{monotonic_time := integer(), scenario := module()}
+```
+
+Indicates termination of a scenario after having run the optional `terminate/` callback, and contains the return value of such:
+```erlang
+event_name: [amoc, scenario, stop]
+measurements: #{count := 1}
+metadata: #{monotonic_time := integer(), scenario := module(), return := term()}
 ```
 
 A telemetry span of a full scenario execution for a user (i.e. the exported `start/1,2` function):

@@ -22,8 +22,6 @@
                 status = idle :: idle | running | terminating | finished |
                                  {error, any()} | disabled,
                 scenario_state :: any(), %% state returned from Scenario:init/0
-                scenario_start :: undefined | integer(),
-                scenario_ref   :: undefined | reference(),
                 create_users = [] :: [amoc_scenario:user_id()],
                 tref :: timer:tref() | undefined}).
 
@@ -192,20 +190,13 @@ handle_info(_Msg, State) ->
 -spec handle_start_scenario(module(), amoc_config:settings(), state()) ->
     {handle_call_res(), state()}.
 handle_start_scenario(Scenario, Settings, #state{status = idle} = State) ->
-    StartTime = erlang:monotonic_time(),
-    Ref = erlang:make_ref(),
     case init_scenario(Scenario, Settings) of
         {ok, ScenarioState} ->
             NewState = State#state{last_user_id   = 0,
                                    scenario       = Scenario,
                                    scenario_state = ScenarioState,
-                                   scenario_start = StartTime,
-                                   scenario_ref   = Ref,
                                    status         = running},
-            %% This simulates a span
-            telemetry:execute([amoc, scenario, run, start],
-                              #{monotonic_time => StartTime, system_time => erlang:system_time()},
-                              #{telemetry_span_context => Ref, scenario => Scenario}),
+            amoc_telemetry:execute([scenario, start], #{count => 1}, #{scenario => Scenario}),
             {ok, NewState};
         {error, _} = Error ->
             NewState = State#state{scenario = Scenario, status = Error},
@@ -323,29 +314,11 @@ init_scenario(Scenario, Settings) ->
         {error, Type, Reason} -> {error, {Type, Reason}}
     end.
 
--spec terminate_scenario(state()) ->
-    ok | {ok, any()} | {error, any()}.
-terminate_scenario(#state{scenario = Scenario,
-                          scenario_state = ScenarioState,
-                          scenario_start = StartTime,
-                          scenario_ref = Ref}) ->
-    case amoc_scenario:terminate(Scenario, ScenarioState) of
-        {error, {Class, Reason, Stacktrace}} = Ret ->
-            %% This simulates a span
-            StopTime = erlang:monotonic_time(),
-            telemetry:execute([amoc, scenario, run, exception],
-                              #{duration => StopTime - StartTime, monotonic_time => StopTime},
-                              #{telemetry_span_context => Ref, scenario => Scenario,
-                                kind => Class, reason => Reason, stacktrace => Stacktrace}),
-            Ret;
-        Ret ->
-            %% This simulates a span
-            StopTime = erlang:monotonic_time(),
-            telemetry:execute([amoc, scenario, run, stop],
-                              #{duration => StopTime - StartTime, monotonic_time => StopTime},
-                              #{telemetry_span_context => Ref, scenario => Scenario}),
-            Ret
-    end.
+-spec terminate_scenario(state()) -> ok | {ok, any()} | {error, any()}.
+terminate_scenario(#state{scenario = Scenario, scenario_state = ScenarioState}) ->
+    Ret = amoc_scenario:terminate(Scenario, ScenarioState),
+    amoc_telemetry:execute([scenario, stop], #{count => 1}, #{scenario => Scenario, return => Ret}),
+    Ret.
 
 -spec maybe_start_timer(timer:tref() | undefined) -> timer:tref().
 maybe_start_timer(undefined) ->
