@@ -27,6 +27,4 @@ stop(Pid, Force) when is_pid(Pid) ->
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     process_flag(trap_exit, true),
-    Metadata = #{scenario => Scenario, user_id => Id},
-    ScenarioFun = fun() -> {amoc_scenario:start(Scenario, Id, State), Metadata} end,
-    telemetry:span([amoc, scenario, user], Metadata, ScenarioFun).
+    amoc_scenario:start(Scenario, Id, State).

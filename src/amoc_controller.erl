@@ -196,7 +196,6 @@ handle_start_scenario(Scenario, Settings, #state{status = idle} = State) ->
                                    scenario       = Scenario,
                                    scenario_state = ScenarioState,
                                    status         = running},
-            amoc_telemetry:execute([scenario, start], #{count => 1}, #{scenario => Scenario}),
             {ok, NewState};
         {error, _} = Error ->
             NewState = State#state{scenario = Scenario, status = Error},
@@ -316,9 +315,7 @@ init_scenario(Scenario, Settings) ->
 
 -spec terminate_scenario(state()) -> ok | {ok, any()} | {error, any()}.
 terminate_scenario(#state{scenario = Scenario, scenario_state = ScenarioState}) ->
-    Ret = amoc_scenario:terminate(Scenario, ScenarioState),
-    amoc_telemetry:execute([scenario, stop], #{count => 1}, #{scenario => Scenario, return => Ret}),
-    Ret.
+    amoc_scenario:terminate(Scenario, ScenarioState).
 
 -spec maybe_start_timer(timer:tref() | undefined) -> timer:tref().
 maybe_start_timer(undefined) ->

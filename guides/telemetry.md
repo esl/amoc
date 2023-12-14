@@ -2,26 +2,32 @@ Amoc also exposes the following telemetry events:
 
 ## Scenario
 
-Indicates the start of a scenario after having successfully return from the `init/0` callback:
-```erlang
-event_name: [amoc, scenario, start]
-measurements: #{count := 1}
-metadata: #{monotonic_time := integer(), scenario := module()}
-```
+All telemetry spans below contain an extra key `return` in the metadata for the `stop` event with the return value of the given callback.
 
-Indicates termination of a scenario after having run the optional `terminate/` callback, and contains the return value of such:
+A telemetry span of a scenario initialisation (i.e. the exported `init/0` function):
 ```erlang
-event_name: [amoc, scenario, stop]
-measurements: #{count := 1}
-metadata: #{monotonic_time := integer(), scenario := module(), return := term()}
+event_name: [amoc, scenario, init, _]
+measurements: #{}                 %% As described in `telemetry:span/3`
+metadata: #{scenario := module()} %% Plus as described in `telemetry:span/3`
 ```
 
 A telemetry span of a full scenario execution for a user (i.e. the exported `start/1,2` function):
 ```erlang
-event_name: [amoc, scenario, user, _]
-measurements: #{} %% As described in `telemetry:span/3`
-metadata: #{scenario := module(),
-            user_id := non_neg_integer()} %% Plus as described in `telemetry:span/3`
+event_name: [amoc, scenario, start, _]
+measurements: #{}                        %% As described in `telemetry:span/3`
+metadata: #{scenario := module(),        %% Running scenario
+            state := term(),             %% The state as returned by `init/0`
+            user_id := non_neg_integer() %% User ID assigned to the running process
+           }                             %% Plus as described in `telemetry:span/3`
+```
+
+A telemetry span of a full scenario execution for a user (i.e. the exported `terminate/1,2` function):
+```erlang
+event_name: [amoc, scenario, terminate, _]
+measurements: #{}                 %% As described in `telemetry:span/3`
+metadata: #{scenario := module(), %% Running scenario
+            state := term()       %% The state as returned by `init/0`
+           }                      %% Plus as described in `telemetry:span/3`
 ```
 
 ## Controller
