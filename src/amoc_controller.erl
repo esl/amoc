@@ -99,13 +99,11 @@ update_settings(Settings) ->
 -spec add_users(amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     ok | {error, term()}.
 add_users(StartId, EndId) ->
-    telemetry:execute([amoc, controller, users], #{count => EndId - StartId + 1}, #{type => add}),
     %% adding the exact range of the users
     gen_server:call(?SERVER, {add, StartId, EndId}).
 
 -spec remove_users(user_count(), boolean()) -> {ok, user_count()}.
 remove_users(Count, ForceRemove) ->
-    telemetry:execute([amoc, controller, users], #{count => Count}, #{type => remove}),
     %% trying to remove Count users, this action is async!!!
     gen_server:call(?SERVER, {remove, Count, ForceRemove}).
 
@@ -207,9 +205,8 @@ handle_start_scenario(_Scenario, _Settings, #state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
 -spec handle_stop_scenario(state()) -> {handle_call_res(), state()}.
-handle_stop_scenario(#state{scenario = Scenario, scenario_state = ScenarioState,
-                            no_of_users = 0, status = running} = State) ->
-    amoc_scenario:terminate(Scenario, ScenarioState),
+handle_stop_scenario(#state{no_of_users = 0, status = running} = State) ->
+    terminate_scenario(State),
     {ok, State#state{status = finished}};
 handle_stop_scenario(#state{status = running} = State) ->
     terminate_all_users(),
@@ -231,8 +228,11 @@ handle_update_settings(_Settings, #state{status = Status}) ->
 handle_add(StartId, EndId, #state{last_user_id = LastId,
                                   create_users = ScheduledUsers,
                                   status       = running,
+                                  scenario     = Scenario,
                                   tref         = TRef} = State) when StartId =< EndId,
                                                                      LastId < StartId ->
+    amoc_telemetry:execute([controller, users], #{count => EndId - StartId + 1},
+                           #{scenario => Scenario, type => add}),
     NewUsers = lists:seq(StartId, EndId),
     NewScheduledUsers = lists:append(ScheduledUsers, NewUsers),
     NewTRef = maybe_start_timer(TRef),
@@ -244,7 +244,9 @@ handle_add(_StartId, _EndId, #state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
 -spec handle_remove(user_count(), boolean(), state()) -> handle_call_res().
-handle_remove(Count, ForceRemove, #state{status = running}) ->
+handle_remove(Count, ForceRemove, #state{status = running, scenario = Scenario}) ->
+    amoc_telemetry:execute([controller, users], #{count => Count},
+                           #{scenario => Scenario, type => remove}),
     Pids = case ets:match_object(?USERS_TABLE, '$1', Count) of
                {Objects, _} -> [Pid || {_Id, Pid} <- Objects];
                '$end_of_table' -> []
@@ -311,6 +313,10 @@ init_scenario(Scenario, Settings) ->
         {error, Type, Reason} -> {error, {Type, Reason}}
     end.
 
+-spec terminate_scenario(state()) -> ok | {ok, any()} | {error, any()}.
+terminate_scenario(#state{scenario = Scenario, scenario_state = ScenarioState}) ->
+    amoc_scenario:terminate(Scenario, ScenarioState).
+
 -spec maybe_start_timer(timer:tref() | undefined) -> timer:tref().
 maybe_start_timer(undefined) ->
     {ok, TRef} = timer:send_interval(interarrival(), start_user),
@@ -347,9 +353,8 @@ terminate_all_users({Objects, Continuation}) ->
 terminate_all_users('$end_of_table') -> ok.
 
 -spec dec_no_of_users(state()) -> state().
-dec_no_of_users(#state{scenario = Scenario, scenario_state = ScenarioState,
-                       no_of_users = 1, status = terminating} = State) ->
-    amoc_scenario:terminate(Scenario, ScenarioState),
+dec_no_of_users(#state{no_of_users = 1, status = terminating} = State) ->
+    terminate_scenario(State),
     State#state{no_of_users = 0, status = finished};
 dec_no_of_users(#state{no_of_users = N} = State) ->
     State#state{no_of_users = N - 1}.

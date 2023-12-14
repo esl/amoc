@@ -28,26 +28,31 @@
 %%-------------------------------------------------------------------------
 
 %% @doc Applies the `Scenario:init/0' callback
+%%
+%% Runs on the controller process and spans a `[amoc, scenario, init, _]' telemetry event.
 -spec init(amoc:scenario()) -> {ok, state()} | {error, Reason :: term()}.
 init(Scenario) ->
-    apply_safely(Scenario, init, []).
+    apply_safely(Scenario, init, [], #{scenario => Scenario}).
 
 %% @doc Applies the `Scenario:terminate/0,1' callback
 %%
 %% `Scenario:terminate/0' and `Scenario:terminate/1' callbacks are optional.
 %% If the scenario module exports both functions, `Scenario:terminate/1' is used.
+%%
+%% Runs on the controller process and spans a `[amoc, scenario, terminate, _]' telemetry event.
 -spec terminate(amoc:scenario(), state()) -> ok | {ok, any()} | {error, Reason :: term()}.
 terminate(Scenario, State) ->
+    Metadata = #{scenario => Scenario, state => State},
     case {erlang:function_exported(Scenario, terminate, 1),
           erlang:function_exported(Scenario, terminate, 0)} of
         {true, _} ->
             %% since we ignore Scenario:terminate/1 return value
             %% we can use apply_safely/3 function
-            apply_safely(Scenario, terminate, [State]);
+            apply_safely(Scenario, terminate, [State], Metadata);
         {_, true} ->
             %% since we ignore Scenario:terminate/0 return value
             %% we can use apply_safely/3 function
-            apply_safely(Scenario, terminate, []);
+            apply_safely(Scenario, terminate, [], Metadata);
         _ ->
             ok
     end.
@@ -56,25 +61,39 @@ terminate(Scenario, State) ->
 %%
 %% Either `Scenario:start/1' or `Scenario:start/2' must be exported from the behaviour module.
 %% if scenario module exports both functions, `Scenario:start/2' is used.
+%%
+%% Runs on the user process and spans a `[amoc, scenario, user, _]' telemetry event.
 -spec start(amoc:scenario(), user_id(), state()) -> any().
 start(Scenario, Id, State) ->
-    case {erlang:function_exported(Scenario, start, 2),
-          erlang:function_exported(Scenario, start, 1)} of
-        {true, _} ->
-            Scenario:start(Id, State);
-        {_, true} ->
-            Scenario:start(Id);
-        {false, false} ->
-            error("the scenario module must export either start/2 or start/1 function")
-    end.
+    Metadata = #{scenario => Scenario, state => State, user_id => Id},
+    Span = case {erlang:function_exported(Scenario, start, 2),
+                 erlang:function_exported(Scenario, start, 1)} of
+               {true, _} ->
+                   fun() ->
+                           Ret = Scenario:start(Id, State),
+                           {Ret, Metadata#{return => Ret}}
+                   end;
+               {_, true} ->
+                   fun() ->
+                           Ret = Scenario:start(Id),
+                           {Ret, Metadata#{return => Ret}}
+                   end;
+               {false, false} ->
+                   exit("the scenario module must export either start/2 or start/1 function")
+           end,
+    telemetry:span([amoc, scenario, start], Metadata, Span).
 
 %% ------------------------------------------------------------------
 %% internal functions
 %% ------------------------------------------------------------------
 
--spec apply_safely(atom(), atom(), [term()]) -> {ok | error, term()}.
-apply_safely(M, F, A) ->
-    try erlang:apply(M, F, A) of
+-spec apply_safely(atom(), atom(), [term()], map()) -> {ok | error, term()}.
+apply_safely(M, F, A, Metadata) ->
+    Span = fun() ->
+                   Ret = erlang:apply(M, F, A),
+                   {Ret, Metadata#{return => Ret}}
+           end,
+    try telemetry:span([amoc, scenario, F], Metadata, Span) of
         {ok, RetVal} -> {ok, RetVal};
         {error, Error} -> {error, Error};
         Result -> {ok, Result}
