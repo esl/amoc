@@ -89,6 +89,7 @@ metadata: #{monotonic_time := integer(),
             log_level := logger:level(),
             msg := binary(),
             rate => non_neg_integer(),
+            interval => non_neg_integer(),
             state => map(),
             _ => _}
 ```

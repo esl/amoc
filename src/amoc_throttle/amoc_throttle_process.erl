@@ -129,10 +129,12 @@ format_status(_Opt, [_PDict, State]) ->
 initial_state(Name, Interval, Rate) when Rate >= 0 ->
     NewRate = case {Rate =:= 0, Rate < 5} of
                   {true, _} ->
-                      internal_error(<<"invalid rate, must be higher than zero">>, Name, Rate),
+                      Msg = <<"invalid rate, must be higher than zero">>,
+                      internal_error(Msg, Name, Rate, Interval),
                       1;
                   {_, true} ->
-                      internal_error(<<"too low rate, please reduce NoOfProcesses">>, Name, Rate),
+                      Msg = <<"too low rate, please reduce NoOfProcesses">>,
+                      internal_error(Msg, Name, Rate, Interval),
                       Rate;
                   {_, false} ->
                       Rate
@@ -140,7 +142,8 @@ initial_state(Name, Interval, Rate) when Rate >= 0 ->
     Delay = case {Interval, Interval div NewRate, Interval rem NewRate} of
                 {0, _, _} -> 0; %% limit only No of simultaneous executions
                 {_, I, _} when I < 10 ->
-                    internal_error(<<"too high rate, please increase NoOfProcesses">>, Name, Rate),
+                    Message = <<"too high rate, please increase NoOfProcesses">>,
+                    internal_error(Message, Name, Rate, Interval),
                     10;
                 {_, DelayBetweenExecutions, 0} -> DelayBetweenExecutions;
                 {_, DelayBetweenExecutions, _} -> DelayBetweenExecutions + 1
@@ -221,10 +224,10 @@ internal_event(Msg, #state{name = Name} = State) ->
     amoc_telemetry:execute_log(
       debug, [throttle, process], #{self => self(), name => Name, state => PrintableState}, Msg).
 
--spec internal_error(binary(), atom(), non_neg_integer()) -> any().
-internal_error(Msg, Name, Rate) ->
+-spec internal_error(binary(), atom(), amoc_throttle:rate(), amoc_throttle:interval()) -> any().
+internal_error(Msg, Name, Rate, Interval) ->
     amoc_telemetry:execute_log(
-      error, [throttle, process], #{name => Name, rate => Rate}, Msg).
+      error, [throttle, process], #{name => Name, rate => Rate, interval => Interval}, Msg).
 
 printable_state(#state{} = State) ->
     Fields = record_info(fields, state),
