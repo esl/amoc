@@ -16,8 +16,6 @@ Mix.install([
 
 ## Getting Started
 
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fesl%2Famoc%2Fblob%2Felixir%2Flivebook%2Fguides%2Famoc_livebook.livemd)
-
 In this book, we're going to experiment with some barebones load testing cases. We will define a server, a scenario, some instrumentation, and we will load-test the server and get some results.
 
 Let's get started!
