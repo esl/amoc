@@ -35,3 +35,7 @@ Before [setting up the distributed environment](guides/distributed.md),
 please read through the configuration overview.
 
 To see the full documentation, see [hexdocs](https://hexdocs.pm/amoc).
+
+You can also try with the livebook demo here:
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fesl%2Famoc%2Fblob%2Fmaster%2Fguides%2Famoc_livebook.livemd)
