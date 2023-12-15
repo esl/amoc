@@ -21,8 +21,6 @@
          handle_continue/2,
          format_status/2]).
 
--include_lib("kernel/include/logger.hrl").
-
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
 -record(state, {can_run_fn = true :: boolean(),
@@ -76,7 +74,7 @@ get_state(Pid) ->
 
 -spec init(list()) -> {ok, state(), timeout()}.
 init([Name, Interval, Rate]) ->
-    InitialState = initial_state(Interval, Rate),
+    InitialState = initial_state(Name, Interval, Rate),
     StateWithTimer = maybe_start_timer(InitialState),
     {ok, StateWithTimer#state{name = Name}, timeout(InitialState)}.
 
@@ -86,7 +84,7 @@ handle_info({'DOWN', _, process, _, _}, State) ->
 handle_info(delay_between_executions, State) ->
     {noreply, State#state{can_run_fn = true}, {continue, maybe_run_fn}};
 handle_info(timeout, State) ->
-    log_state("is inactive", State),
+    internal_event(<<"is inactive">>, State),
     {noreply, State, {continue, maybe_run_fn}}.
 
 -spec handle_cast(term(), state()) ->
@@ -100,9 +98,9 @@ handle_cast(resume_process, State) ->
 handle_cast({schedule, RunnerPid}, #state{schedule_reversed = SchRev, name = Name} = State) ->
     amoc_throttle_controller:telemetry_event(Name, request),
     {noreply, State#state{schedule_reversed = [RunnerPid | SchRev]}, {continue, maybe_run_fn}};
-handle_cast({update, Interval, Rate}, State) ->
-    NewState = merge_state(initial_state(Interval, Rate), State),
-    log_state("state update", NewState),
+handle_cast({update, Interval, Rate}, #state{name = Name} = State) ->
+    NewState = merge_state(initial_state(Name, Interval, Rate), State),
+    internal_event(<<"state update">>, NewState),
     {noreply, NewState, {continue, maybe_run_fn}}.
 
 -spec handle_call(term(), term(), state()) ->
@@ -128,23 +126,29 @@ format_status(_Opt, [_PDict, State]) ->
 %% internal functions
 %%------------------------------------------------------------------------------
 
-initial_state(Interval, 0) ->
-    ?LOG_ERROR("invalid rate, must be higher than zero"),
-    initial_state(Interval, 1);
-initial_state(Interval, Rate) when Rate > 0 ->
-    case Rate < 5 of
-        true -> ?LOG_ERROR("too low rate, please reduce NoOfProcesses");
-        false -> ok
-    end,
-    Delay = case {Interval, Interval div Rate, Interval rem Rate} of
+initial_state(Name, Interval, Rate) when Rate >= 0 ->
+    NewRate = case {Rate =:= 0, Rate < 5} of
+                  {true, _} ->
+                      Msg = <<"invalid rate, must be higher than zero">>,
+                      internal_error(Msg, Name, Rate, Interval),
+                      1;
+                  {_, true} ->
+                      Msg = <<"too low rate, please reduce NoOfProcesses">>,
+                      internal_error(Msg, Name, Rate, Interval),
+                      Rate;
+                  {_, false} ->
+                      Rate
+              end,
+    Delay = case {Interval, Interval div NewRate, Interval rem NewRate} of
                 {0, _, _} -> 0; %% limit only No of simultaneous executions
                 {_, I, _} when I < 10 ->
-                    ?LOG_ERROR("too high rate, please increase NoOfProcesses"),
+                    Message = <<"too high rate, please increase NoOfProcesses">>,
+                    internal_error(Message, Name, Rate, Interval),
                     10;
                 {_, DelayBetweenExecutions, 0} -> DelayBetweenExecutions;
                 {_, DelayBetweenExecutions, _} -> DelayBetweenExecutions + 1
             end,
-    #state{interval = Interval, n = Rate, max_n = Rate, delay_between_executions = Delay}.
+    #state{interval = Interval, n = NewRate, max_n = NewRate, delay_between_executions = Delay}.
 
 merge_state(#state{interval = I, delay_between_executions = D, n = N, max_n = MaxN},
             #state{n = OldN, max_n = OldMaxN} = OldState) ->
@@ -201,25 +205,34 @@ async_runner(Fun) ->
 timeout(State) ->
     State#state.interval + ?DEFAULT_MSG_TIMEOUT.
 
-inc_n(#state{n = N, max_n = MaxN} = State) ->
+inc_n(#state{name = Name, n = N, max_n = MaxN} = State) ->
     NewN = N + 1,
     case MaxN < NewN of
         true ->
             PrintableState = printable_state(State),
-            ?LOG_ERROR("~nthrottle process ~p: invalid N (~p)~n", [self(), PrintableState]),
+            Msg = <<"throttle proccess has invalid N">>,
+            amoc_telemetry:execute_log(
+              error, [throttle, process], #{name => Name, n => NewN, state => PrintableState}, Msg),
             State#state{n = MaxN};
         false ->
             State#state{n = NewN}
     end.
 
-log_state(Msg, State) ->
+-spec internal_event(binary(), state()) -> any().
+internal_event(Msg, #state{name = Name} = State) ->
     PrintableState = printable_state(State),
-    ?LOG_DEBUG("~nthrottle process ~p: ~s (~p)~n", [self(), Msg, PrintableState]).
+    amoc_telemetry:execute_log(
+      debug, [throttle, process], #{self => self(), name => Name, state => PrintableState}, Msg).
+
+-spec internal_error(binary(), atom(), amoc_throttle:rate(), amoc_throttle:interval()) -> any().
+internal_error(Msg, Name, Rate, Interval) ->
+    amoc_telemetry:execute_log(
+      error, [throttle, process], #{name => Name, rate => Rate, interval => Interval}, Msg).
 
 printable_state(#state{} = State) ->
     Fields = record_info(fields, state),
     [_ | Values] = tuple_to_list(State#state{schedule = [], schedule_reversed = []}),
     StateMap = maps:from_list(lists:zip(Fields, Values)),
     StateMap#{
-        schedule:=length(State#state.schedule),
-        schedule_reversed:=length(State#state.schedule_reversed)}.
+        schedule := length(State#state.schedule),
+        schedule_reversed := length(State#state.schedule_reversed)}.

@@ -78,6 +78,22 @@ measurements: #{count := 1}
 metadata: #{monotonic_time := integer(), name := atom()}
 ```
 
+### Throttle process internals
+
+Events related to internals of the throttle processes, these might expose unstable conditions you
+might want to log or reconfigure:
+```erlang
+event_name: [amoc, throttle, process]
+measurements: #{logger:level() => 1}
+metadata: #{monotonic_time := integer(),
+            log_level := logger:level(),
+            msg := binary(),
+            rate => non_neg_integer(),
+            interval => non_neg_integer(),
+            state => map(),
+            _ => _}
+```
+
 ## Coordinator
 
 Indicates when a coordinating event was raised, like a process being added for coordination or a timeout being triggered
@@ -87,4 +103,27 @@ Indicates when a coordinating event was raised, like a process being added for c
 event_name: [amoc, coordinator, start | stop | add | reset | timeout]
 measurements: #{count := 1}
 metadata: #{monotonic_time := integer(), name := atom()}
+```
+
+## Config
+
+### Internal events
+There are related to bad configuration events, they might deserve logging
+```erlang
+event_name: [amoc, config, get | verify | env]
+measurements: #{logger:level() => 1}
+metadata: #{monotonic_time := integer(),
+            log_level => logger:level(),
+            setting => atom(),
+            msg => binary(), _ => _}
+```
+
+## Cluster
+
+### Internal events
+There are related to clustering events
+```erlang
+event_name: [amoc, cluster, connect_nodes | nodedown | master_node_down]
+measurements: #{count => non_neg_integer()},
+metadata: #{nodes => nodes(), state => map()}
 ```
