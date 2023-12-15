@@ -20,6 +20,5 @@ execute(Name, Measurements, Metadata) ->
       Metadata :: telemetry:event_metadata(),
       Msg :: binary().
 execute_log(Level, Name, Metadata, Message) ->
-    PrefixedName = [amoc | Name],
     MetadataWithLog = Metadata#{log_level => Level, msg => Message},
-    telemetry:execute(PrefixedName, #{Level => 1}, MetadataWithLog).
+    execute(Name, #{Level => 1}, MetadataWithLog).

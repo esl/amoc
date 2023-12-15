@@ -85,7 +85,8 @@ might want to log or reconfigure:
 ```erlang
 event_name: [amoc, throttle, process]
 measurements: #{logger:level() => 1}
-metadata: #{log_level := logger:level(),
+metadata: #{monotonic_time := integer(),
+            log_level := logger:level(),
             msg := binary(),
             rate => non_neg_integer(),
             state => map(),
@@ -110,7 +111,10 @@ There are related to bad configuration events, they might deserve logging
 ```erlang
 event_name: [amoc, config, get | verify | env]
 measurements: #{logger:level() => 1}
-metadata: #{log_level => logger:level(), setting => atom(), msg => binary(), _ => _}
+metadata: #{monotonic_time := integer(),
+            log_level => logger:level(),
+            setting => atom(),
+            msg => binary(), _ => _}
 ```
 
 ## Cluster

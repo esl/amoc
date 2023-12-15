@@ -132,7 +132,7 @@ handle_call(_Request, _From, State) ->
 
 -spec handle_cast(any(), state()) -> {noreply, state()}.
 handle_cast({connect_nodes, Nodes}, State) ->
-    execute_nodes(connect_nodes, Nodes, state_to_map(State)),
+    raise_nodes_event(connect_nodes, Nodes, state_to_map(State)),
     NewState = handle_connect_nodes(Nodes, State),
     schedule_timer(NewState),
     {noreply, NewState};
@@ -147,11 +147,11 @@ handle_info(timeout, State) ->
     schedule_timer(NewState),
     {noreply, NewState};
 handle_info({nodedown, Node}, #state{master = Node} = State) ->
-    execute_nodes(master_node_down, [Node], state_to_map(State)),
+    raise_nodes_event(master_node_down, [Node], state_to_map(State)),
     erlang:halt(),
     {noreply, State};
 handle_info({nodedown, Node}, State) ->
-    execute_nodes(nodedown, [Node], state_to_map(State)),
+    raise_nodes_event(nodedown, [Node], state_to_map(State)),
     {noreply, merge(connection_lost, [Node], State)};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -281,7 +281,7 @@ maybe_set_master(Node, #state{new_connection_action = Action}) ->
     %% running the Action call set_master_node/2 asynchronously
     spawn(fun() -> set_master_node(Node, Action) end).
 
--spec execute_nodes(atom(), [node()], #{any() => any()}) -> ok.
-execute_nodes(Name, Nodes, State) ->
-    PrefixedName = [amoc, cluster, Name],
-    telemetry:execute(PrefixedName, #{count => length(Nodes)}, #{nodes => Nodes, state => State}).
+-spec raise_nodes_event(atom(), [node()], #{any() => any()}) -> ok.
+raise_nodes_event(Name, Nodes, State) ->
+    amoc_telemetry:execute(
+      [cluster, Name], #{count => length(Nodes)}, #{nodes => Nodes, state => State}).
