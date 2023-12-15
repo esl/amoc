@@ -2,9 +2,11 @@
 %% @copyright 2023 Erlang Solutions Ltd.
 -module(amoc_user).
 
+-define(SHUTDOWN_TIMEOUT, 2000). %% 2 seconds
+
 %% API
 -export([start_link/3]).
--export([stop/0, stop/2]).
+-export([stop/2]).
 -export([init/4]).
 
 -type state() :: term().
@@ -14,13 +16,11 @@
 start_link(Scenario, Id, State) ->
     proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
 
--spec stop() -> no_return().
-stop() ->
-    stop(self(), false).
-
 -spec stop(pid(), boolean()) -> no_return() | ok | {error, any()}.
-stop(Pid, Force) when is_pid(Pid) ->
-    amoc_users_sup:stop_child(Pid, Force).
+stop(Pid, false) when is_pid(Pid), Pid =/= self() ->
+    proc_lib:stop(Pid, shutdown, ?SHUTDOWN_TIMEOUT);
+stop(Pid, true) when is_pid(Pid), Pid =/= self() ->
+    proc_lib:stop(Pid, kill, ?SHUTDOWN_TIMEOUT).
 
 -spec init(pid(), amoc:scenario(), amoc_scenario:user_id(), state()) ->
     no_return().
