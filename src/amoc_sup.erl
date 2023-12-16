@@ -32,7 +32,7 @@ start_link() ->
 init([]) ->
     {ok, {{rest_for_one, 5, 10},
           [
-              ?CHILD(amoc_users_sup, worker),
+              ?CHILD(amoc_users_sup_sup, supervisor),
               ?CHILD(amoc_controller, worker),
               ?CHILD(amoc_cluster, worker),
               ?CHILD(amoc_code_server, worker),
