@@ -33,7 +33,7 @@ start_link() ->
 init([]) ->
     {ok, {{rest_for_one, 5, 10},
           [
-              ?WORKER(amoc_users_sup, worker),
+              ?SUP(amoc_users_sup_sup, supervisor),
               ?SUP(amoc_throttle_sup, supervisor),
               ?SUP(amoc_coordinator_sup, supervisor),
               ?WORKER(amoc_controller, worker),
