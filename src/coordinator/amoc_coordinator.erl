@@ -37,8 +37,9 @@
 
 -type coordination_actions() :: [coordination_action()] | coordination_action().
 
--type coordination_item() :: {NoOfUsers :: pos_integer() | all,
-                              coordination_actions()}.
+-type num_of_users() :: pos_integer() | {pos_integer(), pos_integer()} | all.
+
+-type coordination_item() :: {num_of_users(), coordination_actions()}.
 
 -type normalized_coordination_item() :: {NoOfUsers :: pos_integer() | all,
                                          [coordination_action()]}.
@@ -51,6 +52,7 @@
 -export_type([name/0,
               event/0,
               plan/0,
+              num_of_users/0,
               coordination_event_type/0,
               coordination_event/0,
               coordination_action/0,
@@ -162,7 +164,11 @@ normalize_coordination_item({NoOfUsers, Action}) when is_function(Action) ->
 normalize_coordination_item({NoOfUsers, Actions}) when ?IS_N_OF_USERS(NoOfUsers),
                                                        is_list(Actions) ->
     [assert_action(NoOfUsers, A) || A <- Actions],
-    {NoOfUsers, Actions}.
+    {NoOfUsers, Actions};
+normalize_coordination_item({{Min, Max}, Actions}) when ?IS_POS_INT(Min), ?IS_POS_INT(Max),
+                                                        Max > Min, is_list(Actions) ->
+    [assert_action({Min, Max}, A) || A <- Actions],
+    {{Min, Max - Min}, Actions}.
 
 assert_action(all, Action) when is_function(Action, 1);
                                 is_function(Action, 2) ->
@@ -171,4 +177,9 @@ assert_action(N, Action) when is_integer(N),
                               (is_function(Action, 1) orelse
                                is_function(Action, 2) orelse
                                is_function(Action, 3)) ->
+    ok;
+assert_action({Min, Max}, Action) when is_integer(Min), is_integer(Max),
+                                       (is_function(Action, 1) orelse
+                                        is_function(Action, 2) orelse
+                                        is_function(Action, 3)) ->
     ok.

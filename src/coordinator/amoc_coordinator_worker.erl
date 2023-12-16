@@ -20,11 +20,12 @@
 -type action() :: amoc_coordinator:coordination_action().
 -type data() :: amoc_coordinator:coordination_data().
 
--record(state, {required_n = all :: pos_integer() | all,
+-record(state, {configured = all :: {pos_integer(), pos_integer()} | pos_integer() | all,
+                required_n = all :: pos_integer() | all,
                 n = 0 :: non_neg_integer(),
                 actions = [] :: [action()],
                 collect_data = true :: boolean(),
-                accumulator = [] :: [data()]}).
+                acc = [] :: [data()]}).
 
 -type state() :: #state{}.
 
@@ -58,9 +59,11 @@ add(Pid, Data) ->
 
 -spec init(amoc_coordinator:normalized_coordination_item()) -> {ok, state()}.
 init({NoOfUsers, Actions}) ->
-    State = #state{required_n = NoOfUsers, actions = Actions},
-    {ok, State#state{collect_data = is_acc_required(Actions)}}.
-
+    State = #state{configured = NoOfUsers,
+                   required_n = calculate_n(NoOfUsers),
+                   actions = Actions,
+                   collect_data = is_acc_required(Actions)},
+    {ok, State}.
 
 -spec handle_call({reset, reset | timeout | stop}, term(), state()) ->
     {reply, ok, state()} | {stop, normal, ok, state()}.
@@ -84,12 +87,12 @@ is_acc_required(Actions) ->
               end, Actions).
 
 -spec add_data(data(), state()) -> state().
-add_data(Data, #state{n = N, accumulator = Acc} = State) ->
+add_data(Data, #state{n = N, acc = Acc} = State) ->
     NewState = case State#state.collect_data of
                    false ->
                        State#state{n = N + 1};
                    true ->
-                       State#state{n = N + 1, accumulator = [Data | Acc]}
+                       State#state{n = N + 1, acc = [Data | Acc]}
                end,
     maybe_reset_state(NewState).
 
@@ -100,13 +103,15 @@ maybe_reset_state(State) ->
     State.
 
 -spec reset_state(event_type(), state()) -> state().
-reset_state(Event, #state{actions = Actions,
-                          accumulator = Acc,
+reset_state(Event, #state{configured = Config,
+                          actions = Actions,
+                          acc = Acc,
                           n = N, required_n = ReqN} = State) ->
     amoc_telemetry:execute([coordinator, execute], #{count => N},
                            #{event => Event, configured => ReqN}),
     [execute_action(Action, {Event, N}, Acc) || Action <- Actions],
-    State#state{accumulator = [], n = 0}.
+    NewN = calculate_n(Config),
+    State#state{required_n = NewN, n = 0, acc = []}.
 
 -spec execute_action(action(), event(), [data()]) -> any().
 execute_action(Action, Event, _) when is_function(Action, 1) ->
@@ -124,6 +129,12 @@ safe_executions(Fun, Args) ->
     catch
         _:_ -> ok
     end.
+
+-spec calculate_n(amoc_coordinator:num_of_users()) -> all | pos_integer().
+calculate_n({Min, Diff}) ->
+    Min + rand:uniform(Diff);
+calculate_n(Value) ->
+    Value.
 
 -spec distinct_pairs(fun((data(), data()) -> any()), [data()]) -> any().
 distinct_pairs(Fun, []) ->

@@ -14,6 +14,7 @@ all() ->
      plan_normalises_successfully,
      ordering_plan_sets_all_at_the_end,
      failing_action_does_not_kill_the_worker,
+     execute_with_range_without_timeout,
      execute_plan_without_timeout,
      reset_plan_without_timeout,
      execute_plan_with_timeout
@@ -44,6 +45,25 @@ init_per_testcase(_, Config) ->
 
 end_per_testcase(_Config) ->
     ok.
+
+execute_with_range_without_timeout(_Config) ->
+    N = 20, Name = ?FUNCTION_NAME,
+
+    Plan = [ Range = {{5, 10}, mocked_action(range, 1)},
+             All = {all, mocked_action(all, 1)}],
+
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan, infinity)),
+    [amoc_coordinator:add(Name, User) || User <- lists:seq(1, N)],
+
+    amoc_coordinator:stop(Name),
+    meck:wait(length(Plan), ?MOCK_MOD, f_1, ['_', {stop, '_'}], 1000),
+
+    History = meck:history(?MOCK_MOD),
+    NumOfEvents = length(History),
+    ?assert(3 =< NumOfEvents andalso NumOfEvents =< 6),
+
+    nothing_after_tags(History, [all]),
+    assert_telemetry_events(Name, [start, {N, add}, stop]).
 
 execute_plan_without_timeout(_Config) ->
     N = 4, Name = ?FUNCTION_NAME,
