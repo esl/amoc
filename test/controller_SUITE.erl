@@ -104,9 +104,10 @@ remove_users_scenario_not_started_fails(_) ->
 
 check_status_with_running_users_is_correct(_) ->
     do_start_scenario(testing_scenario, regular_vars()),
-    amoc_controller:add_users(1, 10),
-    Status = amoc_controller:get_status(),
-    ?assertMatch({running, testing_scenario, _, 10}, Status).
+    StartId = 6,
+    EndId = 10,
+    amoc_controller:add_users(6, 10),
+    wait_until_scenario_has_users(testing_scenario, EndId - StartId + 1, EndId).
 
 check_status_after_killing_one_user_is_correct(_) ->
     do_start_scenario(testing_scenario, regular_vars()),
@@ -175,7 +176,7 @@ regular_vars_with_state() ->
 other_vars_to_keep_quiet() ->
     [{config_scenario_var1, unused_value}].
 
-wait_until_scenario_has_users(Scenario, Current, Total) ->
+wait_until_scenario_has_users(Scenario, Current, HighestId) ->
     WaitUntilFun = fun amoc_controller:get_status/0,
-    WaitUntilValue = {running, Scenario, Current, Total},
+    WaitUntilValue = {running, Scenario, Current, HighestId},
     async_helper:wait_until(WaitUntilFun, WaitUntilValue).
