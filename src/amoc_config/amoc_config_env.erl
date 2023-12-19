@@ -12,7 +12,7 @@
 %% @end
 -module(amoc_config_env).
 
--export([get/1, get/2]).
+-export([get/2]).
 
 -define(DEFAULT_PARSER_MODULE, amoc_config_parser).
 
@@ -21,19 +21,8 @@
 %% ------------------------------------------------------------------
 %% API
 %% ------------------------------------------------------------------
--spec get(amoc_config:name()) -> amoc_config:value().
-get(Name) ->
-    get(Name, undefined).
-
 -spec get(amoc_config:name(), amoc_config:value()) -> amoc_config:value().
 get(Name, Default) when is_atom(Name) ->
-    get_os_env(Name, Default).
-
-%% ------------------------------------------------------------------
-%% Internal Function Definitions
-%% ------------------------------------------------------------------
--spec get_os_env(amoc_config:name(), amoc_config:value()) -> amoc_config:value().
-get_os_env(Name, Default) ->
     EnvName = os_env_name(Name),
     Value = os:getenv(EnvName),
     case parse_value(Value, Default) of
@@ -47,6 +36,9 @@ get_os_env(Name, Default) ->
             Default
     end.
 
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
 -spec os_env_name(amoc_config:name()) -> string().
 os_env_name(Name) when is_atom(Name) ->
     "AMOC_" ++ string:uppercase(erlang:atom_to_list(Name)).
@@ -55,8 +47,7 @@ os_env_name(Name) when is_atom(Name) ->
 parse_value(false, Default) -> {ok, Default};
 parse_value("", Default)    -> {ok, Default};
 parse_value(String, _) ->
-    App = application:get_application(?MODULE),
-    Mod = application:get_env(App, config_parser_mod, ?DEFAULT_PARSER_MODULE),
+    Mod = application:get_env(amoc, config_parser_mod, ?DEFAULT_PARSER_MODULE),
     try Mod:parse_value(String) of
         {ok, Value} -> {ok, Value};
         {error, Error} -> {error, Error};
