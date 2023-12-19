@@ -1,7 +1,7 @@
 ## Configuration
 
 Amoc is configured through environment variables (uppercase with prefix ``AMOC_``).
-Note that by default, values of environment variables are deserialized as Erlang terms. This behavior can be customized by providing an alternative parsing module in the `config_parser_mod` configuration parameter for the amoc application. It can be done using the [application:set_env/4](https://www.erlang.org/doc/man/application#set_env-4) interface or via a [config file](https://www.erlang.org/doc/man/config). The custom parsing module must implement `amoc_config_env` behavior.
+Note that by default, environment variables values are deserialized as Erlang terms. This behavior can be customized by providing an alternative parsing module in the `config_parser_mod` configuration parameter for the amoc application. It can be done using the [application:set_env/4](https://www.erlang.org/doc/man/application#set_env-4) interface or via a [config file](https://www.erlang.org/doc/man/config). The custom parsing module must implement the `amoc_config_env` behavior.
 
 Amoc supports the following generic configuration parameters:
 
