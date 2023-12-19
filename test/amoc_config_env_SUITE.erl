@@ -35,27 +35,22 @@ end_per_suite(_) ->
 
 init_per_testcase(valid_custom_parser_test, Config) ->
     meck:new(?MOCK_MOD, [non_strict, no_link]),
-    App = application:get_application(amoc_config_env),
-    application:set_env(App, config_parser_mod, ?MOCK_MOD),
-    ct:pal("amoc_config_env module belongs to '~p' application", [App]),
+    set_config_parser_module(?MOCK_MOD),
     ct:pal("AMOC_* OS env. variables:~n   ~p",
            [[AmocEnv || "AMOC_" ++ _ = AmocEnv <- os:getenv()]]),
     Config;
 init_per_testcase(invalid_custom_parser_test, Config) ->
-    App = application:get_application(amoc_config_env),
     %% setting non-existing config parser module
-    application:set_env(App, config_parser_mod, invalid_parser_module),
+    set_config_parser_module(invalid_parser_module),
     Config;
 init_per_testcase(_, Config) ->
     Config.
 
 end_per_testcase(valid_custom_parser_test, _Config) ->
-    App = application:get_application(amoc_config_env),
-    application:unset_env(App, config_parser_mod),
+    unset_config_parser_module(),
     meck:unload();
 end_per_testcase(invalid_custom_parser_test, _Config) ->
-    App = application:get_application(amoc_config_env),
-    application:unset_env(App, config_parser_mod);
+    unset_config_parser_module();
 end_per_testcase(_, _Config) ->
     ok.
 %%-----------------------------------------------------------------------------------
@@ -130,3 +125,13 @@ invalid_custom_parser_test(_) ->
     ?assertEqual(default_value, get_env(unset_var, default_value)),
     ?assertEqual(undefined, get_env(empty_var)),
     ?assertEqual(default_value, get_env(empty_var, default_value)).
+
+%%-----------------------------------------------------------------------------------
+%% helper functions
+%%-----------------------------------------------------------------------------------
+
+set_config_parser_module(Mod) ->
+    application:set_env(amoc, config_parser_mod, Mod).
+
+unset_config_parser_module() ->
+    application:unset_env(amoc, config_parser_mod).

@@ -1,7 +1,7 @@
 ## Configuration
 
 Amoc is configured through environment variables (uppercase with prefix ``AMOC_``).
-Note that the environment variables are evaluated as Erlang code.
+Note that by default, environment variables values are deserialized as Erlang terms. This behavior can be customized by providing an alternative parsing module in the `config_parser_mod` configuration parameter for the amoc application. It can be done using the [application:set_env/4](https://www.erlang.org/doc/man/application#set_env-4) interface or via a [config file](https://www.erlang.org/doc/man/config). The custom parsing module must implement the `amoc_config_env` behavior.
 
 Amoc supports the following generic configuration parameters:
 
@@ -12,7 +12,7 @@ Amoc supports the following generic configuration parameters:
 * ``api_port`` - a port for the amoc REST interfaces:
     * default value - 4000
     * example: `AMOC_API_PORT="4000"`
-                                      
+
 * ``interarrival`` - a delay (in ms, for each node in the cluster independently) between creating the processes
   for two consecutive users:
     * default value - 50 ms.
@@ -61,7 +61,7 @@ where
 * **Default:** this field is mandatory
 
 ### `description`
-* **Syntax:** A string describing how this variable is used, can be extracted by APIs to document the behaviour
+* **Syntax:** A string describing how this variable is used, can be extracted by APIs to document the behavior
 * **Example:** `description = "a description of this variable"`
 * **Default:** this field is mandatory
 
@@ -91,9 +91,9 @@ An action to take when the value of this variable is updated. It is triggered at
 - If it is set to `none`, all updates are allowed.
 - If it is an `mfa`, the given function will be called on the old and new value.
 
-## Reasonale
+## Rationale
 
-The reason why the `-required_variable(...)` is preferred over the usual behaviour
+The reason why the `-required_variable(...)` is preferred over the usual behavior
 callback is because the orchestration tools can easily extract the attributes even
 without the compilation, while configuring via a callback, requires a successful
 compilation of the module. As an example, a module:
@@ -101,7 +101,7 @@ compilation of the module. As an example, a module:
 -module(example).
 -include("some_unavailable_header.hrl").
 -some_attr({"some", value}).
--some_attr([{another, "value"}, 
+-some_attr([{another, "value"},
             {yet, <<"another">>, "value"}]).
 ```
 cannot be compiled without the ``some_unavailable_header.hrl`` file, but we still
@@ -115,9 +115,9 @@ error
 {ok,[{attribute,1,file,{"example.erl",1}},
      {attribute,1,module,example},
      {error,{2,epp,{include,file,"some_unavailable_header.hrl"}}},
-     {attribute,3,some_attr,{"some",value}}, 
+     {attribute,3,some_attr,{"some",value}},
      {attribute,4,some_attr,
-                [{another,"value"},{yet,<<"another">>,"value"}]}, 
+                [{another,"value"},{yet,<<"another">>,"value"}]},
      {eof,6}]}
 3> lists:flatten([Value || {attribute, _, some_attr, Value} <- AbstractForm]).
 [{"some",value},

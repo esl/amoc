@@ -15,7 +15,7 @@ env_name(Name) ->
     "AMOC_" ++ string:uppercase(erlang:atom_to_list(Name)).
 
 get_env(Name) ->
-    amoc_config_env:get(Name).
+    get_env(Name, undefined).
 
 get_env(Name, Default) ->
     amoc_config_env:get(Name, Default).
