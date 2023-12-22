@@ -49,10 +49,18 @@ handle_cast({start_child, Scenario, Id, ScenarioState}, #state{tid = Tid} = Stat
     case amoc_user:start_link(Scenario, Id, ScenarioState) of
         {ok, Pid} ->
             handle_up_user(Tid, Pid, Id),
-            {noreply, State#state{}};
+            {noreply, State};
         _ ->
             {noreply, State}
     end;
+handle_cast({start_children, Scenario, Ids, ScenarioState}, #state{tid = Tid} = State) ->
+    [ case amoc_user:start_link(Scenario, Id, ScenarioState) of
+          {ok, Pid} ->
+              handle_up_user(Tid, Pid, Id);
+          _ ->
+              ok
+      end || Id <- Ids],
+    {noreply, State};
 handle_cast({stop_child, ForceRemove}, #state{tid = Tid} = State) ->
     Pids = case ets:match_object(Tid, '$1', 1) of
                {[{Pid, _Id}], _} -> [Pid];

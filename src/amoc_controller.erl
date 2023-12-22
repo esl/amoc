@@ -298,11 +298,12 @@ handle_start_user(#state{create_users = [], tref = TRef} = State) ->
     State#state{tref = maybe_stop_timer(TRef)}.
 
 -spec handle_start_all_users(state()) -> state().
-handle_start_all_users(#state{create_users = []} = State) ->
-    handle_start_user(State);
-handle_start_all_users(State) ->
-    NewState = handle_start_user(State),
-    handle_start_all_users(NewState).
+handle_start_all_users(#state{create_users   = AllUsers,
+                              scenario       = Scenario,
+                              scenario_state = ScenarioState,
+                              tref = TRef} = State) ->
+    amoc_users_sup_sup:start_children(Scenario, AllUsers, ScenarioState),
+    State#state{create_users = [], tref = maybe_stop_timer(TRef)}.
 
 %% ------------------------------------------------------------------
 %% helpers
