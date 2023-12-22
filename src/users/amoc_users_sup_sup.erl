@@ -9,7 +9,7 @@
 
 %% API
 -export([init_storage/0, incr_no_of_users/0, decr_no_of_users/0, count_no_of_users/0,
-         start_child/3, stop_children/2, terminate_all_children/0]).
+         start_child/3, start_children/3, stop_children/2, terminate_all_children/0]).
 
 -record(storage, {
           user_count :: atomics:atomics_ref(),
@@ -65,6 +65,17 @@ decr_no_of_users() ->
 start_child(Scenario, Id, ScenarioState) ->
     Sup = get_sup_for_user_id(Id),
     gen_server:cast(Sup, {start_child, Scenario, Id, ScenarioState}).
+
+-spec start_children(amoc:scenario(), [amoc_scenario:user_id()], any()) -> ok.
+start_children(Scenario, UserIds, ScenarioState) ->
+    KeyFun = fun(UserId) ->
+                     get_sup_for_user_id(UserId)
+             end,
+    Assignments = maps:groups_from_list(KeyFun, UserIds),
+    CastFun = fun (Sup, Users) ->
+                      gen_server:cast(Sup, {start_children, Scenario, Users, ScenarioState})
+              end,
+    maps:foreach(CastFun, Assignments).
 
 -spec stop_children(non_neg_integer(), boolean()) -> non_neg_integer().
 stop_children(Count, Force) ->
