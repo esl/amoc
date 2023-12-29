@@ -99,7 +99,11 @@ maybe_reset_state(State) ->
     State.
 
 -spec reset_state(event_type(), state()) -> state().
-reset_state(Event, #state{actions = Actions, accumulator = Acc, n = N} = State) ->
+reset_state(Event, #state{actions = Actions,
+                          accumulator = Acc,
+                          n = N, required_n = ReqN} = State) ->
+    amoc_telemetry:execute([coordinator, execute], #{count => N},
+                           #{event => Event, configured => ReqN}),
     [execute_action(Action, {Event, N}, Acc) || Action <- Actions],
     State#state{accumulator = [], n = 0}.
 
