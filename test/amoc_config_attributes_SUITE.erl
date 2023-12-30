@@ -2,7 +2,7 @@
 -module(amoc_config_attributes_SUITE).
 
 -include_lib("eunit/include/eunit.hrl").
--include("../src/amoc_config/amoc_config.hrl").
+-include("../src/config/amoc_config.hrl").
 
 -export([all/0]).
 -export([get_module_attributes/1,

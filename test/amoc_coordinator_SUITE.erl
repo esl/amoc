@@ -28,10 +28,13 @@ init_per_suite(Config) ->
     TelemetryHandler = fun ?TELEMETRY_HANDLER:handler/4,
     telemetry:attach_many(?TELEMETRY_HANDLER, TelemetryEvents,
                            TelemetryHandler, ?TELEMETRY_HANDLER_CONFIG),
-    Config.
+    Pid = spawn(fun() -> amoc_coordinator_sup_sup:start_link(), receive terminate -> ok end end),
+    [{sup, Pid} | Config].
 
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
     application:stop(telemetry),
+    Sup = ?config(sup, Config),
+    Sup ! terminate,
     meck:unload().
 
 init_per_testcase(_, Config) ->

@@ -33,6 +33,7 @@ init([]) ->
     {ok, {{one_for_one, 5, 10},
           [
               ?CHILD(amoc_users_sup, supervisor),
+              ?CHILD(amoc_coordinator_sup, supervisor),
               ?CHILD(amoc_controller, worker),
               ?CHILD(amoc_cluster, worker),
               ?CHILD(amoc_code_server, worker),
