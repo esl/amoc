@@ -141,9 +141,13 @@ send(Name, Msg) ->
 %% Can be used to halt execution if we want a process to be idle when waiting for rate increase or other processes finishing their tasks.
 -spec send_and_wait(name(), any()) -> ok | {error, any()}.
 send_and_wait(Name, Msg) ->
-    send(Name, Msg),
-    receive
-        Msg -> ok
+    case send(Name, Msg) of
+        ok ->
+            receive
+                Msg -> ok
+            end;
+        Error ->
+            Error
     end.
 
 %% @doc Stops the throttle mechanism for the given `Name'.
