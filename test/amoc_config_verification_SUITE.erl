@@ -1,6 +1,6 @@
 -module(amoc_config_verification_SUITE).
 -include_lib("eunit/include/eunit.hrl").
--include("../src/amoc_config/amoc_config.hrl").
+-include("../src/config/amoc_config.hrl").
 
 -compile(export_all).
 
