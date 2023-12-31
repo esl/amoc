@@ -5,8 +5,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/3,
-         stop/1,
+-export([stop/1,
          run/2,
          update/3,
          pause/1,
@@ -14,13 +13,15 @@
          get_state/1]).
 
 %% gen_server behaviour
--export([init/1,
+-export([start_link/3,
+         init/1,
          handle_call/3,
          handle_info/2,
          handle_cast/2,
          handle_continue/2,
          format_status/2]).
 
+-define(PG_SCOPE, amoc_throttle).
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
 -record(state, {can_run_fn = true :: boolean(),
@@ -39,9 +40,9 @@
 %% Exported functions
 %%------------------------------------------------------------------------------
 
--spec start(atom(), amoc_throttle:interval(), amoc_throttle:rate()) -> {ok, pid()}.
-start(Name, Interval, Rate) ->
-    gen_server:start(?MODULE, [Name, Interval, Rate], []).
+-spec start_link(atom(), amoc_throttle:interval(), amoc_throttle:rate()) -> {ok, pid()}.
+start_link(Name, Interval, Rate) ->
+    gen_server:start_link(?MODULE, {Name, Interval, Rate}, []).
 
 -spec stop(pid()) -> ok.
 stop(Pid) ->
@@ -64,7 +65,7 @@ pause(Pid) ->
 resume(Pid) ->
     gen_server:cast(Pid, resume_process).
 
--spec get_state(pid()) -> state().
+-spec get_state(pid()) -> map().
 get_state(Pid) ->
     gen_server:call(Pid, get_state).
 
@@ -72,8 +73,10 @@ get_state(Pid) ->
 %% gen_server behaviour
 %%------------------------------------------------------------------------------
 
--spec init(list()) -> {ok, state(), timeout()}.
-init([Name, Interval, Rate]) ->
+-spec init({amoc_throttle:name(), amoc_throttle:interval(), amoc_throttle:rate()}) ->
+    {ok, state(), timeout()}.
+init({Name, Interval, Rate}) ->
+    pg:join(?PG_SCOPE, Name, self()),
     InitialState = initial_state(Name, Interval, Rate),
     StateWithTimer = maybe_start_timer(InitialState),
     {ok, StateWithTimer#state{name = Name}, timeout(InitialState)}.
