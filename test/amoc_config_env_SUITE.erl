@@ -4,6 +4,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -import(amoc_config_helper, [format_value/1,
+                             format_value/2,
                              get_env/1,
                              get_env/2,
                              set_os_env/2,
@@ -60,9 +61,15 @@ end_per_testcase(_, _Config) ->
 parse_value_prop_test(_) ->
     RealAnyType = weighted_union([{1, map(any(), any())},
                                   {10, any()}]),
-    ProperTest = ?FORALL(Value, RealAnyType,
-                         amoc_config_parser:parse_value(format_value(Value)) =:= {ok, Value}),
-    ?assertEqual(true, proper:quickcheck(ProperTest, [quiet])).
+    ProperTestStrings =
+        ?FORALL(Value, RealAnyType,
+                amoc_config_parser:parse_value(format_value(Value)) =:= {ok, Value}),
+    ?assertEqual(true, proper:quickcheck(ProperTestStrings, [quiet])),
+
+    ProperTestBinaries =
+        ?FORALL(Value, RealAnyType,
+                amoc_config_parser:parse_value(format_value(Value, binary)) =:= {ok, Value}),
+    ?assertEqual(true, proper:quickcheck(ProperTestBinaries, [quiet])).
 
 default_parser_test(_) ->
     %% testing default config parser module (amoc_config_parser)
