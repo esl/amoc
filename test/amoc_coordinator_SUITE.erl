@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
 
--compile(export_all).
+-compile([export_all, nowarn_export_all]).
 
 -define(MOCK_MOD, mock_mod).
 -define(TELEMETRY_HANDLER, telemetry_handler).
@@ -11,15 +11,20 @@
 
 
 all() ->
-    [execute_plan_without_timeout,
+    [
+     plan_normalises_successfully,
+     failing_action_does_not_kill_the_worker,
+     execute_plan_without_timeout,
      reset_plan_without_timeout,
-     execute_plan_with_timeout].
+     execute_plan_with_timeout
+    ].
 
 init_per_suite(Config) ->
     meck:new(?MOCK_MOD, [non_strict, no_link]),
     meck:expect(?MOCK_MOD, f_1, ['_', '_'], ok),
     meck:expect(?MOCK_MOD, f_2, ['_', '_', '_'], ok),
     meck:expect(?MOCK_MOD, f_3, ['_', '_', '_', '_'], ok),
+    meck:expect(?MOCK_MOD, f_throw, fun(_, _) -> throw(error) end),
     meck:new(?TELEMETRY_HANDLER, [non_strict, no_link]),
     meck:expect(?TELEMETRY_HANDLER, handler, ['_', '_', '_', '_'], ok),
     application:start(telemetry),
@@ -28,7 +33,7 @@ init_per_suite(Config) ->
     TelemetryHandler = fun ?TELEMETRY_HANDLER:handler/4,
     telemetry:attach_many(?TELEMETRY_HANDLER, TelemetryEvents,
                            TelemetryHandler, ?TELEMETRY_HANDLER_CONFIG),
-    Pid = spawn(fun() -> amoc_coordinator_sup_sup:start_link(), receive terminate -> ok end end),
+    Pid = spawn(fun() -> amoc_coordinator_sup:start_link(), receive terminate -> ok end end),
     [{sup, Pid} | Config].
 
 end_per_suite(Config) ->
@@ -200,8 +205,36 @@ execute_plan_with_timeout(_Config) ->
     assert_telemetry_events(Name, [start, {N1, add}, timeout,
                                    {N2, add}, timeout, stop]).
 
+failing_action_does_not_kill_the_worker(_) ->
+    Name = ?FUNCTION_NAME,
+    Plan = {2, [mock_failing()]},
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan)),
+    {ok, _, Workers} = amoc_coordinator_sup:get_workers(Name),
+    [amoc_coordinator:add(Name, User) || User <- lists:seq(1, 2)],
+    {ok, _, Workers} = amoc_coordinator_sup:get_workers(Name),
+    amoc_coordinator:stop(Name),
+    ok.
+
+plan_normalises_successfully(_) ->
+    Name = ?FUNCTION_NAME,
+
+    Plan1 = {2, [mocked_action(item1, 2)]},
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan1)),
+    amoc_coordinator:stop(Name),
+
+    Plan2 = [{2, mocked_action(item1, 2)}],
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan2)),
+    amoc_coordinator:stop(Name),
+
+    Plan3 = [{2, [mocked_action(item1, 2)]}],
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan3)),
+    amoc_coordinator:stop(Name),
+    ok.
 
 %% Helpers
+
+mock_failing() ->
+    fun(Event) -> mock_mod:f_throw(ok, Event) end.
 
 mocked_action(Tag, 1) ->
     fun(Event) -> mock_mod:f_1(Tag, Event) end;

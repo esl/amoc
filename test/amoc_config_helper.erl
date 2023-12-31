@@ -1,6 +1,6 @@
 -module(amoc_config_helper).
 
--compile(export_all).
+-compile([export_all, nowarn_export_all]).
 
 set_os_env(Name, Value) ->
     os:putenv(env_name(Name), format_value(Value)).
@@ -22,3 +22,6 @@ get_env(Name, Default) ->
 
 format_value(Value) ->
     amoc_config_parser:format(Value, string).
+
+format_value(Value, Format) ->
+    amoc_config_parser:format(Value, Format).
