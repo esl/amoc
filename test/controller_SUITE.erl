@@ -34,6 +34,7 @@ all_tests() ->
      stop_running_scenario_with_users_eventually_terminates,
      scenario_with_state_and_crashing_in_terminate_run_fine,
      scenario_without_start_never_runs_users,
+     interarrival_equal_zero_starts_all_users_at_once,
      bad_scenario_fails
     ].
 
@@ -84,7 +85,11 @@ start_scenario_runs_fine(_) ->
 start_scenario_check_status(_) ->
     do_start_scenario(testing_scenario, test_helpers:regular_vars()),
     Status = amoc_controller:get_status(),
-    ?assertMatch({running, testing_scenario, 0, 0}, Status).
+    ?assertMatch(
+       {running, #{scenario := testing_scenario,
+                   currently_running_users := 0,
+                   highest_user_id := 0}},
+       Status).
 
 add_users_to_started_scenario(_) ->
     do_start_scenario(testing_scenario, test_helpers:regular_vars()),
@@ -150,6 +155,14 @@ stop_running_scenario_with_users_eventually_terminates(_) ->
     WaitUntilFun = fun amoc_controller:get_status/0,
     WaitUntilValue = {finished, testing_scenario},
     wait_helper:wait_until(WaitUntilFun, WaitUntilValue).
+
+interarrival_equal_zero_starts_all_users_at_once(_) ->
+    Vars = [{interarrival, 0}, {testing_var1, def1} | other_vars_to_keep_quiet()],
+    do_start_scenario(testing_scenario, Vars),
+    NumOfUsers = 1000,
+    amoc_controller:add_users(1, NumOfUsers),
+    Extra = #{time_left => 25, sleep_time => 5},
+    wait_until_scenario_has_users(testing_scenario, NumOfUsers, NumOfUsers, Extra).
 
 scenario_with_state_and_crashing_in_terminate_run_fine(_) ->
     do_start_scenario(testing_scenario_with_state, test_helpers:regular_vars_with_state()),

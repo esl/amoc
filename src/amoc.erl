@@ -35,7 +35,7 @@ do(Scenario, Count, Settings) ->
 add(Count) when is_integer(Count), Count > 0 ->
     case is_running_locally() of
         ok ->
-            {running, _, _, LastUserId} = amoc_controller:get_status(),
+            {running, #{highest_user_id := LastUserId}} = amoc_controller:get_status(),
             amoc_controller:add_users(LastUserId + 1, LastUserId + Count);
         Error -> Error
     end.
