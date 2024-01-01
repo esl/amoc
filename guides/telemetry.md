@@ -96,13 +96,22 @@ metadata: #{monotonic_time := integer(),
 
 ## Coordinator
 
+### Event
 Indicates when a coordinating event was raised, like a process being added for coordination or a timeout being triggered
 
-### Event
 ```erlang
 event_name: [amoc, coordinator, start | stop | add | reset | timeout]
 measurements: #{count := 1}
 metadata: #{monotonic_time := integer(), name := atom()}
+```
+
+### Action triggered
+Indicates an action is about to be triggered, either by enough users in the group or by timeout
+
+```erlang
+event_name: [amoc, coordinator, execute]
+measurements: #{count := num_of_users()}
+metadata: #{monotonic_time := integer(), event := coordinate | reset | timeout | stop}
 ```
 
 ## Config
