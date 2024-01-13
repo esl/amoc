@@ -73,7 +73,6 @@ handle_cast({add, Data}, State) ->
     NewState = add_data(Data, State),
     {noreply, NewState}.
 
-
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================

@@ -41,19 +41,15 @@ init({Name, Timeout}) ->
 handle_call(_, _, State) ->
     {reply, not_implemented, State}.
 
--spec handle_cast(term(), state()) -> {noreply, state()} | {stop, normal, state()}.
+-spec handle_cast(term(), state()) -> {noreply, state(), timeout()}.
 handle_cast({coordinate, _}, #timeouts{timeout = Timeout} = State) ->
     {noreply, State, Timeout};
 handle_cast(reset_coordinator, State) ->
     {noreply, State, infinity};
 handle_cast(coordinator_timeout, State) ->
-    {noreply, State, infinity};
-handle_cast(_, State) ->
-    {stop, normal, State}.
+    {noreply, State, infinity}.
 
--spec handle_info(term(), state()) -> {noreply, state()}.
+-spec handle_info(term(), state()) -> {noreply, state(), timeout()}.
 handle_info(timeout, #timeouts{name = Name} = State) ->
     amoc_coordinator:notify(Name, coordinator_timeout),
-    {noreply, State, infinity};
-handle_info(_, State) ->
-    {noreply, State}.
+    {noreply, State, infinity}.
