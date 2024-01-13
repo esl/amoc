@@ -10,7 +10,7 @@
 
 -export([start_link/0, init/1]).
 
--spec start_coordinator(amoc_coordinator:name(), amoc_coordinator:coordination_plan(), timeout()) ->
+-spec start_coordinator(amoc_coordinator:name(), amoc_coordinator:plan(), timeout()) ->
     {ok, pid()} | {error, term()}.
 start_coordinator(Name, Plan, Timeout) ->
     case supervisor:start_child(?MODULE, [{Name, Plan, Timeout}]) of

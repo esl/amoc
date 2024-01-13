@@ -43,18 +43,18 @@
 -type normalized_coordination_item() :: {NoOfUsers :: pos_integer() | all,
                                          [coordination_action()]}.
 
--type coordination_plan() :: [coordination_item()] | coordination_item().
+-type plan() :: [coordination_item()] | coordination_item().
 
 %% timeout in seconds
 -type coordination_timeout_in_sec() :: pos_integer() | infinity.
 
 -export_type([name/0,
               event/0,
+              plan/0,
               coordination_event_type/0,
               coordination_event/0,
               coordination_action/0,
               coordination_data/0,
-              coordination_plan/0,
               normalized_coordination_item/0]).
 
 %%%===================================================================
@@ -62,12 +62,12 @@
 %%%===================================================================
 
 %% @see start/3
--spec start(name(), coordination_plan()) -> ok | error.
+-spec start(name(), plan()) -> ok | error.
 start(Name, CoordinationPlan) ->
     start(Name, CoordinationPlan, ?DEFAULT_TIMEOUT).
 
 %% @doc Starts a coordinator. Usually called in the init callback of an amoc scenario.
--spec start(name(), coordination_plan(), coordination_timeout_in_sec()) -> ok | error.
+-spec start(name(), plan(), coordination_timeout_in_sec()) -> ok | error.
 start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
     Plan = normalize_coordination_plan(CoordinationPlan),
     case amoc_coordinator_sup:start_coordinator(Name, Plan, Timeout) of
@@ -135,7 +135,7 @@ raise_telemetry_event(Name, Event) ->
                      end,
     amoc_telemetry:execute([coordinator, TelemetryEvent], #{count => 1}, #{name => Name}).
 
--spec normalize_coordination_plan(coordination_plan()) -> [normalized_coordination_item()].
+-spec normalize_coordination_plan(plan()) -> [normalized_coordination_item()].
 normalize_coordination_plan(CoordinationPlan) when is_tuple(CoordinationPlan) ->
     normalize_coordination_plan([CoordinationPlan]);
 normalize_coordination_plan(CoordinationPlan) ->
