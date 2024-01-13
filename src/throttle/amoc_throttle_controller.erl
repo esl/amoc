@@ -126,10 +126,10 @@ init([]) ->
 handle_call({start_processes, Name, Rate, Interval, NoOfProcesses}, _From, State) ->
     case pg:get_members(?PG_SCOPE, Name) of
         [] ->
-            RealNoOfProcesses = start_processes(Name, Rate, Interval, NoOfProcesses),
-            {reply, {ok, started},
-             State#{Name => #throttle_info{rate = Rate, interval = Interval, active = true,
-                                           no_of_procs = RealNoOfProcesses}}};
+            RealNoOfProcs = start_processes(Name, Rate, Interval, NoOfProcesses),
+            NewState = State#{Name => #throttle_info{rate = Rate, interval = Interval,
+                                                     active = true, no_of_procs = RealNoOfProcs}},
+            {reply, {ok, started}, NewState};
         Group when is_list(Group) ->
             verify_new_start_matches_running(Name, Rate, Interval, NoOfProcesses, Group, State)
     end;
@@ -138,7 +138,8 @@ handle_call({pause, Name}, _From, State) ->
         ok ->
             Info = maps:get(Name, State),
             {reply, ok, State#{Name => Info#throttle_info{active = false}}};
-        Error -> {reply, Error, State}
+        Error ->
+            {reply, Error, State}
     end;
 handle_call({resume, Name}, _From, State) ->
     case all_processes(Name, resume) of
@@ -151,11 +152,14 @@ handle_call({change_rate, Name, Rate, Interval}, _From, State) ->
     case State of
         #{Name := Info} ->
             case maybe_change_rate(Name, Rate, Interval, Info) of
-                {ok, Rate} -> UpdatedInfo = Info#throttle_info{rate = Rate, interval = Interval},
-                              {reply, ok, State#{Name => UpdatedInfo}};
-                Error -> {reply, Error, State}
+                {ok, Rate} ->
+                    UpdatedInfo = Info#throttle_info{rate = Rate, interval = Interval},
+                    {reply, ok, State#{Name => UpdatedInfo}};
+                Error ->
+                    {reply, Error, State}
             end;
-        _ -> {reply, {error, {no_throttle_by_name, Name}}, State}
+        _ ->
+            {reply, {error, {no_throttle_by_name, Name}}, State}
     end;
 handle_call({change_rate_gradually, Name, LowRate, HighRate,
              RateInterval, StepInterval, NoOfSteps},
@@ -167,15 +171,18 @@ handle_call({change_rate_gradually, Name, LowRate, HighRate,
                     NewInfo = start_gradual_rate_change(Name, LowRate, HighRate, RateInterval,
                                                         StepInterval, NoOfSteps, Info),
                     {reply, ok, State#{Name => NewInfo}};
-                _ -> {reply, {error, cannot_change_rate}, State}
+                _ ->
+                    {reply, {error, cannot_change_rate}, State}
             end;
-        _ -> {reply, {error, {no_throttle_by_name, Name}}, State}
+        _ ->
+            {reply, {error, {no_throttle_by_name, Name}}, State}
     end;
 handle_call({stop, Name}, _From, State) ->
     case all_processes(Name, stop) of
         ok ->
             {reply, ok, maps:remove(Name, State)};
-        Error -> {reply, Error, State}
+        Error ->
+            {reply, Error, State}
     end.
 
 -spec(handle_cast(any(), state()) -> {noreply, state()}).
