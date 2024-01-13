@@ -211,25 +211,22 @@ failing_action_does_not_kill_the_worker(_) ->
     ?assertEqual(ok, amoc_coordinator:start(Name, Plan)),
     {ok, _, Workers} = amoc_coordinator_sup:get_workers(Name),
     [amoc_coordinator:add(Name, User) || User <- lists:seq(1, 2)],
+    meck:wait(1, ?MOCK_MOD, f_throw, ['_', {'_', '_'}], 1000),
     {ok, _, Workers} = amoc_coordinator_sup:get_workers(Name),
     amoc_coordinator:stop(Name),
     ok.
 
 plan_normalises_successfully(_) ->
-    Name = ?FUNCTION_NAME,
+    NormalisedPlan = [{2, [mocked_action(item1, 2)]}],
 
     Plan1 = {2, [mocked_action(item1, 2)]},
-    ?assertEqual(ok, amoc_coordinator:start(Name, Plan1)),
-    amoc_coordinator:stop(Name),
+    ?assertEqual(NormalisedPlan, amoc_coordinator:normalize_coordination_plan(Plan1)),
 
     Plan2 = [{2, mocked_action(item1, 2)}],
-    ?assertEqual(ok, amoc_coordinator:start(Name, Plan2)),
-    amoc_coordinator:stop(Name),
+    ?assertEqual(NormalisedPlan, amoc_coordinator:normalize_coordination_plan(Plan2)),
 
     Plan3 = [{2, [mocked_action(item1, 2)]}],
-    ?assertEqual(ok, amoc_coordinator:start(Name, Plan3)),
-    amoc_coordinator:stop(Name),
-    ok.
+    ?assertEqual(NormalisedPlan, amoc_coordinator:normalize_coordination_plan(Plan3)).
 
 %% Helpers
 

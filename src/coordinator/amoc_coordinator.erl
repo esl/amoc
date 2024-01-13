@@ -9,6 +9,9 @@
          add/2, add/3,
          stop/1, reset/1,
          notify/2]).
+-ifdef(TEST).
+-export([normalize_coordination_plan/1]).
+-endif.
 
 -define(DEFAULT_TIMEOUT, 30). %% 30 seconds
 

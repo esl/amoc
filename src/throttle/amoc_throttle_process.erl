@@ -129,17 +129,13 @@ format_status(_Opt, [_PDict, State]) ->
 %% internal functions
 %%------------------------------------------------------------------------------
 
-initial_state(Name, Interval, Rate) when Rate >= 0 ->
-    NewRate = case {Rate =:= 0, Rate < 5} of
-                  {true, _} ->
-                      Msg = <<"invalid rate, must be higher than zero">>,
-                      internal_error(Msg, Name, Rate, Interval),
-                      1;
-                  {_, true} ->
+initial_state(Name, Interval, Rate) when Rate > 0 ->
+    NewRate = case Rate < 5 of
+                  true ->
                       Msg = <<"too low rate, please reduce NoOfProcesses">>,
                       internal_error(Msg, Name, Rate, Interval),
                       Rate;
-                  {_, false} ->
+                  false ->
                       Rate
               end,
     Delay = case {Interval, Interval div NewRate, Interval rem NewRate} of

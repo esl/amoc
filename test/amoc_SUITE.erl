@@ -6,14 +6,16 @@
 
 all() ->
     [
-     start_with_bad_config,
+     bad_config_fails_to_start,
      start_with_no_users,
      start_with_some_users,
      start_and_add_some_users,
      start_and_then_force_remove_some_users,
      start_and_then_soft_remove_some_users,
+     start_and_then_force_remove_more_users_than_running,
+     start_and_then_soft_remove_users_that_ignore_the_error,
      start_and_then_stop_cannot_rerun,
-     start_and_then_stop_can_rerun
+     after_reset_can_run_again
     ].
 
 init_per_suite(Config) ->
@@ -34,7 +36,7 @@ end_per_testcase(_, _Config) ->
 %% test cases
 %%-----------------------------------------------------------------------------------
 
-start_with_bad_config(_) ->
+bad_config_fails_to_start(_) ->
     Ret = amoc_do(testing_scenario, 0, []),
     ?assertMatch({{error, _}, 0}, Ret).
 
@@ -59,15 +61,37 @@ start_and_then_force_remove_some_users(_) ->
     Ret = amoc_do(testing_scenario, 2),
     ?assertEqual(ok, Ret),
     test_helpers:wait_until_scenario_has_users(testing_scenario, 2, 2),
-    amoc:remove(1, true),
+    Removed = amoc:remove(1, true),
+    ?assertEqual({ok, 1}, Removed),
     test_helpers:wait_until_scenario_has_users(testing_scenario, 1, 2).
 
 start_and_then_soft_remove_some_users(_) ->
     Ret = amoc_do(testing_scenario, 2),
     ?assertEqual(ok, Ret),
     test_helpers:wait_until_scenario_has_users(testing_scenario, 2, 2),
-    amoc:remove(1, false),
+    Removed = amoc:remove(1, false),
+    ?assertEqual({ok, 1}, Removed),
     test_helpers:wait_until_scenario_has_users(testing_scenario, 1, 2).
+
+start_and_then_force_remove_more_users_than_running(_) ->
+    Ret = amoc_do(testing_scenario, 2),
+    ?assertEqual(ok, Ret),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, 2, 2),
+    Removed = amoc:remove(10, true),
+    ?assertEqual({ok, 2}, Removed),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, 0, 2).
+
+start_and_then_soft_remove_users_that_ignore_the_error(_) ->
+    Ret = amoc_do(testing_scenario_with_state, 2, test_helpers:all_vars_with_state()),
+    ?assertEqual(ok, Ret),
+    test_helpers:wait_until_scenario_has_users(testing_scenario_with_state, 2, 2),
+    Removed = amoc:remove(10, false),
+    ?assertEqual({ok, 2}, Removed),
+    timer:sleep(100),
+    Status = amoc_controller:get_status(),
+    ?assertMatch({running, #{scenario := testing_scenario_with_state,
+                             currently_running_users := 2,
+                             highest_user_id := 2}}, Status).
 
 start_and_then_stop_cannot_rerun(_) ->
     Ret = amoc_do(testing_scenario, 1),
@@ -78,7 +102,7 @@ start_and_then_stop_cannot_rerun(_) ->
     Retry = amoc_do(testing_scenario, 1),
     ?assertMatch({{error, {invalid_status, _}}, 1}, Retry).
 
-start_and_then_stop_can_rerun(_) ->
+after_reset_can_run_again(_) ->
     Ret = amoc_do(testing_scenario, 1),
     ?assertEqual(ok, Ret),
     test_helpers:wait_until_scenario_has_users(testing_scenario, 1, 1),

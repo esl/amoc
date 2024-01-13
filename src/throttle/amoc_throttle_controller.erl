@@ -150,7 +150,6 @@ handle_call({resume, Name}, _From, State) ->
 handle_call({change_rate, Name, Rate, Interval}, _From, State) ->
     case State of
         #{Name := Info} ->
-            Info = maps:get(Name, State),
             case maybe_change_rate(Name, Rate, Interval, Info) of
                 {ok, Rate} -> UpdatedInfo = Info#throttle_info{rate = Rate, interval = Interval},
                               {reply, ok, State#{Name => UpdatedInfo}};
@@ -256,7 +255,7 @@ start_processes(Name, Rate, Interval, NoOfProcesses) ->
     raise_event(Name, init),
     RatePerMinute = rate_per_minute(Rate, Interval),
     report_rate(Name, RatePerMinute),
-    RealNoOfProcesses = max(1, min(Rate, NoOfProcesses)),
+    RealNoOfProcesses = min(Rate, NoOfProcesses),
     start_throttle_processes(Name, Interval, Rate, RealNoOfProcesses),
     RealNoOfProcesses.
 

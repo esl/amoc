@@ -62,12 +62,7 @@ start(_) ->
                                      ?DEFAULT_NO_PROCESSES + 1)).
 
 rate_zero_gets_remapped_without_crashing(_) ->
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 0, 100, 1)),
-    State = get_state_of_one_process(?FUNCTION_NAME),
-    ?assertMatch(#{name := ?FUNCTION_NAME,
-                   interval := 100,
-                   delay_between_executions := 100},
-                 State).
+    ?assertMatch({error, invalid_throttle}, amoc_throttle:start(?FUNCTION_NAME, 0, 100, 1)).
 
 low_rate_gets_remapped(_) ->
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 2, 100, 1)),

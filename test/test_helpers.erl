@@ -19,6 +19,10 @@ all_vars() ->
 regular_vars() ->
     [{interarrival, 1}, {testing_var1, def1}].
 
+all_vars_with_state() ->
+    [{interarrival, 1}, {testing_state_var1, def1},
+     {config_scenario_var1, unused_value}].
+
 regular_vars_with_state() ->
     [{interarrival, 1}, {testing_state_var1, def1}].
 
