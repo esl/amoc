@@ -223,7 +223,6 @@ change_rate_and_stop_plan(Name, State) ->
     Interval = Info#throttle_info.interval,
     TRef = Plan#change_rate_plan.timer,
     HighRate = Plan#change_rate_plan.high_rate,
-
     ok = do_change_rate(Name, HighRate, Interval),
     {ok, cancel} = timer:cancel(TRef),
     consume_all_timer_ticks({change_plan, Name}),

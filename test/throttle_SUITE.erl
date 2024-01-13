@@ -107,8 +107,12 @@ change_rate_gradually(_) ->
                  amoc_throttle:change_rate_gradually(
                    ?FUNCTION_NAME, 100, 200, 1, 1, 1)),
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
-    ?assertMatch(ok, amoc_throttle:change_rate_gradually(
-                   ?FUNCTION_NAME, 50, 200, 1, 1, 1)).
+    ?assertMatch(ok, amoc_throttle:change_rate_gradually(?FUNCTION_NAME, 50, 200, 1, 1, 1)),
+    %% We cannot change rate while a current gradual change is already running.
+    ?assertMatch({error, cannot_change_rate},
+                 amoc_throttle:change_rate_gradually(?FUNCTION_NAME, 50, 200, 1, 1, 1)),
+    ?assertMatch({error, cannot_change_rate},
+                 amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)).
 
 send_and_wait(_) ->
     %% it failts if the throttle wasn't started yet
