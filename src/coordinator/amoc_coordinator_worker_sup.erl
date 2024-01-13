@@ -10,18 +10,13 @@
 
 -spec start_link({amoc_coordinator:name(), amoc_coordinator:plan(), timeout()}) ->
     supervisor:startlink_ret().
-start_link({Name, Plan, Timeout}) ->
-    supervisor:start_link(?MODULE, {Name, Plan, Timeout}).
+start_link({Name, OrderedPlan, Timeout}) ->
+    supervisor:start_link(?MODULE, {Name, OrderedPlan, Timeout}).
 
 -spec init({amoc_coordinator:name(), amoc_coordinator:plan(), timeout()}) ->
     {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
-init({Name, Plan, Timeout}) ->
-    %% Order matters, as we need to ensure that:
-    %%  - all the items in the plan with NoOfUsers =:= all are executed last
-    %%  - the timeout handler is executed first
-    {All, NotAll} = lists:partition(fun partitioner/1, Plan),
-    OrderedPlan = lists:reverse(All) ++ lists:reverse(NotAll),
-    OrderedChilds = [ worker_spec(Item) || Item <- OrderedPlan ],
+init({Name, OrderedPlan, Timeout}) ->
+    OrderedChilds = [ worker_spec(Name, Item) || Item <- OrderedPlan ],
     TimeoutChild = timeout_child(Name, Timeout),
     Childs = [TimeoutChild | OrderedChilds],
 
@@ -37,15 +32,10 @@ timeout_child(Name, Timeout) ->
       type => worker,
       modules => [amoc_coordinator_timeout]}.
 
-worker_spec(Item) ->
-    #{id => {amoc_coordinator_worker, Item},
+worker_spec(Name, Item) ->
+    #{id => {amoc_coordinator_worker, Name, Item},
       start => {amoc_coordinator_worker, start_link, [Item]},
       restart => transient,
       shutdown => timer:seconds(5),
       type => worker,
       modules => [amoc_coordinator_worker]}.
-
-partitioner({all, _}) ->
-    true;
-partitioner(_) ->
-    false.

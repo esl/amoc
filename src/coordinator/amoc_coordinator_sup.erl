@@ -12,17 +12,29 @@
 
 -spec start_coordinator(amoc_coordinator:name(), amoc_coordinator:plan(), timeout()) ->
     {ok, pid()} | {error, term()}.
-start_coordinator(Name, Plan, Timeout) ->
-    case supervisor:start_child(?MODULE, [{Name, Plan, Timeout}]) of
+start_coordinator(Name, OrderedPlan, Timeout) ->
+    case supervisor:start_child(?MODULE, [{Name, OrderedPlan, Timeout}]) of
         {ok, Coordinator} ->
             Children = supervisor:which_children(Coordinator),
-            [TimeoutWorker] = [ Pid || {{amoc_coordinator_timeout, _, _}, Pid, _, _} <- Children ],
-            Workers = [ Pid || {{amoc_coordinator_worker, _}, Pid, _, _} <- Children ],
+            Workers = get_workers_in_order(Name, OrderedPlan, Children),
+            TimeoutWorker = get_timeout_pid(Name, Timeout, Children),
             store_coordinator(Name, Coordinator, TimeoutWorker, Workers),
             {ok, Coordinator};
         Other ->
             Other
     end.
+
+-spec get_workers_in_order(amoc_coordinator:name(), amoc_coordinator:plan(), []) -> [pid()].
+get_workers_in_order(Name, OrderedPlan, Children) ->
+    [ get_child_pid({amoc_coordinator_worker, Name, Item}, Children) || Item <- OrderedPlan ].
+
+-spec get_timeout_pid(amoc_coordinator:name(), amoc_coordinator:plan(), []) -> pid().
+get_timeout_pid(Name, Timeout, Children) ->
+    get_child_pid({amoc_coordinator_timeout, Name, Timeout}, Children).
+
+get_child_pid(ChildId, Children) ->
+    [Pid] = [ Pid || {Id, Pid, _, _} <- Children, Id =:= ChildId ],
+    Pid.
 
 -spec stop_coordinator(amoc_coordinator:name()) ->
     ok | {error, term()}.

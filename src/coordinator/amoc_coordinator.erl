@@ -70,7 +70,8 @@ start(Name, CoordinationPlan) ->
 -spec start(name(), plan(), coordination_timeout_in_sec()) -> ok | error.
 start(Name, CoordinationPlan, Timeout) when ?IS_TIMEOUT(Timeout) ->
     Plan = normalize_coordination_plan(CoordinationPlan),
-    case amoc_coordinator_sup:start_coordinator(Name, Plan, Timeout) of
+    OrderedPlan = order_plan(Plan),
+    case amoc_coordinator_sup:start_coordinator(Name, OrderedPlan, Timeout) of
         {ok, _} ->
             amoc_telemetry:execute([coordinator, start], #{count => 1}, #{name => Name}),
             ok;
@@ -134,6 +135,17 @@ raise_telemetry_event(Name, Event) ->
                          coordinator_timeout -> timeout
                      end,
     amoc_telemetry:execute([coordinator, TelemetryEvent], #{count => 1}, #{name => Name}).
+
+-spec order_plan([normalized_coordination_item()]) -> [normalized_coordination_item()].
+order_plan(Items) ->
+    %% We need to ensure that `all` plans are executed last because we rely on the children's order
+    %% at `amoc_coordinator_sup:start_coordinator/3',
+    %% and `supervisor:which_children/1' return children in a reversed order.
+    lists:sort(fun order/2, Items).
+
+-spec order(normalized_coordination_item(), normalized_coordination_item()) -> boolean().
+order({A, _}, {B, _}) ->
+    all =/= A orelse all =:= B.
 
 -spec normalize_coordination_plan(plan()) -> [normalized_coordination_item()].
 normalize_coordination_plan(CoordinationPlan) when is_tuple(CoordinationPlan) ->
