@@ -1,6 +1,6 @@
 %% @private
 %% @see amoc_throttle
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 -module(amoc_throttle_controller).
 
 -behaviour(gen_server).

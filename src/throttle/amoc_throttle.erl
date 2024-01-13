@@ -1,4 +1,4 @@
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 %% @doc This module allows to synchronize the users and act on groups of them.
 -module(amoc_throttle).
 

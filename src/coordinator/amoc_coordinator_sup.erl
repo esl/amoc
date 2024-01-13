@@ -1,6 +1,6 @@
 %% @private
 %% @see amoc_coordinator
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 %% @doc Global supervisor for all started coordination actions
 -module(amoc_coordinator_sup).
 

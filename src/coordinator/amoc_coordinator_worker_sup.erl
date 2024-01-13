@@ -1,6 +1,6 @@
 %% @private
 %% @see amoc_coordinator
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 %% @doc Supervisor for a pool of handlers for a new supervision tree
 -module(amoc_coordinator_worker_sup).
 

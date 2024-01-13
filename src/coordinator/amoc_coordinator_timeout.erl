@@ -1,3 +1,6 @@
+%% @private
+%% @see amoc_coordinator
+%% @copyright 2024 Erlang Solutions Ltd.
 -module(amoc_coordinator_timeout).
 
 -behaviour(gen_server).

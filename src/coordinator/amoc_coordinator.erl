@@ -1,6 +1,6 @@
 %%==============================================================================
 %% @doc This module allows to synchronize the users and act on groups of them.
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 %%==============================================================================
 -module(amoc_coordinator).
 

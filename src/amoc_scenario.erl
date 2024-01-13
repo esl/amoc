@@ -1,4 +1,4 @@
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 %% @doc Wrapper around the defined scenario
 -module(amoc_scenario).
 
