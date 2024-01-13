@@ -100,7 +100,7 @@ change_rate(_) ->
                  amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL)),
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
     ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL)),
-    ?assertMatch({ok, 99}, amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)).
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)).
 
 change_rate_gradually(_) ->
     ?assertMatch({error, {no_throttle_by_name, ?FUNCTION_NAME}},

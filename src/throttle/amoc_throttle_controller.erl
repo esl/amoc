@@ -152,7 +152,7 @@ handle_call({change_rate, Name, Rate, Interval}, _From, State) ->
     case State of
         #{Name := Info} ->
             case maybe_change_rate(Name, Rate, Interval, Info) of
-                {ok, Rate} ->
+                ok ->
                     UpdatedInfo = Info#throttle_info{rate = Rate, interval = Interval},
                     {reply, ok, State#{Name => UpdatedInfo}};
                 Error ->
@@ -225,7 +225,7 @@ change_rate_and_stop_plan(Name, State) ->
     TRef = Plan#change_rate_plan.timer,
     HighRate = Plan#change_rate_plan.high_rate,
 
-    {ok, _} = do_change_rate(Name, HighRate, Interval),
+    ok = do_change_rate(Name, HighRate, Interval),
     {ok, cancel} = timer:cancel(TRef),
     consume_all_timer_ticks({change_plan, Name}),
     State#{Name => Info#throttle_info{rate = HighRate, change_plan = undefined}}.
@@ -246,7 +246,7 @@ continue_plan(Name, State) ->
 
     Step = (HighRate - LowRate) div (NoOfSteps),
     NewRate = LowRate + Step,
-    {ok, _} = do_change_rate(Name, NewRate, Info#throttle_info.interval),
+    ok = do_change_rate(Name, NewRate, Info#throttle_info.interval),
 
     NewPlan = Plan#change_rate_plan{no_of_steps = NoOfSteps - 1},
     State#{Name => Info#throttle_info{rate = NewRate, change_plan = NewPlan}}.
@@ -278,18 +278,17 @@ get_throttle_process(Name) ->
     end.
 
 -spec maybe_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval(), throttle_info()) ->
-    {ok, non_neg_integer()} | {error, any()}.
+    ok | {error, any()}.
 maybe_change_rate(Name, Rate, Interval, Info) ->
     CurrentRatePerMin = rate_per_minute(Info#throttle_info.rate, Info#throttle_info.interval),
     ReqRatePerMin = rate_per_minute(Rate, Interval),
     case {CurrentRatePerMin, Info#throttle_info.change_plan} of
-        {ReqRatePerMin, _} -> {ok, ReqRatePerMin};
+        {ReqRatePerMin, _} -> ok;
         {_, undefined} -> do_change_rate(Name, Rate, Interval);
         _ -> {error, cannot_change_rate}
     end.
 
--spec do_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval()) ->
-    {ok, non_neg_integer()} | {error, any()}.
+-spec do_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval()) -> ok | {error, any()}.
 do_change_rate(Name, Rate, Interval) ->
     case pg:get_members(?PG_SCOPE, Name) of
         [] -> {error, no_processes_in_group};
@@ -297,7 +296,7 @@ do_change_rate(Name, Rate, Interval) ->
             RatePerMinute = rate_per_minute(Rate, Interval),
             report_rate(Name, RatePerMinute),
             update_throttle_processes(List, Interval, Rate, length(List)),
-            {ok, RatePerMinute}
+            ok
     end.
 
 -spec start_gradual_rate_change(
@@ -305,7 +304,7 @@ do_change_rate(Name, Rate, Interval) ->
         amoc_throttle:interval(), pos_integer(), pos_integer(), throttle_info()) ->
     throttle_info().
 start_gradual_rate_change(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps, Info) ->
-    {ok, _} = do_change_rate(Name, LowRate, RateInterval),
+    ok = do_change_rate(Name, LowRate, RateInterval),
     {ok, Timer} = timer:send_interval(StepInterval, {change_plan, Name}),
     Plan = #change_rate_plan{high_rate = HighRate, no_of_steps = NoOfSteps, timer = Timer},
     Info#throttle_info{rate = LowRate, interval = RateInterval, change_plan = Plan}.
