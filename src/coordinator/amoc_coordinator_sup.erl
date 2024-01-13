@@ -27,28 +27,28 @@ start_coordinator(Name, Plan, Timeout) ->
 -spec stop_coordinator(amoc_coordinator:name()) ->
     ok | {error, term()}.
 stop_coordinator(Name) ->
-    case ets:lookup(?MODULE, Name) of
-        [{_, #{coordinator := Coordinator, timeout_worker := TimeoutWorker, workers := Workers}}] ->
+    case persistent_term:get({?MODULE, Name}) of
+        #{coordinator := Coordinator, timeout_worker := TimeoutWorker, workers := Workers} ->
             [ amoc_coordinator_worker:stop(Worker) || Worker <- Workers ],
             erlang:send(TimeoutWorker, terminate),
             supervisor:terminate_child(?MODULE, Coordinator);
-        [] ->
+        not_found ->
             {error, not_found}
     end.
 
 -spec get_workers(amoc_coordinator:name()) ->
     {ok, pid(), [pid()]} | {error, term()}.
 get_workers(Name) ->
-    case ets:lookup(?MODULE, Name) of
-        [{_, #{timeout_worker := TimeoutWorker, workers := Workers}}] ->
+    case persistent_term:get({?MODULE, Name}, not_found) of
+        #{timeout_worker := TimeoutWorker, workers := Workers} ->
             {ok, TimeoutWorker, Workers};
-        [] ->
+        not_found ->
             {error, not_found}
     end.
 
 store_coordinator(Name, Coordinator, TimeoutWorker, Workers) ->
     Item = #{coordinator => Coordinator, timeout_worker => TimeoutWorker, workers => Workers},
-    ets:insert(?MODULE, {Name, Item}).
+    persistent_term:put({?MODULE, Name}, Item).
 
 -spec start_link() -> {ok, Pid :: pid()}.
 start_link() ->
