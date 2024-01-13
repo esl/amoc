@@ -17,14 +17,14 @@ groups() ->
      {api, [parallel],
       [
        start,
-       rate_zero_gets_remapped_without_crashing,
+       rate_zero_is_not_accepted,
        low_rate_gets_remapped,
        low_interval_get_remapped,
        start_and_stop,
        change_rate,
        change_rate_gradually,
        send_and_wait,
-       run_with_interval_zero_runs_very_fast,
+       run_with_interval_zero_limits_only_number_of_parallel_executions,
        pause_and_resume,
        get_state
      ]}
@@ -33,10 +33,13 @@ groups() ->
 init_per_suite(Config) ->
     application:ensure_all_started(amoc),
     amoc_cluster:set_master_node(node()),
+    TelemetryEvents = [[amoc, throttle, Event] || Event <- [init, rate, request, execute, process]],
+    telemetry_helpers:start(TelemetryEvents),
     Config.
 
 end_per_suite(_) ->
     application:stop(amoc),
+    telemetry_helpers:stop(),
     ok.
 
 init_per_testcase(_, Config) ->
@@ -61,7 +64,7 @@ start(_) ->
                  amoc_throttle:start(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL,
                                      ?DEFAULT_NO_PROCESSES + 1)).
 
-rate_zero_gets_remapped_without_crashing(_) ->
+rate_zero_is_not_accepted(_) ->
     ?assertMatch({error, invalid_throttle}, amoc_throttle:start(?FUNCTION_NAME, 0, 100, 1)).
 
 low_rate_gets_remapped(_) ->
@@ -70,7 +73,8 @@ low_rate_gets_remapped(_) ->
     ?assertMatch(#{name := ?FUNCTION_NAME,
                    interval := 100,
                    delay_between_executions := 50},
-                 State).
+                 State),
+    assert_telemetry_event([amoc, throttle, process], error, ?FUNCTION_NAME, 2, 100).
 
 low_interval_get_remapped(_) ->
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 1, 1, 1)),
@@ -78,7 +82,8 @@ low_interval_get_remapped(_) ->
     ?assertMatch(#{name := ?FUNCTION_NAME,
                    interval := 1,
                    delay_between_executions := 10},
-                 State).
+                 State),
+    assert_telemetry_event([amoc, throttle, process], error, ?FUNCTION_NAME, 1, 1).
 
 start_and_stop(_) ->
     %% Starts successfully
@@ -93,21 +98,16 @@ start_and_stop(_) ->
 change_rate(_) ->
     ?assertMatch({error, {no_throttle_by_name, ?FUNCTION_NAME}},
                  amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL)),
-    ?assertMatch({ok, started},
-                 amoc_throttle:start(?FUNCTION_NAME, 100)),
-    ?assertMatch(ok,
-                 amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL)),
-    ?assertMatch({ok, 99},
-                 amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)).
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL)),
+    ?assertMatch({ok, 99}, amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)).
 
 change_rate_gradually(_) ->
     ?assertMatch({error, {no_throttle_by_name, ?FUNCTION_NAME}},
                  amoc_throttle:change_rate_gradually(
                    ?FUNCTION_NAME, 100, 200, 1, 1, 1)),
-    ?assertMatch({ok, started},
-                 amoc_throttle:start(?FUNCTION_NAME, 100)),
-    ?assertMatch(ok,
-                 amoc_throttle:change_rate_gradually(
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
+    ?assertMatch(ok, amoc_throttle:change_rate_gradually(
                    ?FUNCTION_NAME, 50, 200, 1, 1, 1)).
 
 send_and_wait(_) ->
@@ -125,16 +125,16 @@ send_and_wait(_) ->
     %% it will take proportionally so long to execute for me
     fill_throttle(?FUNCTION_NAME, 100 * 10),
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch({error, not_received_yet}, receive_msg_in_timeout(receive_this, 1000)).
+    ?assertMatch({error, not_received_yet}, receive_msg_in_timeout(receive_this, 200)).
 
-run_with_interval_zero_runs_very_fast(_) ->
+run_with_interval_zero_limits_only_number_of_parallel_executions(_) ->
     %% Start 10 actions at once in 10 processes
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 10, 0, 1)),
     %% If someone else fills the throttle heavily,
     %% it will take proportionally so long to execute for me
     fill_throttle(?FUNCTION_NAME, 100),
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 1000)).
+    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 200)).
 
 pause_and_resume(_) ->
     %% Start 100-per-10ms throttle with a single process
@@ -145,10 +145,10 @@ pause_and_resume(_) ->
     ?assertMatch(ok, amoc_throttle:pause(?FUNCTION_NAME)),
     %% It is paused, so messages aren't received
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch({error, not_received_yet}, receive_msg_in_timeout(receive_this, 1000)),
+    ?assertMatch({error, not_received_yet}, receive_msg_in_timeout(receive_this, 200)),
     %% After resume the message is then received
     ?assertMatch(ok, amoc_throttle:resume(?FUNCTION_NAME)),
-    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 1000)).
+    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 200)).
 
 get_state(_) ->
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 60000, 1)),
@@ -160,6 +160,17 @@ get_state(_) ->
 
 
 %% Helpers
+assert_telemetry_event(Name, Count, Throttle, Rate, Interval) ->
+    TelemetryEvents = telemetry_helpers:get_calls([amoc, throttle]),
+    LowRateEvent = fun({EventName, Measurements, Metadata}) ->
+                           Name =:= EventName andalso
+                           1 =:= maps:get(Count, Measurements, 1) andalso
+                           Throttle =:= maps:get(name, Metadata, undefined) andalso
+                           Rate =:= maps:get(rate, Metadata, undefined) andalso
+                           Interval =:= maps:get(interval, Metadata, undefined)
+                   end,
+    lists:any(LowRateEvent, TelemetryEvents).
+
 get_number_of_workers(Name) ->
     Processes = pg:get_members(amoc_throttle, Name),
     length(Processes).
