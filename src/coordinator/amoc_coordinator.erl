@@ -99,7 +99,14 @@ reset(Name) ->
     notify(Name, reset_coordinator).
 
 -spec notify(name(), coordinator_timeout | reset_coordinator | {coordinate, {pid(), term()}}) -> ok.
-notify(Name, Event) ->
+notify(Name, coordinator_timeout) when is_atom(Name) ->
+    do_notify(Name, coordinator_timeout);
+notify(Name, reset_coordinator) when is_atom(Name) ->
+    do_notify(Name, reset_coordinator);
+notify(Name, {coordinate, _} = Event) when is_atom(Name) ->
+    do_notify(Name, Event).
+
+do_notify(Name, Event) ->
     raise_telemetry_event(Name, Event),
     case amoc_coordinator_sup:get_workers(Name) of
         {ok, TimeoutWorker, Workers} ->
