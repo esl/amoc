@@ -167,14 +167,7 @@ scenario_with_state_and_crashing_in_terminate_run_fine(_) ->
 
 scenario_without_start_never_runs_users(_) ->
     Ret = do_start_scenario(testing_scenario_without_callbacks, test_helpers:regular_vars()),
-    ?assertEqual(ok, Ret),
-    amoc_controller:add_users(1, 1),
-    Status = amoc_controller:get_status(),
-    ?assertMatch(
-       {running, #{scenario := testing_scenario_without_callbacks,
-                   currently_running_users := 0,
-                   highest_user_id := 1}},
-       Status).
+    ?assertMatch({error, _}, Ret).
 
 bad_scenario_fails(_) ->
     Ret = do_start_scenario(testing_scenario_with_error_in_init, test_helpers:regular_vars()),

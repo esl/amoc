@@ -32,7 +32,17 @@
 %% Runs on the controller process and spans a `[amoc, scenario, init, _]' telemetry event.
 -spec init(amoc:scenario()) -> {ok, state()} | {error, Reason :: term()}.
 init(Scenario) ->
-    apply_safely(Scenario, init, [], #{scenario => Scenario}).
+    case verify_exports_callbacks(Scenario) of
+        true ->
+            apply_safely(Scenario, init, [], #{scenario => Scenario});
+        false ->
+            {error, invalid_scenario}
+    end.
+
+verify_exports_callbacks(Scenario) ->
+    erlang:function_exported(Scenario, init, 0)
+    andalso erlang:function_exported(Scenario, start, 2)
+    orelse erlang:function_exported(Scenario, start, 1).
 
 %% @doc Applies the `Scenario:terminate/0,1' callback
 %%
