@@ -19,5 +19,5 @@ init([]) ->
                   shutdown => infinity,
                   restart => transient,
                   modules => [amoc_throttle_pool] },
-    SupFlags = #{strategy => simple_one_for_one},
+    SupFlags = #{strategy => simple_one_for_one, intensity => 0},
     {ok, {SupFlags, [ChildSpec]}}.

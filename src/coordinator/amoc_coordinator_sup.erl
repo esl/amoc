@@ -69,11 +69,11 @@ start_link() ->
 -spec init(term()) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
     ets:new(?MODULE,  [named_table, ordered_set, public, {read_concurrency, true}]),
-    SupFlags = #{strategy => simple_one_for_one},
     AChild = #{id => amoc_coordinator_worker_sup,
                start => {amoc_coordinator_worker_sup, start_link, []},
                restart => transient,
                shutdown => infinity,
                type => supervisor,
                modules => [amoc_coordinator_worker_sup]},
+    SupFlags = #{strategy => simple_one_for_one, intensity => 0},
     {ok, {SupFlags, [AChild]}}.

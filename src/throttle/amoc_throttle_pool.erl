@@ -37,13 +37,12 @@ init({Name, Interval, Rate, NoOfProcesses}) ->
                   start => {amoc_throttle_process, start_link, [Name, Interval, RatePerProcess]},
                   type => worker,
                   shutdown => timer:seconds(5),
-                  restart => permanent,
+                  restart => transient,
                   modules => [amoc_throttle_process]
                  }
                 || {RatePerProcess, N} <- lists:zip(RatesPerProcess, Tags)
                ],
-
-    SupFlags = #{strategy => one_for_one},
+    SupFlags = #{strategy => one_for_one, intensity => 0},
     {ok, {SupFlags, Children}}.
 
 %% Helpers

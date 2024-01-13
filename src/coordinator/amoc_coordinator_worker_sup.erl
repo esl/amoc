@@ -19,8 +19,7 @@ init({Name, OrderedPlan, Timeout}) ->
     OrderedChilds = [ worker_spec(Name, Item) || Item <- OrderedPlan ],
     TimeoutChild = timeout_child(Name, Timeout),
     Childs = [TimeoutChild | OrderedChilds],
-
-    SupFlags = #{strategy => one_for_one, intensity => 1, period => 5},
+    SupFlags = #{strategy => one_for_one, intensity => 0},
     {ok, {SupFlags, Childs}}.
 
 %% Helpers
