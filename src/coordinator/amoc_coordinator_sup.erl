@@ -29,8 +29,8 @@ start_coordinator(Name, Plan, Timeout) ->
 stop_coordinator(Name) ->
     case persistent_term:get({?MODULE, Name}) of
         #{coordinator := Coordinator, timeout_worker := TimeoutWorker, workers := Workers} ->
+            amoc_coordinator_timeout:stop(TimeoutWorker),
             [ amoc_coordinator_worker:stop(Worker) || Worker <- Workers ],
-            erlang:send(TimeoutWorker, terminate),
             supervisor:terminate_child(?MODULE, Coordinator);
         not_found ->
             {error, not_found}

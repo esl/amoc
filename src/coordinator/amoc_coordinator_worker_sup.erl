@@ -32,7 +32,7 @@ init({Name, Plan, Timeout}) ->
 timeout_child(Name, Timeout) ->
     #{id => {amoc_coordinator_timeout, Name, Timeout},
       start => {amoc_coordinator_timeout, start_link, [Name, Timeout]},
-      restart => permanent,
+      restart => transient,
       shutdown => timer:seconds(5),
       type => worker,
       modules => [amoc_coordinator_timeout]}.
@@ -40,7 +40,7 @@ timeout_child(Name, Timeout) ->
 worker_spec(Item) ->
     #{id => {amoc_coordinator_worker, Item},
       start => {amoc_coordinator_worker, start_link, [Item]},
-      restart => permanent,
+      restart => transient,
       shutdown => timer:seconds(5),
       type => worker,
       modules => [amoc_coordinator_worker]}.

@@ -64,9 +64,10 @@ init({NoOfUsers, Actions}) ->
 
 -spec handle_call({reset, reset | timeout | stop}, term(), state()) ->
     {reply, ok, state()} | {stop, normal, ok, state()}.
+handle_call({reset, stop}, _, State) ->
+    {stop, normal, ok, reset_state(stop, State)};
 handle_call({reset, Event}, _, State) ->
-    NewState = reset_state(Event, State),
-    {reply, ok, NewState}.
+    {reply, ok, reset_state(Event, State)}.
 
 -spec handle_cast({add, data()}, state()) -> {noreply, state()}.
 handle_cast({add, Data}, State) ->
