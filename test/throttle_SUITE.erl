@@ -112,7 +112,7 @@ change_rate_gradually(_) ->
 
 send_and_wait(_) ->
     %% it failts if the throttle wasn't started yet
-    ?assertMatch({error, {no_throttle_process_registered, ?FUNCTION_NAME}},
+    ?assertMatch({error, no_throttle_process_registered},
                  amoc_throttle:send_and_wait(?FUNCTION_NAME, receive_this)),
     %% Start 100-per-10ms throttle with a single process
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 10, 1)),

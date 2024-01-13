@@ -10,7 +10,10 @@
          update/3,
          pause/1,
          resume/1,
-         get_state/1]).
+         get_state/1,
+         get_throttle_process/1,
+         get_throttle_processes/1
+        ]).
 
 %% gen_server behaviour
 -export([start_link/3,
@@ -68,6 +71,27 @@ resume(Pid) ->
 -spec get_state(pid()) -> map().
 get_state(Pid) ->
     gen_server:call(Pid, get_state).
+
+-spec get_throttle_process(amoc_throttle:name()) ->
+    {error, no_throttle_process_registered} | {ok, pid()}.
+get_throttle_process(Name) ->
+    case pg:get_members(?PG_SCOPE, Name) of
+        [] ->
+            {error, no_throttle_process_registered};
+        List -> %% nonempty list
+            N = rand:uniform(length(List)),
+            {ok, lists:nth(N, List)}
+    end.
+
+-spec get_throttle_processes(amoc_throttle:name()) ->
+    {error, no_throttle_process_registered} | {ok, [pid()]}.
+get_throttle_processes(Name) ->
+    case pg:get_members(?PG_SCOPE, Name) of
+        [] ->
+            {error, no_throttle_process_registered};
+        List ->
+            {ok, List}
+    end.
 
 %%------------------------------------------------------------------------------
 %% gen_server behaviour
