@@ -7,7 +7,6 @@
 
 -define(MOCK_MOD, mock_mod).
 -define(TELEMETRY_HANDLER, telemetry_handler).
--define(TELEMETRY_HANDLER_CONFIG, #{dummy_config => true}).
 
 
 all() ->
@@ -25,14 +24,8 @@ init_per_suite(Config) ->
     meck:expect(?MOCK_MOD, f_2, ['_', '_', '_'], ok),
     meck:expect(?MOCK_MOD, f_3, ['_', '_', '_', '_'], ok),
     meck:expect(?MOCK_MOD, f_throw, fun(_, _) -> throw(error) end),
-    meck:new(?TELEMETRY_HANDLER, [non_strict, no_link]),
-    meck:expect(?TELEMETRY_HANDLER, handler, ['_', '_', '_', '_'], ok),
-    application:start(telemetry),
-    TelemetryEvents = [[amoc, coordinator, Event] ||
-                           Event <- [start, stop, timeout, reset, add]],
-    TelemetryHandler = fun ?TELEMETRY_HANDLER:handler/4,
-    telemetry:attach_many(?TELEMETRY_HANDLER, TelemetryEvents,
-                           TelemetryHandler, ?TELEMETRY_HANDLER_CONFIG),
+    TelemetryEvents = [[amoc, coordinator, Event] || Event <- [start, stop, timeout, reset, add]],
+    telemetry_helpers:start(TelemetryEvents),
     Pid = spawn(fun() -> amoc_coordinator_sup:start_link(), receive terminate -> ok end end),
     [{sup, Pid} | Config].
 
@@ -44,7 +37,7 @@ end_per_suite(Config) ->
 
 init_per_testcase(_, Config) ->
     meck:reset(?MOCK_MOD),
-    meck:reset(?TELEMETRY_HANDLER),
+    telemetry_helpers:stop(),
     Config.
 
 end_per_testcase(_Config) ->
@@ -332,11 +325,9 @@ distinct_pairs(Acc, [Element1 | Tail]) ->
     distinct_pairs(NewAcc, Tail).
 
 assert_telemetry_events(Name, EventList) ->
-    History = meck:history(?TELEMETRY_HANDLER),
-    ct:pal("meck history = ~p", [History]),
+    Calls = telemetry_helpers:get_calls([amoc, coordinator]),
     UnfoldedEventList = unfold_event_list(EventList),
-    assert_telemetry_events(Name, History, UnfoldedEventList),
-    ok.
+    assert_telemetry_events(Name, Calls, UnfoldedEventList).
 
 unfold_event_list(EventList) ->
     lists:flatten(
@@ -347,21 +338,17 @@ unfold_event_list(EventList) ->
         end || E <- EventList]).
 
 assert_telemetry_events(_Name, [], []) -> ok;
-assert_telemetry_events(_Name, History, EventList)
-  when length(History) > length(EventList) ->
-    ct:fail("unexpected telemetry events:~n ~p~n ~p", [History, EventList]);
-assert_telemetry_events(_Name, History, EventList)
-  when length(History) < length(EventList) ->
-    ct:fail("missing telemetry events:~n ~p~n ~p", [History, EventList]);
-assert_telemetry_events(Name, [{_Pid, Call, _Ret} | History], [Event | EventList]) ->
+assert_telemetry_events(_Name, Calls, EventList)
+  when length(Calls) > length(EventList) ->
+    ct:fail("unexpected telemetry events:~n ~p~n ~p", [Calls, EventList]);
+assert_telemetry_events(_Name, Calls, EventList)
+  when length(Calls) < length(EventList) ->
+    ct:fail("missing telemetry events:~n ~p~n ~p", [Calls, EventList]);
+assert_telemetry_events(Name, [Call | Calls], [Event | EventList]) ->
     assert_telemetry_handler_call(Name, Call, Event),
-    assert_telemetry_events(Name, History, EventList).
+    assert_telemetry_events(Name, Calls, EventList).
 
 assert_telemetry_handler_call(Name, Call, Event) ->
     EventName = [amoc, coordinator, Event],
     Measurements = #{count => 1},
-    HandlerConfig = ?TELEMETRY_HANDLER_CONFIG,
-    ?assertMatch(
-       {?TELEMETRY_HANDLER, handler,
-        [EventName, Measurements,
-         #{name := Name, monotonic_time := _}, HandlerConfig]}, Call).
+    ?assertMatch({EventName, Measurements, #{name := Name, monotonic_time := _}}, Call).
