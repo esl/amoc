@@ -136,16 +136,20 @@ raise_telemetry_event(Name, Event) ->
                      end,
     amoc_telemetry:execute([coordinator, TelemetryEvent], #{count => 1}, #{name => Name}).
 
+%% This function defines the execution order of the events that must be processed synchronously (on
+%% reset/timeout/stop). We need to ensure that 'all' items are executed after 'non-all'. Note that
+%% '{coordinate, _}' events are exceptional and their processing is done asynchronously. The order
+%% of All plan items must be preserved as in the original plan, the same applies to NonAll items.
 -spec order_plan([normalized_coordination_item()]) -> [normalized_coordination_item()].
 order_plan(Items) ->
-    %% We need to ensure that `all` plans are executed last because we rely on the children's order
-    %% at `amoc_coordinator_sup:start_coordinator/3',
-    %% and `supervisor:which_children/1' return children in a reversed order.
-    lists:sort(fun order/2, Items).
+    {All, NotAll} = lists:partition(fun partitioner/1, Items),
+    NotAll ++ All.
 
--spec order(normalized_coordination_item(), normalized_coordination_item()) -> boolean().
-order({A, _}, {B, _}) ->
-    all =/= A orelse all =:= B.
+-spec partitioner(normalized_coordination_item()) -> boolean().
+partitioner({all, _}) ->
+    true;
+partitioner(_) ->
+    false.
 
 -spec normalize_coordination_plan(plan()) -> [normalized_coordination_item()].
 normalize_coordination_plan(CoordinationPlan) when is_tuple(CoordinationPlan) ->
