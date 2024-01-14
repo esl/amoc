@@ -164,11 +164,11 @@ get_state(_) ->
 
 
 %% Helpers
-assert_telemetry_event(Name, Count, Throttle, Rate, Interval) ->
+assert_telemetry_event(Name, Measurement, Throttle, Rate, Interval) ->
     TelemetryEvents = telemetry_helpers:get_calls([amoc, throttle]),
     IsLowRateEventFn = fun({EventName, Measurements, Metadata}) ->
                                Name =:= EventName andalso
-                               maps:is_key(Count, Measurements) andalso
+                               maps:is_key(Measurement, Measurements) andalso
                                Throttle =:= maps:get(name, Metadata, undefined) andalso
                                Rate =:= maps:get(rate, Metadata, undefined) andalso
                                Interval =:= maps:get(interval, Metadata, undefined)
