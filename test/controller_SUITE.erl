@@ -33,8 +33,8 @@ all_tests() ->
      stop_running_scenario_with_users_stays_in_finished,
      stop_running_scenario_with_users_eventually_terminates,
      scenario_with_state_and_crashing_in_terminate_run_fine,
-     scenario_without_start_never_runs_users,
-     bad_scenario_fails
+     scenario_missing_start_callback_fails,
+     scenario_with_failing_init_fails
     ].
 
 
@@ -165,11 +165,11 @@ scenario_with_state_and_crashing_in_terminate_run_fine(_) ->
     WaitUntilValue = {finished, testing_scenario_with_state},
     wait_helper:wait_until(WaitUntilFun, WaitUntilValue).
 
-scenario_without_start_never_runs_users(_) ->
+scenario_missing_start_callback_fails(_) ->
     Ret = do_start_scenario(testing_scenario_without_callbacks, test_helpers:regular_vars()),
     ?assertMatch({error, _}, Ret).
 
-bad_scenario_fails(_) ->
+scenario_with_failing_init_fails(_) ->
     Ret = do_start_scenario(testing_scenario_with_error_in_init, test_helpers:regular_vars()),
     ?assertMatch({error, _}, Ret).
 

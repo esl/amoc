@@ -12,6 +12,7 @@
 all() ->
     [
      plan_normalises_successfully,
+     ordering_plan_sets_all_at_the_end,
      failing_action_does_not_kill_the_worker,
      execute_plan_without_timeout,
      reset_plan_without_timeout,
@@ -33,11 +34,12 @@ end_per_suite(Config) ->
     application:stop(telemetry),
     Sup = ?config(sup, Config),
     Sup ! terminate,
+    telemetry_helpers:stop(),
     meck:unload().
 
 init_per_testcase(_, Config) ->
     meck:reset(?MOCK_MOD),
-    telemetry_helpers:stop(),
+    telemetry_helpers:reset(),
     Config.
 
 end_per_testcase(_Config) ->
@@ -220,6 +222,33 @@ plan_normalises_successfully(_) ->
 
     Plan3 = [{2, [mocked_action(item1, 2)]}],
     ?assertEqual(NormalisedPlan, amoc_coordinator:normalize_coordination_plan(Plan3)).
+
+ordering_plan_sets_all_at_the_end(_) ->
+    OrderedPlan = [
+                   {2, [mocked_action(item1, 2)]},
+                   {5, [mocked_action(item1, 2)]},
+                   {1, [mocked_action(item3, 1)]},
+                   {all, [mocked_action(all2, 1)]},
+                   {all, [mocked_action(all1, 1)]}
+                  ],
+    %% all is moved after all the non-all, but relative order between 'all' is untouched.
+    Plan1 = [
+             {all, [mocked_action(all2, 1)]},
+             {2, [mocked_action(item1, 2)]},
+             {5, [mocked_action(item1, 2)]},
+             {1, [mocked_action(item3, 1)]},
+             {all, [mocked_action(all1, 1)]}
+            ],
+    ?assertEqual(OrderedPlan, amoc_coordinator:order_plan(Plan1)),
+    %% all is moved after all the non-all, but relative order between 'all' is untouched.
+    Plan2 = [
+             {all, [mocked_action(all2, 1)]},
+             {all, [mocked_action(all1, 1)]},
+             {2, [mocked_action(item1, 2)]},
+             {5, [mocked_action(item1, 2)]},
+             {1, [mocked_action(item3, 1)]}
+            ],
+    ?assertEqual(OrderedPlan, amoc_coordinator:order_plan(Plan2)).
 
 %% Helpers
 

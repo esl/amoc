@@ -166,14 +166,14 @@ get_state(_) ->
 %% Helpers
 assert_telemetry_event(Name, Count, Throttle, Rate, Interval) ->
     TelemetryEvents = telemetry_helpers:get_calls([amoc, throttle]),
-    LowRateEvent = fun({EventName, Measurements, Metadata}) ->
-                           Name =:= EventName andalso
-                           1 =:= maps:get(Count, Measurements, 1) andalso
-                           Throttle =:= maps:get(name, Metadata, undefined) andalso
-                           Rate =:= maps:get(rate, Metadata, undefined) andalso
-                           Interval =:= maps:get(interval, Metadata, undefined)
-                   end,
-    lists:any(LowRateEvent, TelemetryEvents).
+    IsLowRateEventFn = fun({EventName, Measurements, Metadata}) ->
+                               Name =:= EventName andalso
+                               maps:is_key(Count, Measurements) andalso
+                               Throttle =:= maps:get(name, Metadata, undefined) andalso
+                               Rate =:= maps:get(rate, Metadata, undefined) andalso
+                               Interval =:= maps:get(interval, Metadata, undefined)
+                       end,
+    ?assert(lists:any(IsLowRateEventFn, TelemetryEvents)).
 
 get_number_of_workers(Name) ->
     Processes = pg:get_members(amoc_throttle, Name),

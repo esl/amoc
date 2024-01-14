@@ -10,7 +10,7 @@
          stop/1, reset/1,
          notify/2]).
 -ifdef(TEST).
--export([normalize_coordination_plan/1]).
+-export([normalize_coordination_plan/1, order_plan/1]).
 -endif.
 
 -define(DEFAULT_TIMEOUT, 30). %% 30 seconds

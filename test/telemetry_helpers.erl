@@ -4,7 +4,7 @@
 -define(CONFIG, #{dummy_config => true}).
 -define(CONFIG_MATCH, #{dummy_config := true}).
 
--export([start/1, stop/0, get_calls/1]).
+-export([start/1, reset/0, stop/0, get_calls/1]).
 
 start(TelemetryEvents) ->
     meck:new(?HANDLER, [non_strict, no_link]),
@@ -13,8 +13,11 @@ start(TelemetryEvents) ->
     TelemetryHandler = fun ?HANDLER:handler/4,
     telemetry:attach_many(?HANDLER, TelemetryEvents, TelemetryHandler, ?CONFIG).
 
-stop() ->
+reset() ->
     meck:reset(?HANDLER).
+
+stop() ->
+    meck:unload(?HANDLER).
 
 get_calls(Prefix) ->
     History = meck:history(?HANDLER),
