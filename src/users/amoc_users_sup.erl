@@ -53,7 +53,7 @@ init(no_args) ->
 %% API
 -spec init_storage() -> any().
 init_storage() ->
-    UserSups = supervisor:which_children(?MODULE),
+    UserSups = lists:reverse(supervisor:which_children(?MODULE)),
     UserSupPids = [ Pid || {_, Pid, _, _} <- UserSups ],
     UserSupPidsTuple = erlang:list_to_tuple(UserSupPids),
     NumOfSupervisors = tuple_size(UserSupPidsTuple),
@@ -110,12 +110,7 @@ start_children(Scenario, UserIds, ScenarioState) ->
 %% in order to load-balance the request among all workers.
 -spec stop_children(non_neg_integer(), boolean()) -> non_neg_integer().
 stop_children(Count, Force) ->
-    TotalCount = count_no_of_users(),
-    #storage{sups = Sups} = persistent_term:get(?MODULE),
-    NumOfSupervisors = tuple_size(Sups),
-    ShuffledSupervisors = shuffle_supervisors(tuple_to_list(Sups)),
-    CountRemove = min(Count, TotalCount),
-    Assignments = assign_counts_to_supervisors(ShuffledSupervisors, NumOfSupervisors, CountRemove),
+    {CountRemove, Assignments} = assign_counts(Count),
     [ gen_server:cast(Sup, {stop_children, Int, Force}) || {Sup, Int} <- Assignments ],
     CountRemove.
 
@@ -131,27 +126,34 @@ get_sup_for_user_id(Id) ->
     Index = Id rem tuple_size(Supervisors) + 1,
     element(Index, Supervisors).
 
-%% Create a list with random indexes with supervisors that will then be sorted
-%% Uses mwc59 for the most performant (though statistically unsound) erlang RNG
--spec shuffle_supervisors([pid()]) -> [pid()].
-shuffle_supervisors(Supervisors) ->
-    UniqueInt = erlang:unique_integer([positive]),
-    F1 = fun(Sup, Int) ->
-                Rand = rand:mwc59(Int),
-                {{Rand, Sup}, Rand}
-        end,
-    {Indexed, _} = lists:mapfoldl(F1, UniqueInt, Supervisors),
-    SortedByIndex = lists:sort(Indexed),
-    {_Indexes, ShuffledSupervisors} = lists:unzip(SortedByIndex),
-    ShuffledSupervisors.
+%% assign how many users each worker will be requested to remove,
+%% taking care of the fact that worker might not have enough users
+assign_counts(Total) ->
+    #storage{user_count = Atomics, sups = Sups} = persistent_term:get(?MODULE),
+    NumOfSupervisors = tuple_size(Sups),
+    Supervisors = tuple_to_list(Sups),
+    UsersPerSup = [ atomics:get(Atomics, SupPos) || SupPos <- lists:seq(2, NumOfSupervisors + 1) ],
+    SupervisorsWithCounts = lists:zip(Supervisors, UsersPerSup),
+    SupervisorWithPositiveCounts = [ T || T = {_, Count} <- SupervisorsWithCounts, Count =/= 0],
+    Data = maps:from_list(SupervisorWithPositiveCounts),
+    distribute(#{}, Data, SupervisorWithPositiveCounts, Total).
 
--spec assign_counts_to_supervisors([pid()], non_neg_integer(), non_neg_integer()) ->
-    [{pid(), non_neg_integer()}].
-assign_counts_to_supervisors(ShuffledList, NumOfSupervisors, CountRemove) ->
-    SlotPerSup = CountRemove div NumOfSupervisors,
-    Remainder = CountRemove rem NumOfSupervisors,
-    F2 = fun(Sup, Rem) ->
-                 {{Sup, SlotPerSup + Rem}, min(0, Rem - 1)}
-         end,
-    {Assignments, _} = lists:mapfoldl(F2, Remainder, ShuffledList),
-    Assignments.
+-spec distribute(#{pid() := count()}, #{pid() := count()}, [{pid(), count()}], count()) ->
+    {count(), [{pid(), count()}]}.
+%% Assigned all or not enough active users, already assigned all possible
+distribute(Acc, Data, _, Left) when 0 =:= Left; 0 =:= map_size(Data) ->
+    {lists:sum(maps:values(Acc)), maps:to_list(Acc)};
+%% Already assigned one round and still have counts left and running users available, loop again
+distribute(Acc, Data, [], Left) ->
+    distribute(Acc, Data, maps:to_list(Data), Left);
+distribute(Acc, Data, [{Sup, Count} | Rest], Left) ->
+    NewAcc = maps:put(Sup, maps:get(Sup, Acc, 0) + 1, Acc),
+    NewData = case Count of
+                  1 ->
+                      %% Assigning last possible user to this sup, remove from data
+                      maps:remove(Sup, Data);
+                  _ ->
+                      %% Assign one more to this sup and continue assigning
+                      maps:put(Sup, Count - 1, Data)
+              end,
+    distribute(NewAcc, NewData, Rest, Left - 1).

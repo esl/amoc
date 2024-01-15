@@ -63,8 +63,10 @@ handle_cast({start_children, Scenario, Ids, ScenarioState}, #state{index = N, ti
     {noreply, State};
 handle_cast({stop_children, Int, ForceRemove}, #state{tid = Tid} = State) ->
     Pids = case ets:match_object(Tid, '$1', Int) of
-               {[{Pid, _Id}], _} -> [Pid];
-               '$end_of_table' -> []
+               '$end_of_table' ->
+                   [];
+               {Objects, _} ->
+                   [Pid || {Pid, _Id} <- Objects]
            end,
     NewState = maybe_track_task_to_stop_my_children(State, Pids, ForceRemove),
     {noreply, NewState};

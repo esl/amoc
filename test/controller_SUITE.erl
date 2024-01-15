@@ -28,6 +28,8 @@ all_tests() ->
      remove_users_scenario_not_started_fails,
      check_status_with_running_users_is_correct,
      check_status_after_killing_one_user_is_correct,
+     killing_more_users_than_available_is_correct,
+     killing_many_users_in_a_big_test_is_correct,
      stop_non_running_scenario_fails,
      stop_running_scenario_with_no_users_immediately_terminates,
      stop_running_scenario_with_users_stays_in_finished,
@@ -124,6 +126,24 @@ check_status_after_killing_one_user_is_correct(_) ->
     Ret = amoc_controller:remove_users(1, true),
     ?assertMatch({ok, 1}, Ret),
     test_helpers:wait_until_scenario_has_users(testing_scenario, NumOfUsers - 1, NumOfUsers).
+
+killing_more_users_than_available_is_correct(_) ->
+    do_start_scenario(testing_scenario, test_helpers:regular_vars()),
+    NumOfUsers = 10,
+    amoc_controller:add_users(1, NumOfUsers),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, NumOfUsers, NumOfUsers),
+    Ret = amoc_controller:remove_users(999, true),
+    ?assertMatch({ok, 10}, Ret),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, 0, NumOfUsers).
+
+killing_many_users_in_a_big_test_is_correct(_) ->
+    do_start_scenario(testing_scenario, test_helpers:regular_vars()),
+    NumOfUsers = 200,
+    amoc_controller:add_users(1, NumOfUsers),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, NumOfUsers, NumOfUsers),
+    Ret = amoc_controller:remove_users(120, true),
+    ?assertMatch({ok, 120}, Ret),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, 80, NumOfUsers).
 
 stop_non_running_scenario_fails(_) ->
     Ret = amoc_controller:stop_scenario(),
