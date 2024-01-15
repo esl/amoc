@@ -8,7 +8,8 @@
 -export([start_link/0, init/1]).
 
 %% API
--export([init_storage/0, incr_no_of_users/0, decr_no_of_users/0, count_no_of_users/0,
+-export([init_storage/0, clean_storage/0,
+         incr_no_of_users/0, decr_no_of_users/0, count_no_of_users/0,
          start_child/3, start_children/3, stop_children/2, terminate_all_children/0]).
 
 -record(storage, {
@@ -36,7 +37,7 @@ init(no_args) ->
                modules => [amoc_users_worker_sup]
               }
              || N <- lists:seq(1, erlang:system_info(schedulers_online)) ],
-    Strategy = #{strategy => one_for_one, intensity => 5, period => 10},
+    Strategy = #{strategy => one_for_one, intensity => 0},
     {ok, {Strategy, Specs}}.
 
 %% API
@@ -104,6 +105,10 @@ init_storage() ->
     atomics:put(Atomic, 1, 0),
     Storage = #storage{user_count = Atomic, sups = UserSupPidsTuple},
     persistent_term:put(?MODULE, Storage).
+
+-spec clean_storage() -> any().
+clean_storage() ->
+    persistent_term:erase(?MODULE).
 
 get_sup_for_user_id(Id) ->
     #storage{sups = Supervisors} = persistent_term:get(?MODULE),
