@@ -1,5 +1,5 @@
 %% @private
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 -module(amoc_sup).
 
 -behaviour(supervisor).

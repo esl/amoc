@@ -1,5 +1,5 @@
 %% @private
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 %% @doc Supervisor-like gen_server with some tracking responsibilities over the users
 %%
 %% We want to keep consistent track of all users running globally by running special code upon a

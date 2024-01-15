@@ -1,5 +1,5 @@
 %% @private
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 -module(amoc_user).
 
 -define(SHUTDOWN_TIMEOUT, 2000). %% 2 seconds

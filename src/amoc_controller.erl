@@ -1,4 +1,4 @@
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 %% @doc Main controller of a node, responsible for the scenario and the users
 %%
 %% Note that this module should be rarely used, APIs are fully exposed by `amoc' and `amoc_dist'

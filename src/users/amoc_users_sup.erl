@@ -1,5 +1,5 @@
 %% @private
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 %% @doc Top supervisor of the pooled users supervisor.
 %%
 %% It spawns a pool of workers as big as online schedulers. When starting a new user, as the user is
