@@ -3,40 +3,43 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
 
--compile(export_all).
+-compile([export_all, nowarn_export_all]).
 
 -define(MOCK_MOD, mock_mod).
 -define(TELEMETRY_HANDLER, telemetry_handler).
--define(TELEMETRY_HANDLER_CONFIG, #{dummy_config => true}).
 
 
 all() ->
-    [execute_plan_without_timeout,
+    [
+     plan_normalises_successfully,
+     ordering_plan_sets_all_at_the_end,
+     failing_action_does_not_kill_the_worker,
+     execute_plan_without_timeout,
      reset_plan_without_timeout,
-     execute_plan_with_timeout].
+     execute_plan_with_timeout
+    ].
 
 init_per_suite(Config) ->
     meck:new(?MOCK_MOD, [non_strict, no_link]),
     meck:expect(?MOCK_MOD, f_1, ['_', '_'], ok),
     meck:expect(?MOCK_MOD, f_2, ['_', '_', '_'], ok),
     meck:expect(?MOCK_MOD, f_3, ['_', '_', '_', '_'], ok),
-    meck:new(?TELEMETRY_HANDLER, [non_strict, no_link]),
-    meck:expect(?TELEMETRY_HANDLER, handler, ['_', '_', '_', '_'], ok),
-    application:start(telemetry),
-    TelemetryEvents = [[amoc, coordinator, Event] ||
-                           Event <- [start, stop, timeout, reset, add]],
-    TelemetryHandler = fun ?TELEMETRY_HANDLER:handler/4,
-    telemetry:attach_many(?TELEMETRY_HANDLER, TelemetryEvents,
-                           TelemetryHandler, ?TELEMETRY_HANDLER_CONFIG),
-    Config.
+    meck:expect(?MOCK_MOD, f_throw, fun(_, _) -> throw(error) end),
+    TelemetryEvents = [[amoc, coordinator, Event] || Event <- [start, stop, timeout, reset, add]],
+    telemetry_helpers:start(TelemetryEvents),
+    Pid = spawn(fun() -> amoc_coordinator_sup:start_link(), receive terminate -> ok end end),
+    [{sup, Pid} | Config].
 
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
     application:stop(telemetry),
+    Sup = ?config(sup, Config),
+    Sup ! terminate,
+    telemetry_helpers:stop(),
     meck:unload().
 
 init_per_testcase(_, Config) ->
     meck:reset(?MOCK_MOD),
-    meck:reset(?TELEMETRY_HANDLER),
+    telemetry_helpers:reset(),
     Config.
 
 end_per_testcase(_Config) ->
@@ -197,8 +200,60 @@ execute_plan_with_timeout(_Config) ->
     assert_telemetry_events(Name, [start, {N1, add}, timeout,
                                    {N2, add}, timeout, stop]).
 
+failing_action_does_not_kill_the_worker(_) ->
+    Name = ?FUNCTION_NAME,
+    Plan = {2, [mock_failing()]},
+    ?assertEqual(ok, amoc_coordinator:start(Name, Plan)),
+    {ok, _, Workers} = amoc_coordinator_sup:get_workers(Name),
+    [amoc_coordinator:add(Name, User) || User <- lists:seq(1, 2)],
+    meck:wait(1, ?MOCK_MOD, f_throw, ['_', {'_', '_'}], 1000),
+    {ok, _, Workers} = amoc_coordinator_sup:get_workers(Name),
+    amoc_coordinator:stop(Name),
+    ok.
+
+plan_normalises_successfully(_) ->
+    NormalisedPlan = [{2, [mocked_action(item1, 2)]}],
+
+    Plan1 = {2, [mocked_action(item1, 2)]},
+    ?assertEqual(NormalisedPlan, amoc_coordinator:normalize_coordination_plan(Plan1)),
+
+    Plan2 = [{2, mocked_action(item1, 2)}],
+    ?assertEqual(NormalisedPlan, amoc_coordinator:normalize_coordination_plan(Plan2)),
+
+    Plan3 = [{2, [mocked_action(item1, 2)]}],
+    ?assertEqual(NormalisedPlan, amoc_coordinator:normalize_coordination_plan(Plan3)).
+
+ordering_plan_sets_all_at_the_end(_) ->
+    OrderedPlan = [
+                   {2, [mocked_action(item1, 2)]},
+                   {5, [mocked_action(item1, 2)]},
+                   {1, [mocked_action(item3, 1)]},
+                   {all, [mocked_action(all2, 1)]},
+                   {all, [mocked_action(all1, 1)]}
+                  ],
+    %% all is moved after all the non-all, but relative order between 'all' is untouched.
+    Plan1 = [
+             {all, [mocked_action(all2, 1)]},
+             {2, [mocked_action(item1, 2)]},
+             {5, [mocked_action(item1, 2)]},
+             {1, [mocked_action(item3, 1)]},
+             {all, [mocked_action(all1, 1)]}
+            ],
+    ?assertEqual(OrderedPlan, amoc_coordinator:order_plan(Plan1)),
+    %% all is moved after all the non-all, but relative order between 'all' is untouched.
+    Plan2 = [
+             {all, [mocked_action(all2, 1)]},
+             {all, [mocked_action(all1, 1)]},
+             {2, [mocked_action(item1, 2)]},
+             {5, [mocked_action(item1, 2)]},
+             {1, [mocked_action(item3, 1)]}
+            ],
+    ?assertEqual(OrderedPlan, amoc_coordinator:order_plan(Plan2)).
 
 %% Helpers
+
+mock_failing() ->
+    fun(Event) -> mock_mod:f_throw(ok, Event) end.
 
 mocked_action(Tag, 1) ->
     fun(Event) -> mock_mod:f_1(Tag, Event) end;
@@ -299,11 +354,9 @@ distinct_pairs(Acc, [Element1 | Tail]) ->
     distinct_pairs(NewAcc, Tail).
 
 assert_telemetry_events(Name, EventList) ->
-    History = meck:history(?TELEMETRY_HANDLER),
-    ct:pal("meck history = ~p", [History]),
+    Calls = telemetry_helpers:get_calls([amoc, coordinator]),
     UnfoldedEventList = unfold_event_list(EventList),
-    assert_telemetry_events(Name, History, UnfoldedEventList),
-    ok.
+    assert_telemetry_events(Name, Calls, UnfoldedEventList).
 
 unfold_event_list(EventList) ->
     lists:flatten(
@@ -314,21 +367,17 @@ unfold_event_list(EventList) ->
         end || E <- EventList]).
 
 assert_telemetry_events(_Name, [], []) -> ok;
-assert_telemetry_events(_Name, History, EventList)
-  when length(History) > length(EventList) ->
-    ct:fail("unexpected telemetry events:~n ~p~n ~p", [History, EventList]);
-assert_telemetry_events(_Name, History, EventList)
-  when length(History) < length(EventList) ->
-    ct:fail("missing telemetry events:~n ~p~n ~p", [History, EventList]);
-assert_telemetry_events(Name, [{_Pid, Call, _Ret} | History], [Event | EventList]) ->
+assert_telemetry_events(_Name, Calls, EventList)
+  when length(Calls) > length(EventList) ->
+    ct:fail("unexpected telemetry events:~n ~p~n ~p", [Calls, EventList]);
+assert_telemetry_events(_Name, Calls, EventList)
+  when length(Calls) < length(EventList) ->
+    ct:fail("missing telemetry events:~n ~p~n ~p", [Calls, EventList]);
+assert_telemetry_events(Name, [Call | Calls], [Event | EventList]) ->
     assert_telemetry_handler_call(Name, Call, Event),
-    assert_telemetry_events(Name, History, EventList).
+    assert_telemetry_events(Name, Calls, EventList).
 
 assert_telemetry_handler_call(Name, Call, Event) ->
     EventName = [amoc, coordinator, Event],
     Measurements = #{count => 1},
-    HandlerConfig = ?TELEMETRY_HANDLER_CONFIG,
-    ?assertMatch(
-       {?TELEMETRY_HANDLER, handler,
-        [EventName, Measurements,
-         #{name := Name, monotonic_time := _}, HandlerConfig]}, Call).
+    ?assertMatch({EventName, Measurements, #{name := Name, monotonic_time := _}}, Call).

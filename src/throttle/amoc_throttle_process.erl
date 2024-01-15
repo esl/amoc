@@ -1,26 +1,30 @@
 %% @private
 %% @see amoc_throttle
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 -module(amoc_throttle_process).
 -behaviour(gen_server).
 
 %% API
--export([start/3,
-         stop/1,
+-export([stop/1,
          run/2,
          update/3,
          pause/1,
          resume/1,
-         get_state/1]).
+         get_state/1,
+         get_throttle_process/1,
+         get_throttle_processes/1
+        ]).
 
 %% gen_server behaviour
--export([init/1,
+-export([start_link/3,
+         init/1,
          handle_call/3,
          handle_info/2,
          handle_cast/2,
          handle_continue/2,
          format_status/2]).
 
+-define(PG_SCOPE, amoc_throttle).
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
 -record(state, {can_run_fn = true :: boolean(),
@@ -39,9 +43,9 @@
 %% Exported functions
 %%------------------------------------------------------------------------------
 
--spec start(atom(), amoc_throttle:interval(), amoc_throttle:rate()) -> {ok, pid()}.
-start(Name, Interval, Rate) ->
-    gen_server:start(?MODULE, [Name, Interval, Rate], []).
+-spec start_link(atom(), amoc_throttle:interval(), amoc_throttle:rate()) -> {ok, pid()}.
+start_link(Name, Interval, Rate) ->
+    gen_server:start_link(?MODULE, {Name, Interval, Rate}, []).
 
 -spec stop(pid()) -> ok.
 stop(Pid) ->
@@ -64,16 +68,39 @@ pause(Pid) ->
 resume(Pid) ->
     gen_server:cast(Pid, resume_process).
 
--spec get_state(pid()) -> state().
+-spec get_state(pid()) -> map().
 get_state(Pid) ->
     gen_server:call(Pid, get_state).
+
+-spec get_throttle_process(amoc_throttle:name()) ->
+    {error, no_throttle_process_registered} | {ok, pid()}.
+get_throttle_process(Name) ->
+    case pg:get_members(?PG_SCOPE, Name) of
+        [] ->
+            {error, no_throttle_process_registered};
+        List -> %% nonempty list
+            N = rand:uniform(length(List)),
+            {ok, lists:nth(N, List)}
+    end.
+
+-spec get_throttle_processes(amoc_throttle:name()) ->
+    {error, no_throttle_process_registered} | {ok, [pid()]}.
+get_throttle_processes(Name) ->
+    case pg:get_members(?PG_SCOPE, Name) of
+        [] ->
+            {error, no_throttle_process_registered};
+        List ->
+            {ok, List}
+    end.
 
 %%------------------------------------------------------------------------------
 %% gen_server behaviour
 %%------------------------------------------------------------------------------
 
--spec init(list()) -> {ok, state(), timeout()}.
-init([Name, Interval, Rate]) ->
+-spec init({amoc_throttle:name(), amoc_throttle:interval(), amoc_throttle:rate()}) ->
+    {ok, state(), timeout()}.
+init({Name, Interval, Rate}) ->
+    pg:join(?PG_SCOPE, Name, self()),
     InitialState = initial_state(Name, Interval, Rate),
     StateWithTimer = maybe_start_timer(InitialState),
     {ok, StateWithTimer#state{name = Name}, timeout(InitialState)}.
@@ -126,17 +153,13 @@ format_status(_Opt, [_PDict, State]) ->
 %% internal functions
 %%------------------------------------------------------------------------------
 
-initial_state(Name, Interval, Rate) when Rate >= 0 ->
-    NewRate = case {Rate =:= 0, Rate < 5} of
-                  {true, _} ->
-                      Msg = <<"invalid rate, must be higher than zero">>,
-                      internal_error(Msg, Name, Rate, Interval),
-                      1;
-                  {_, true} ->
+initial_state(Name, Interval, Rate) when Rate > 0 ->
+    NewRate = case Rate < 5 of
+                  true ->
                       Msg = <<"too low rate, please reduce NoOfProcesses">>,
                       internal_error(Msg, Name, Rate, Interval),
                       Rate;
-                  {_, false} ->
+                  false ->
                       Rate
               end,
     Delay = case {Interval, Interval div NewRate, Interval rem NewRate} of

@@ -1,6 +1,6 @@
 %% @private
 %% @see amoc_coordinator
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 -module(amoc_coordinator_worker).
 
 -behaviour(gen_server).
@@ -33,19 +33,24 @@
 %%%===================================================================
 
 -spec start_link(amoc_coordinator:normalized_coordination_item()) -> {ok, Pid :: pid()}.
-start_link(CoordinationItem) -> gen_server:start_link(?MODULE, CoordinationItem, []).
+start_link(CoordinationItem) ->
+    gen_server:start_link(?MODULE, CoordinationItem, []).
 
 -spec reset(pid()) -> ok.
-reset(Pid) -> gen_server:call(Pid, {reset, reset}).
+reset(Pid) ->
+    gen_server:call(Pid, {reset, reset}).
 
 -spec timeout(pid()) -> ok.
-timeout(Pid) -> gen_server:call(Pid, {reset, timeout}).
+timeout(Pid) ->
+    gen_server:call(Pid, {reset, timeout}).
 
 -spec stop(pid()) -> ok.
-stop(Pid) -> gen_server:call(Pid, {reset, stop}).
+stop(Pid) ->
+    gen_server:call(Pid, {reset, stop}).
 
 -spec add(pid(), data()) -> ok.
-add(Pid, Data) -> gen_server:cast(Pid, {add, Data}).
+add(Pid, Data) ->
+    gen_server:cast(Pid, {add, Data}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -59,19 +64,15 @@ init({NoOfUsers, Actions}) ->
 
 -spec handle_call({reset, reset | timeout | stop}, term(), state()) ->
     {reply, ok, state()} | {stop, normal, ok, state()}.
+handle_call({reset, stop}, _, State) ->
+    {stop, normal, ok, reset_state(stop, State)};
 handle_call({reset, Event}, _, State) ->
-    NewState = reset_state(Event, State),
-    case Event of
-        stop -> {stop, normal, ok, NewState};
-        _ ->
-            {reply, ok, NewState}
-    end.
+    {reply, ok, reset_state(Event, State)}.
 
 -spec handle_cast({add, data()}, state()) -> {noreply, state()}.
 handle_cast({add, Data}, State) ->
     NewState = add_data(Data, State),
     {noreply, NewState}.
-
 
 %%%===================================================================
 %%% Internal functions

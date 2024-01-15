@@ -1,6 +1,6 @@
 %% @private
 %% @see amoc_throttle
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 -module(amoc_throttle_controller).
 
 -behaviour(gen_server).
@@ -46,21 +46,19 @@
 -spec(start_link() ->
     {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
-    pg:start_link(),
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 -spec(ensure_throttle_processes_started(name(), amoc_throttle:rate(),
                                         amoc_throttle:interval(), pos_integer()) ->
-    {ok, started_throttle_processes} |
-    {ok, throttle_processes_already_started} |
-    {error, any()}).
+    {ok, started | already_started} |
+    {error, wrong_reconfiguration | wrong_no_of_procs}).
 ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses) ->
     maybe_raise_event(Name, init),
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Rate, Interval, NoOfProcesses}).
 
 -spec run(name(), fun(() -> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
-    case get_throttle_process(Name) of
+    case amoc_throttle_process:get_throttle_process(Name) of
         {ok, Pid} ->
             maybe_raise_event(Name, request),
             Fun =
@@ -110,8 +108,8 @@ init([]) ->
 
 -spec handle_call({start_processes, name(), pos_integer(), amoc_throttle:interval(), pos_integer()},
                   From :: {pid(), Tag :: term()}, state()) ->
-                     {reply, {ok, started}, state()} |
-                     {reply, {error, wrong_no_of_procs}, state()};
+                     {reply, {ok, started | already_started}, state()} |
+                     {reply, {error, wrong_reconfiguration | wrong_no_of_procs}, state()};
                  ({pause | resume | stop}, From :: {pid(), Tag :: term()}, state()) ->
                      {reply, ok, state()} |
                      {reply, Error :: any(), state()};
@@ -125,56 +123,65 @@ init([]) ->
                      {reply, ok, state()} |
                      {reply, {error, any()}, state()}.
 handle_call({start_processes, Name, Rate, Interval, NoOfProcesses}, _From, State) ->
-    case pg:get_members(Name) of
-        [] ->
-            RealNoOfProcesses = start_processes(Name, Rate, Interval, NoOfProcesses),
-            {reply, {ok, started},
-             State#{Name => #throttle_info{rate = Rate, interval = Interval, active = true,
-                                           no_of_procs = RealNoOfProcesses}}};
-        Group when is_list(Group) ->
-            ExpectedNoOfProcesses = min(Rate, NoOfProcesses),
-            case length(Group) of
-                ExpectedNoOfProcesses -> {reply, {ok, started}, State};
-                _ -> {reply, {error, wrong_no_of_procs}, State}
-            end
+    case amoc_throttle_process:get_throttle_processes(Name) of
+        {error, no_throttle_process_registered} ->
+            RealNoOfProcs = start_processes(Name, Rate, Interval, NoOfProcesses),
+            NewState = State#{Name => #throttle_info{rate = Rate, interval = Interval,
+                                                     active = true, no_of_procs = RealNoOfProcs}},
+            {reply, {ok, started}, NewState};
+        {ok, Group} ->
+            verify_new_start_matches_running(Name, Rate, Interval, NoOfProcesses, Group, State)
     end;
 handle_call({pause, Name}, _From, State) ->
-    case all_processes(Name, pause) of
+    case run_in_all_processes(Name, pause) of
         ok ->
             Info = maps:get(Name, State),
             {reply, ok, State#{Name => Info#throttle_info{active = false}}};
-        Error -> {reply, Error, State}
+        Error ->
+            {reply, Error, State}
     end;
 handle_call({resume, Name}, _From, State) ->
-    case all_processes(Name, resume) of
+    case run_in_all_processes(Name, resume) of
         ok ->
             Info = maps:get(Name, State),
             {reply, ok, State#{Name => Info#throttle_info{active = true}}};
         Error -> {reply, Error, State}
     end;
 handle_call({change_rate, Name, Rate, Interval}, _From, State) ->
-    Info = maps:get(Name, State),
-    case maybe_change_rate(Name, Rate, Interval, Info) of
-        {ok, Rate} -> UpdatedInfo = Info#throttle_info{rate = Rate, interval = Interval},
-            {reply, ok, State#{Name => UpdatedInfo}};
-        Error -> {reply, Error, State}
+    case State of
+        #{Name := Info} ->
+            case maybe_change_rate(Name, Rate, Interval, Info) of
+                ok ->
+                    UpdatedInfo = Info#throttle_info{rate = Rate, interval = Interval},
+                    {reply, ok, State#{Name => UpdatedInfo}};
+                Error ->
+                    {reply, Error, State}
+            end;
+        _ ->
+            {reply, {error, {no_throttle_by_name, Name}}, State}
     end;
 handle_call({change_rate_gradually, Name, LowRate, HighRate,
              RateInterval, StepInterval, NoOfSteps},
             _From, State) ->
-    Info = maps:get(Name, State),
-    case Info#throttle_info.change_plan of
-        undefined ->
-            NewInfo = start_gradual_rate_change(Name, LowRate, HighRate, RateInterval,
-                                                StepInterval, NoOfSteps, Info),
-            {reply, ok, State#{Name => NewInfo}};
-        _ -> {reply, {error, cannot_change_rate}, State}
+    case State of
+        #{Name := Info} ->
+            case Info#throttle_info.change_plan of
+                undefined ->
+                    NewInfo = start_gradual_rate_change(Name, LowRate, HighRate, RateInterval,
+                                                        StepInterval, NoOfSteps, Info),
+                    {reply, ok, State#{Name => NewInfo}};
+                _ ->
+                    {reply, {error, cannot_change_rate}, State}
+            end;
+        _ ->
+            {reply, {error, {no_throttle_by_name, Name}}, State}
     end;
 handle_call({stop, Name}, _From, State) ->
-    case all_processes(Name, stop) of
+    case run_in_all_processes(Name, stop) of
         ok ->
             {reply, ok, maps:remove(Name, State)};
-        Error -> {reply, Error, State}
+        Error ->
+            {reply, Error, State}
     end.
 
 -spec(handle_cast(any(), state()) -> {noreply, state()}).
@@ -216,8 +223,7 @@ change_rate_and_stop_plan(Name, State) ->
     Interval = Info#throttle_info.interval,
     TRef = Plan#change_rate_plan.timer,
     HighRate = Plan#change_rate_plan.high_rate,
-
-    {ok, HighRate} = do_change_rate(Name, HighRate, Interval),
+    ok = do_change_rate(Name, HighRate, Interval),
     {ok, cancel} = timer:cancel(TRef),
     consume_all_timer_ticks({change_plan, Name}),
     State#{Name => Info#throttle_info{rate = HighRate, change_plan = undefined}}.
@@ -238,7 +244,7 @@ continue_plan(Name, State) ->
 
     Step = (HighRate - LowRate) div (NoOfSteps),
     NewRate = LowRate + Step,
-    {ok, NewRate} = do_change_rate(Name, NewRate, Info#throttle_info.interval),
+    ok = do_change_rate(Name, NewRate, Info#throttle_info.interval),
 
     NewPlan = Plan#change_rate_plan{no_of_steps = NoOfSteps - 1},
     State#{Name => Info#throttle_info{rate = NewRate, change_plan = NewPlan}}.
@@ -258,38 +264,27 @@ start_processes(Name, Rate, Interval, NoOfProcesses) ->
     start_throttle_processes(Name, Interval, Rate, RealNoOfProcesses),
     RealNoOfProcesses.
 
--spec get_throttle_process(name()) -> {error, {no_throttle_process_registered, name()}} |
-                                      {error, any()} | {ok, pid()}.
-get_throttle_process(Name) ->
-    case pg:get_members(Name) of
-        [] ->
-            {error, {no_throttle_process_registered, Name}};
-        List -> %% nonempty list
-            N = rand:uniform(length(List)),
-            {ok, lists:nth(N, List)}
-    end.
-
 -spec maybe_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval(), throttle_info()) ->
-    {ok, non_neg_integer()} | {error, any()}.
+    ok | {error, any()}.
 maybe_change_rate(Name, Rate, Interval, Info) ->
     CurrentRatePerMin = rate_per_minute(Info#throttle_info.rate, Info#throttle_info.interval),
     ReqRatePerMin = rate_per_minute(Rate, Interval),
     case {CurrentRatePerMin, Info#throttle_info.change_plan} of
-        {ReqRatePerMin, _} -> {ok, ReqRatePerMin};
+        {ReqRatePerMin, _} -> ok;
         {_, undefined} -> do_change_rate(Name, Rate, Interval);
         _ -> {error, cannot_change_rate}
     end.
 
--spec do_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval()) ->
-    {ok, non_neg_integer()} | {error, any()}.
+-spec do_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval()) -> ok | {error, any()}.
 do_change_rate(Name, Rate, Interval) ->
-    case pg:get_members(Name) of
-        [] -> {error, no_processes_in_group};
-        List when is_list(List) ->
+    case amoc_throttle_process:get_throttle_processes(Name) of
+        {ok, List} ->
             RatePerMinute = rate_per_minute(Rate, Interval),
             report_rate(Name, RatePerMinute),
             update_throttle_processes(List, Interval, Rate, length(List)),
-            {ok, RatePerMinute}
+            ok;
+        Error ->
+            Error
     end.
 
 -spec start_gradual_rate_change(
@@ -297,21 +292,13 @@ do_change_rate(Name, Rate, Interval) ->
         amoc_throttle:interval(), pos_integer(), pos_integer(), throttle_info()) ->
     throttle_info().
 start_gradual_rate_change(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps, Info) ->
-    {ok, LowRate} = do_change_rate(Name, LowRate, RateInterval),
+    ok = do_change_rate(Name, LowRate, RateInterval),
     {ok, Timer} = timer:send_interval(StepInterval, {change_plan, Name}),
     Plan = #change_rate_plan{high_rate = HighRate, no_of_steps = NoOfSteps, timer = Timer},
     Info#throttle_info{rate = LowRate, interval = RateInterval, change_plan = Plan}.
 
-start_throttle_processes(Name, Interval, Rate, 1) ->
-    start_throttle_process(Name, Interval, Rate);
-start_throttle_processes(Name, Interval, Rate, N) when is_integer(N), N > 1 ->
-    ProcessRate = Rate div N,
-    start_throttle_process(Name, Interval, ProcessRate),
-    start_throttle_processes(Name, Interval, Rate - ProcessRate, N - 1).
-
-start_throttle_process(Name, Interval, Rate) ->
-    {ok, Pid} = amoc_throttle_process:start(Name, Interval, Rate),
-    pg:join(Name, Pid).
+start_throttle_processes(Name, Interval, Rate, N) ->
+    ok = amoc_throttle_pool:start_process_pool(Name, Interval, Rate, N).
 
 update_throttle_processes([Pid], Interval, Rate, 1) ->
     amoc_throttle_process:update(Pid, Interval, Rate);
@@ -320,10 +307,24 @@ update_throttle_processes([Pid | Tail], Interval, Rate, N) when N > 1 ->
     amoc_throttle_process:update(Pid, Interval, ProcessRate),
     update_throttle_processes(Tail, Interval, Rate - ProcessRate, N - 1).
 
-all_processes(Name, Cmd) ->
-    case pg:get_members(Name) of
-        [] -> {error, no_processes_in_group};
-        Ps -> [run_cmd(P, Cmd) || P <- Ps], ok
+run_in_all_processes(Name, Cmd) ->
+    case amoc_throttle_process:get_throttle_processes(Name) of
+        {ok, List} ->
+            [run_cmd(P, Cmd) || P <- List],
+            ok;
+        Error ->
+            Error
+    end.
+
+verify_new_start_matches_running(Name, Rate, Interval, NoOfProcesses, Group, State) ->
+    ExpectedNoOfProcesses = min(Rate, NoOfProcesses),
+    case {length(Group), State} of
+        {ExpectedNoOfProcesses, #{Name := #throttle_info{rate = Rate, interval = Interval}}} ->
+            {reply, {ok, already_started}, State};
+        {ExpectedNoOfProcesses, #{Name := #throttle_info{}}} ->
+            {reply, {error, wrong_reconfiguration}, State};
+        _ ->
+            {reply, {error, wrong_no_of_procs}, State}
     end.
 
 run_cmd(Pid, stop) ->

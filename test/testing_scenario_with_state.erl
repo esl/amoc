@@ -16,9 +16,11 @@ init() ->
     {ok, #{some_state => this_has_state}}.
 
 -spec start(amoc_scenario:user_id(), state()) -> any().
-start(_Id, #{some_state := this_has_state}) ->
+start(Id, #{some_state := this_has_state} = State) ->
     %% Wait for anymessage to be send
     receive
+        {'EXIT', _, _} ->
+            start(Id, State);
         Msg ->
             ct:pal("Msg ~p~n", [Msg]),
             timer:sleep(100),

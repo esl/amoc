@@ -1,4 +1,4 @@
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 %% @doc This module allows to synchronize the users and act on groups of them.
 -module(amoc_throttle).
 
@@ -18,6 +18,8 @@
 
 -define(DEFAULT_NO_PROCESSES, 10).
 -define(DEFAULT_INTERVAL, 60000). %% one minute
+-define(NONNEG_INT(N), (is_integer(N) andalso N >= 0)).
+-define(POS_INT(N), (is_integer(N) andalso N > 0)).
 
 -type name() :: atom().
 -type rate() :: pos_integer().
@@ -44,8 +46,11 @@ start(Name, Rate, Interval) ->
 %% `Interval' is given in milliseconds and can be changed to a different value for convenience or higher granularity.
 %% It also accepts a special value of `0' which limits the number of parallel executions associated with `Name' to `Rate'.
 -spec start(name(), rate(), interval(), pos_integer()) -> ok | {error, any()}.
-start(Name, Rate, Interval, NoOfProcesses) ->
-    amoc_throttle_controller:ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses).
+start(Name, Rate, Interval, NoOfProcesses)
+  when is_atom(Name), ?POS_INT(Rate), ?NONNEG_INT(Interval), ?POS_INT(NoOfProcesses) ->
+    amoc_throttle_controller:ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses);
+start(_Name, _Rate, _Interval, _NoOfProcesses) ->
+    {error, invalid_throttle}.
 
 %% @doc Pauses executions for the given `Name' as if `Rate' was set to `0'.
 %%
@@ -141,9 +146,13 @@ send(Name, Msg) ->
 %% Can be used to halt execution if we want a process to be idle when waiting for rate increase or other processes finishing their tasks.
 -spec send_and_wait(name(), any()) -> ok | {error, any()}.
 send_and_wait(Name, Msg) ->
-    send(Name, Msg),
-    receive
-        Msg -> ok
+    case send(Name, Msg) of
+        ok ->
+            receive
+                Msg -> ok
+            end;
+        Error ->
+            Error
     end.
 
 %% @doc Stops the throttle mechanism for the given `Name'.
