@@ -61,8 +61,8 @@ handle_cast({start_children, Scenario, Ids, ScenarioState}, #state{tid = Tid} = 
               ok
       end || Id <- Ids],
     {noreply, State};
-handle_cast({stop_child, ForceRemove}, #state{tid = Tid} = State) ->
-    Pids = case ets:match_object(Tid, '$1', 1) of
+handle_cast({stop_children, Int, ForceRemove}, #state{tid = Tid} = State) ->
+    Pids = case ets:match_object(Tid, '$1', Int) of
                {[{Pid, _Id}], _} -> [Pid];
                '$end_of_table' -> []
            end,
