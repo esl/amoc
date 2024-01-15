@@ -18,7 +18,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -record(state, {
-          id :: non_neg_integer(),
+          index :: non_neg_integer(),
           tid :: ets:tid(),
           tasks = #{} :: #{reference() => pid()}
          }).
@@ -36,7 +36,7 @@ start_link(N) ->
 init(N) ->
     process_flag(trap_exit, true),
     Tid = ets:new(?MODULE,  [ordered_set, private]),
-    {ok, #state{id = N, tid = Tid}}.
+    {ok, #state{index = N, tid = Tid}}.
 
 %% @private
 -spec handle_call(any(), any(), state()) -> {reply, term(), state()}.
@@ -45,18 +45,18 @@ handle_call(_Request, _From, State) ->
 
 %% @private
 -spec handle_cast(any(), state()) -> {noreply, state()}.
-handle_cast({start_child, Scenario, Id, ScenarioState}, #state{tid = Tid} = State) ->
+handle_cast({start_child, Scenario, Id, ScenarioState}, #state{index = N, tid = Tid} = State) ->
     case amoc_user:start_link(Scenario, Id, ScenarioState) of
         {ok, Pid} ->
-            handle_up_user(Tid, Pid, Id),
+            handle_up_user(Tid, Pid, Id, N),
             {noreply, State};
         _ ->
             {noreply, State}
     end;
-handle_cast({start_children, Scenario, Ids, ScenarioState}, #state{tid = Tid} = State) ->
+handle_cast({start_children, Scenario, Ids, ScenarioState}, #state{index = N, tid = Tid} = State) ->
     [ case amoc_user:start_link(Scenario, Id, ScenarioState) of
           {ok, Pid} ->
-              handle_up_user(Tid, Pid, Id);
+              handle_up_user(Tid, Pid, Id, N);
           _ ->
               ok
       end || Id <- Ids],
@@ -78,8 +78,8 @@ handle_cast(_Msg, State) ->
 -spec handle_info(any(), state()) -> {noreply, state()}.
 handle_info({'DOWN', Ref, process, _Pid, _Reason}, #state{tasks = Tasks} = State) ->
     {noreply, State#state{tasks = maps:remove(Ref, Tasks)}};
-handle_info({'EXIT', Pid, _Reason}, #state{tid = Tid} = State) ->
-    handle_down_user(Tid, Pid),
+handle_info({'EXIT', Pid, _Reason}, #state{index = N, tid = Tid} = State) ->
+    handle_down_user(Tid, Pid, N),
     {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -91,15 +91,15 @@ terminate(_Reason, State) ->
 
 %% Helpers
 
--spec handle_up_user(ets:tid(), pid(), amoc_scenario:user_id()) -> ok.
-handle_up_user(Tid, Pid, Id) ->
+-spec handle_up_user(ets:tid(), pid(), amoc_scenario:user_id(), non_neg_integer()) -> ok.
+handle_up_user(Tid, Pid, Id, SupNum) ->
     ets:insert(Tid, {Pid, Id}),
-    amoc_users_sup:incr_no_of_users().
+    amoc_users_sup:incr_no_of_users(SupNum).
 
--spec handle_down_user(ets:tid(), pid()) -> ok.
-handle_down_user(Tid, Pid) ->
+-spec handle_down_user(ets:tid(), pid(), non_neg_integer()) -> ok.
+handle_down_user(Tid, Pid, SupNum) ->
     ets:delete(Tid, Pid),
-    amoc_users_sup:decr_no_of_users().
+    amoc_users_sup:decr_no_of_users(SupNum).
 
 %% @doc Stop a list of users in parallel.
 %% We don't want to ever block the supervisor on `timer:sleep/1' so we spawn that async.

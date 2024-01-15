@@ -17,8 +17,10 @@
 
 %% API
 -export([init_storage/0, clean_storage/0,
-         incr_no_of_users/0, decr_no_of_users/0, count_no_of_users/0,
+         incr_no_of_users/1, decr_no_of_users/1, count_no_of_users/0,
          start_child/3, start_children/3, stop_children/2, terminate_all_children/0]).
+
+-type count() :: non_neg_integer().
 
 -record(storage, {
           user_count :: atomics:atomics_ref(),
@@ -54,29 +56,31 @@ init_storage() ->
     UserSups = supervisor:which_children(?MODULE),
     UserSupPids = [ Pid || {_, Pid, _, _} <- UserSups ],
     UserSupPidsTuple = erlang:list_to_tuple(UserSupPids),
-    Atomic = atomics:new(1, [{signed, false}]),
-    atomics:put(Atomic, 1, 0),
-    Storage = #storage{user_count = Atomic, sups = UserSupPidsTuple},
+    NumOfSupervisors = tuple_size(UserSupPidsTuple),
+    Atomics = atomics:new(1 + NumOfSupervisors, [{signed, false}]),
+    Storage = #storage{user_count = Atomics, sups = UserSupPidsTuple},
     persistent_term:put(?MODULE, Storage).
 
 -spec clean_storage() -> any().
 clean_storage() ->
     persistent_term:erase(?MODULE).
 
--spec count_no_of_users() -> non_neg_integer().
+-spec count_no_of_users() -> count().
 count_no_of_users() ->
-    #storage{user_count = Atomic} = persistent_term:get(?MODULE),
-    atomics:get(Atomic, 1).
+    #storage{user_count = Atomics} = persistent_term:get(?MODULE),
+    atomics:get(Atomics, 1).
 
--spec incr_no_of_users() -> any().
-incr_no_of_users() ->
-    #storage{user_count = Atomic} = persistent_term:get(?MODULE),
-    atomics:add(Atomic, 1, 1).
+-spec incr_no_of_users(non_neg_integer()) -> any().
+incr_no_of_users(SupNum) ->
+    #storage{user_count = Atomics} = persistent_term:get(?MODULE),
+    atomics:add(Atomics, 1, 1),
+    atomics:add(Atomics, SupNum + 1, 1).
 
--spec decr_no_of_users() -> ok.
-decr_no_of_users() ->
-    #storage{user_count = Atomic} = persistent_term:get(?MODULE),
-    case atomics:sub_get(Atomic, 1, 1) of
+-spec decr_no_of_users(non_neg_integer()) -> ok.
+decr_no_of_users(SupNum) ->
+    #storage{user_count = Atomics} = persistent_term:get(?MODULE),
+    atomics:sub(Atomics, SupNum + 1, 1),
+    case atomics:sub_get(Atomics, 1, 1) of
         0 ->
             amoc_controller:zero_users_running();
         _ ->
