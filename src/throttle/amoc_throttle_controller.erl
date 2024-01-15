@@ -10,7 +10,7 @@
          ensure_throttle_processes_started/4,
          pause/1, resume/1, stop/1,
          change_rate/3, change_rate_gradually/6,
-         run/2, telemetry_event/2]).
+         run/2, raise_event_on_slave_node/2, telemetry_event/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -38,6 +38,7 @@
 -type change_rate_plan() :: #change_rate_plan{}.
 -type throttle_info() :: #throttle_info{}.
 -type state() :: #{name() => throttle_info()}.
+-type event() :: init | execute | request.
 
 %%%===================================================================
 %%% API
@@ -53,17 +54,17 @@ start_link() ->
     {ok, started | already_started} |
     {error, wrong_reconfiguration | wrong_no_of_procs}.
 ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses) ->
-    maybe_raise_event(Name, init),
+    raise_event_on_slave_node(Name, init),
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Rate, Interval, NoOfProcesses}).
 
 -spec run(name(), fun(() -> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
     case amoc_throttle_process:get_throttle_process(Name) of
         {ok, Pid} ->
-            maybe_raise_event(Name, request),
+            raise_event_on_slave_node(Name, request),
             Fun =
                 fun() ->
-                    maybe_raise_event(Name, execute),
+                    raise_event_on_slave_node(Name, execute),
                     Fn()
                 end,
             amoc_throttle_process:run(Pid, Fun),
@@ -97,6 +98,13 @@ stop(Name) ->
 -spec telemetry_event(name(), request | execute) -> ok.
 telemetry_event(Name, Event) when Event =:= request; Event =:= execute ->
     raise_event(Name, Event).
+
+-spec raise_event_on_slave_node(name(), event()) -> ok.
+raise_event_on_slave_node(Name, Event) ->
+    case amoc_cluster:master_node() =:= node() of
+        true -> ok;
+        _ -> raise_event(Name, Event)
+    end.
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -203,12 +211,6 @@ handle_info({change_plan, Name}, State) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-maybe_raise_event(Name, Event) ->
-    case amoc_cluster:master_node() =:= node() of
-        true -> ok;
-        _ -> raise_event(Name, Event)
-    end.
 
 raise_event(Name, Event) when Event =:= request; Event =:= execute; Event =:= init ->
     amoc_telemetry:execute([throttle, Event], #{count => 1}, #{name => Name}).
