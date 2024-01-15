@@ -20,6 +20,8 @@
          incr_no_of_users/1, decr_no_of_users/1, count_no_of_users/0,
          start_child/3, start_children/3, stop_children/2, terminate_all_children/0]).
 
+-export([get_all_children/0]).
+
 -type count() :: non_neg_integer().
 
 -record(storage, {
@@ -113,6 +115,12 @@ stop_children(Count, Force) ->
     {CountRemove, Assignments} = assign_counts(Count),
     [ gen_server:cast(Sup, {stop_children, Int, Force}) || {Sup, Int} <- Assignments ],
     CountRemove.
+
+-spec get_all_children() -> [{pid(), amoc_scenario:user_id()}].
+get_all_children() ->
+    #storage{sups = Sups} = persistent_term:get(?MODULE),
+    All = [ gen_server:call(Sup, get_all_children, infinity) || Sup <- tuple_to_list(Sups) ],
+    lists:flatten(All).
 
 -spec terminate_all_children() -> any().
 terminate_all_children() ->

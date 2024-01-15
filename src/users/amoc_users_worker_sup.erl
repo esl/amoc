@@ -40,8 +40,9 @@ init(N) ->
 
 %% @private
 -spec handle_call(any(), any(), state()) -> {reply, term(), state()}.
-handle_call(_Request, _From, State) ->
-    {reply, {error, not_implemented}, State}.
+handle_call(get_all_children, _From, #state{tid = Tid} = State) ->
+    Children = ets:tab2list(Tid),
+    {reply, Children, State}.
 
 %% @private
 -spec handle_cast(any(), state()) -> {noreply, state()}.
