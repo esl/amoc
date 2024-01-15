@@ -144,7 +144,7 @@ zero_users_running() ->
 -spec init([]) -> {ok, state()}.
 init([]) ->
     start_tables(),
-    amoc_users_sup_sup:init_storage(),
+    amoc_users_sup:init_storage(),
     {ok, #state{}}.
 
 %% @private
@@ -222,12 +222,12 @@ handle_start_scenario(_Scenario, _Settings, #state{status = Status} = State) ->
 
 -spec handle_stop_scenario(state()) -> {handle_call_res(), state()}.
 handle_stop_scenario(#state{status = running} = State) ->
-    case amoc_users_sup_sup:count_no_of_users() of
+    case amoc_users_sup:count_no_of_users() of
         0 ->
             terminate_scenario(State),
             {ok, State#state{status = finished}};
         _ ->
-            amoc_users_sup_sup:terminate_all_children(),
+            amoc_users_sup:terminate_all_children(),
             {ok, State#state{status = terminating}}
     end;
 handle_stop_scenario(#state{status = Status} = State) ->
@@ -263,7 +263,7 @@ handle_add(_StartId, _EndId, #state{status = Status} = State) ->
 
 -spec handle_remove(user_count(), boolean(), state()) -> handle_call_res().
 handle_remove(Count, ForceRemove, #state{status = running, scenario = Scenario}) ->
-    CountRemove = amoc_users_sup_sup:stop_children(Count, ForceRemove),
+    CountRemove = amoc_users_sup:stop_children(Count, ForceRemove),
     amoc_telemetry:execute([controller, users], #{count => CountRemove},
                            #{scenario => Scenario, type => remove}),
     {ok, CountRemove};
@@ -273,7 +273,7 @@ handle_remove(_Count, _ForceRemove, #state{status = Status}) ->
 -spec handle_status(state()) -> amoc_status().
 handle_status(#state{status = running, scenario = Scenario,
                      last_user_id = LastId}) ->
-    N = amoc_users_sup_sup:count_no_of_users(),
+    N = amoc_users_sup:count_no_of_users(),
     {running, #{scenario => Scenario, currently_running_users => N, highest_user_id => LastId}};
 handle_status(#state{status = terminating, scenario = Scenario}) ->
     {terminating, Scenario};
@@ -292,7 +292,7 @@ handle_disable(#state{status = Status} = State) ->
 handle_start_user(#state{create_users   = [UserId | T],
                          scenario       = Scenario,
                          scenario_state = ScenarioState} = State) ->
-    amoc_users_sup_sup:start_child(Scenario, UserId, ScenarioState),
+    amoc_users_sup:start_child(Scenario, UserId, ScenarioState),
     State#state{create_users = T};
 handle_start_user(#state{create_users = [], tref = TRef} = State) ->
     State#state{tref = maybe_stop_timer(TRef)}.
@@ -302,7 +302,7 @@ handle_start_all_users(#state{create_users   = AllUsers,
                               scenario       = Scenario,
                               scenario_state = ScenarioState,
                               tref = TRef} = State) ->
-    amoc_users_sup_sup:start_children(Scenario, AllUsers, ScenarioState),
+    amoc_users_sup:start_children(Scenario, AllUsers, ScenarioState),
     State#state{create_users = [], tref = maybe_stop_timer(TRef)}.
 
 %% ------------------------------------------------------------------

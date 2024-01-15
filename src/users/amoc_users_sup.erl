@@ -1,135 +1,131 @@
 %% @private
 %% @copyright 2023 Erlang Solutions Ltd.
-%% @doc Supervisor-like gen_server with some tracking responsibilities over the users
-%%
-%% We want to keep consistent track of all users running globally by running special code upon a
-%% children's death. Standard solutions don't cut it because:
-%%  - A supervisor doesn't expose callbacks on user termination
-%%  - Implementing code on the user process before it dies risks inconsistencies if it is killed
-%%  More improvements that could be made would be to distribute the supervision tree like ranch did,
-%%  see https://stressgrid.com/blog/100k_cps_with_elixir/
-%% @end
 -module(amoc_users_sup).
 
--behaviour(gen_server).
+-behaviour(supervisor).
 
-%% gen_server callbacks
--export([start_link/1]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+%% Supervisor
+-export([start_link/0, init/1]).
 
--record(state, {
-          id :: non_neg_integer(),
-          tid :: ets:tid(),
-          tasks = #{} :: #{reference() => pid()}
+%% API
+-export([init_storage/0, incr_no_of_users/0, decr_no_of_users/0, count_no_of_users/0,
+         start_child/3, start_children/3, stop_children/2, terminate_all_children/0]).
+
+-record(storage, {
+          user_count :: atomics:atomics_ref(),
+          sups :: tuple()
          }).
--type state() :: #state{}.
 
--define(SHUTDOWN_TIMEOUT, 2000). %% 2 seconds
-
-%% @private
--spec start_link(non_neg_integer()) -> {ok, pid()}.
-start_link(N) ->
-    gen_server:start_link(?MODULE, N, []).
+%% Supervisor
 
 %% @private
--spec init(non_neg_integer()) -> {ok, term()}.
-init(N) ->
-    process_flag(trap_exit, true),
-    Tid = ets:new(?MODULE,  [ordered_set, private]),
-    {ok, #state{id = N, tid = Tid}}.
+-spec start_link() -> supervisor:startlink_ret().
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, no_args).
 
 %% @private
--spec handle_call(any(), any(), state()) -> {reply, term(), state()}.
-handle_call(_Request, _From, State) ->
-    {reply, {error, not_implemented}, State}.
+-spec init(no_args) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
+init(no_args) ->
+    Specs = [
+             #{
+               id => {amoc_users_worker_sup, N},
+               start => {amoc_users_worker_sup, start_link, [N]},
+               restart => permanent,
+               shutdown => infinity,
+               type => worker,
+               modules => [amoc_users_worker_sup]
+              }
+             || N <- lists:seq(1, erlang:system_info(schedulers_online)) ],
+    Strategy = #{strategy => one_for_one, intensity => 5, period => 10},
+    {ok, {Strategy, Specs}}.
 
-%% @private
--spec handle_cast(any(), state()) -> {noreply, state()}.
-handle_cast({start_child, Scenario, Id, ScenarioState}, #state{tid = Tid} = State) ->
-    case amoc_user:start_link(Scenario, Id, ScenarioState) of
-        {ok, Pid} ->
-            handle_up_user(Tid, Pid, Id),
-            {noreply, State};
+%% API
+
+-spec count_no_of_users() -> non_neg_integer().
+count_no_of_users() ->
+    #storage{user_count = Atomic} = persistent_term:get(?MODULE),
+    atomics:get(Atomic, 1).
+
+-spec incr_no_of_users() -> any().
+incr_no_of_users() ->
+    #storage{user_count = Atomic} = persistent_term:get(?MODULE),
+    atomics:add(Atomic, 1, 1).
+
+-spec decr_no_of_users() -> ok.
+decr_no_of_users() ->
+    #storage{user_count = Atomic} = persistent_term:get(?MODULE),
+    case atomics:sub_get(Atomic, 1, 1) of
+        0 ->
+            amoc_controller:zero_users_running();
         _ ->
-            {noreply, State}
-    end;
-handle_cast({start_children, Scenario, Ids, ScenarioState}, #state{tid = Tid} = State) ->
-    [ case amoc_user:start_link(Scenario, Id, ScenarioState) of
-          {ok, Pid} ->
-              handle_up_user(Tid, Pid, Id);
-          _ ->
-              ok
-      end || Id <- Ids],
-    {noreply, State};
-handle_cast({stop_child, ForceRemove}, #state{tid = Tid} = State) ->
-    Pids = case ets:match_object(Tid, '$1', 1) of
-               {[{Pid, _Id}], _} -> [Pid];
-               '$end_of_table' -> []
-           end,
-    NewState = maybe_track_task_to_stop_my_children(State, Pids, ForceRemove),
-    {noreply, NewState};
-handle_cast(terminate_all_children, State) ->
-    NewState = do_terminate_all_my_children(State),
-    {noreply, NewState};
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+            ok
+    end.
 
-%% @private
--spec handle_info(any(), state()) -> {noreply, state()}.
-handle_info({'DOWN', Ref, process, _Pid, _Reason}, #state{tasks = Tasks} = State) ->
-    {noreply, State#state{tasks = maps:remove(Ref, Tasks)}};
-handle_info({'EXIT', Pid, _Reason}, #state{tid = Tid} = State) ->
-    handle_down_user(Tid, Pid),
-    {noreply, State};
-handle_info(_Info, State) ->
-    {noreply, State}.
+-spec start_child(amoc:scenario(), amoc_scenario:user_id(), any()) -> ok.
+start_child(Scenario, Id, ScenarioState) ->
+    Sup = get_sup_for_user_id(Id),
+    gen_server:cast(Sup, {start_child, Scenario, Id, ScenarioState}).
 
-%% @private
--spec terminate(term(), state()) -> any().
-terminate(_Reason, State) ->
-    do_terminate_all_my_children(State).
+-spec start_children(amoc:scenario(), [amoc_scenario:user_id()], any()) -> ok.
+start_children(Scenario, UserIds, ScenarioState) ->
+    KeyFun = fun(UserId) ->
+                     get_sup_for_user_id(UserId)
+             end,
+    Assignments = maps:groups_from_list(KeyFun, UserIds),
+    CastFun = fun (Sup, Users) ->
+                      gen_server:cast(Sup, {start_children, Scenario, Users, ScenarioState})
+              end,
+    maps:foreach(CastFun, Assignments).
 
-%% Helpers
+-spec stop_children(non_neg_integer(), boolean()) -> non_neg_integer().
+stop_children(Count, Force) ->
+    TotalCount = count_no_of_users(),
+    CountRemove = min(Count, TotalCount),
+    #storage{sups = Sups} = persistent_term:get(?MODULE),
+    NumOfSupervisors = tuple_size(Sups),
+    ShuffledSupervisors = shuffle_supervisors(tuple_to_list(Sups)),
+    Assignments = assign_counts_to_supervisors(ShuffledSupervisors, NumOfSupervisors, CountRemove),
+    [ gen_server:cast(Sup, {stop_children, Int, Force}) || {Sup, Int} <- Assignments ],
+    CountRemove.
 
--spec handle_up_user(ets:tid(), pid(), amoc_scenario:user_id()) -> ok.
-handle_up_user(Tid, Pid, Id) ->
-    ets:insert(Tid, {Pid, Id}),
-    amoc_users_sup_sup:incr_no_of_users().
+-spec terminate_all_children() -> any().
+terminate_all_children() ->
+    #storage{sups = Sups} = persistent_term:get(?MODULE),
+    [ gen_server:cast(Sup, terminate_all_children) || Sup <- tuple_to_list(Sups) ].
 
--spec handle_down_user(ets:tid(), pid()) -> ok.
-handle_down_user(Tid, Pid) ->
-    ets:delete(Tid, Pid),
-    amoc_users_sup_sup:decr_no_of_users().
 
-%% @doc Stop a list of users in parallel.
-%% We don't want to ever block the supervisor on `timer:sleep/1' so we spawn that async.
-%% However we don't want free processes roaming around, we want monitoring that can be traced.
--spec maybe_track_task_to_stop_my_children(state(), [pid()], boolean()) -> state().
-maybe_track_task_to_stop_my_children(State, [], _) ->
-    State;
-maybe_track_task_to_stop_my_children(State, Pids, false) ->
-    [ exit(Pid, shutdown) || Pid <- Pids ],
-    State;
-maybe_track_task_to_stop_my_children(#state{tasks = Tasks} = State, Pids, true) ->
-    Fun = fun() ->
-                  [ exit(Pid, shutdown) || Pid <- Pids ],
-                  timer:sleep(?SHUTDOWN_TIMEOUT),
-                  [ exit(Pid, kill) || Pid <- Pids ]
-          end,
-    {Pid, Ref} = spawn_monitor(Fun),
-    State#state{tasks = Tasks#{Pid => Ref}}.
+%%% Helpers
+-spec init_storage() -> any().
+init_storage() ->
+    UserSups = supervisor:which_children(?MODULE),
+    UserSupPids = [ Pid || {_, Pid, _, _} <- UserSups ],
+    UserSupPidsTuple = erlang:list_to_tuple(UserSupPids),
+    Atomic = atomics:new(1, [{signed, false}]),
+    atomics:put(Atomic, 1, 0),
+    Storage = #storage{user_count = Atomic, sups = UserSupPidsTuple},
+    persistent_term:put(?MODULE, Storage).
 
--spec do_terminate_all_my_children(state()) -> any().
-do_terminate_all_my_children(#state{tid = Tid} = State) ->
-    Match = ets:match_object(Tid, '$1', 200),
-    do_terminate_all_my_children(State, Match).
+get_sup_for_user_id(Id) ->
+    #storage{sups = Supervisors} = persistent_term:get(?MODULE),
+    Index = Id rem tuple_size(Supervisors) + 1,
+    element(Index, Supervisors).
 
-%% ets:continuation/0 type is unfortunately not exported from the ets module.
--spec do_terminate_all_my_children(state(), {tuple(), term()} | '$end_of_table') -> state().
-do_terminate_all_my_children(State, {Objects, Continuation}) ->
-    Pids = [Pid || {Pid, _Id} <- Objects],
-    NewState = maybe_track_task_to_stop_my_children(State, Pids, true),
-    Match = ets:match_object(Continuation),
-    do_terminate_all_my_children(NewState, Match);
-do_terminate_all_my_children(State, '$end_of_table') ->
-    State.
+%% Create a list with random indexes with supervisors that will then be sorted
+%% Uses mwc59 for the most performant (though statistically unsound) erlang RNG
+shuffle_supervisors(Supervisors) ->
+    UniqueInt = erlang:unique_integer([positive]),
+    F1 = fun(Sup, Int) ->
+                Rand = rand:mwc59(Int),
+                {{Rand, Sup}, Rand}
+        end,
+    {Indexed, _} = lists:mapfoldl(F1, UniqueInt, Supervisors),
+    lists:sort(Indexed).
+
+assign_counts_to_supervisors(ShuffledList, NumOfSupervisors, CountRemove) ->
+    SlotPerSup = CountRemove div NumOfSupervisors,
+    Remainder = CountRemove rem NumOfSupervisors,
+    F2 = fun({_Index, Sup}, Rem) ->
+                 {{Sup, SlotPerSup + Rem}, min(0, Rem - 1)}
+         end,
+    {Assignments, _} = lists:mapfoldl(F2, Remainder, ShuffledList),
+    Assignments.
