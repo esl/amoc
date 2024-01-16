@@ -130,18 +130,18 @@ change_rate_gradually(Name, FromRate, ToRate, RateInterval, StepInterval, NoOfSt
 run(Name, Fn) ->
     amoc_throttle_controller:run(Name, Fn).
 
+%% @see send/3
+%% @doc Sends a given message to `erlang:self()'
+-spec send(name(), any()) -> ok | {error, any()}.
+send(Name, Msg) ->
+    send(Name, self(), Msg).
+
 %% @doc Sends a given message `Msg' to a given `Pid' when the rate for `Name' allows for that.
 %%
 %% May be used to schedule tasks.
 -spec send(name(), pid(), any()) -> ok | {error, any()}.
 send(Name, Pid, Msg) ->
-    run(Name, fun() -> Pid ! Msg end).
-
-%% @doc Sends a given message to `erlang:self()'
-%% @see send/3
--spec send(name(), any()) -> ok | {error, any()}.
-send(Name, Msg) ->
-    send(Name, self(), Msg).
+    amoc_throttle_controller:send(Name, Pid, Msg).
 
 %% @doc Sends and receives the given message `Msg'.
 %% Can be used to halt execution if we want a process to be idle when waiting for rate increase or other processes finishing their tasks.
