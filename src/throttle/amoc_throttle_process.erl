@@ -8,6 +8,7 @@
 -export([stop/1,
          run/3,
          send/4,
+         wait/2,
          update/3,
          pause/1,
          resume/1,
@@ -28,6 +29,7 @@
 -define(PG_SCOPE, amoc_throttle).
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
+-type schedule() :: [{gen_server:from(), term()} | pid()].
 -record(state, {can_run_fn = true :: boolean(),
                 pause = false :: boolean(),
                 max_n :: non_neg_integer(),
@@ -36,8 +38,8 @@
                 interval = 0 :: amoc_throttle:interval(),  %%ms
                 delay_between_executions = 0 :: non_neg_integer(),  %%ms
                 tref :: timer:tref() | undefined,
-                schedule = [] :: [pid()],
-                schedule_reversed = [] :: [pid()]}).
+                schedule = [] :: schedule(),
+                schedule_reversed = [] :: schedule()}).
 
 -type state() :: #state{}.
 %%------------------------------------------------------------------------------
@@ -61,6 +63,10 @@ run(Pid, Name, Fun) ->
 send(Pid, Name, ReqPid, Msg) ->
     RunnerPid = amoc_throttle_runner:spawn_send(Name, ReqPid, Msg),
     gen_server:cast(Pid, {schedule, RunnerPid}).
+
+-spec wait(pid(), term()) -> ok.
+wait(Pid, Msg) ->
+    gen_server:call(Pid, {schedule, Msg}, infinity).
 
 -spec update(pid(), amoc_throttle:interval(), amoc_throttle:rate()) -> ok.
 update(Pid, Interval, Rate) ->
@@ -138,6 +144,9 @@ handle_cast({update, Interval, Rate}, #state{name = Name} = State) ->
 
 -spec handle_call(term(), term(), state()) ->
     {reply, {error, not_implemented} | state(), state(), {continue, maybe_run_fn}}.
+handle_call({schedule, Reply}, From, #state{schedule_reversed = SchRev, name = Name} = State) ->
+    amoc_throttle_controller:telemetry_event(Name, request),
+    {noreply, State#state{schedule_reversed = [{From, Reply} | SchRev]}, {continue, maybe_run_fn}};
 handle_call(get_state, _, State) ->
     {reply, printable_state(State), State, {continue, maybe_run_fn}};
 handle_call(_, _, State) ->
@@ -220,6 +229,10 @@ maybe_run_fn(#state{can_run_fn = true, pause = false, n = N} = State) when N > 0
 maybe_run_fn(State) ->
     State.
 
+run_fn(#state{schedule = [{From, Reply} | T], name = Name} = State) ->
+    gen_server:reply(From, Reply),
+    amoc_throttle_controller:telemetry_event(Name, execute),
+    State#state{schedule = T};
 run_fn(#state{schedule = [RunnerPid | T], name = Name, n = N} = State) ->
     erlang:monitor(process, RunnerPid),
     RunnerPid ! scheduled,

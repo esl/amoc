@@ -10,7 +10,7 @@
          ensure_throttle_processes_started/4,
          pause/1, resume/1, stop/1,
          change_rate/3, change_rate_gradually/6,
-         run/2, send/3, raise_event_on_slave_node/2, telemetry_event/2]).
+         run/2, send/3, wait/2, raise_event_on_slave_node/2, telemetry_event/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -71,6 +71,17 @@ send(Name, Pid, Msg) ->
     case amoc_throttle_process:get_throttle_process(Name) of
         {ok, Throttler} ->
             amoc_throttle_process:send(Throttler, Name, Pid, Msg);
+        Error ->
+            Error
+    end.
+
+-spec wait(name(), term()) -> ok | {error, any()}.
+wait(Name, Msg) ->
+    case amoc_throttle_process:get_throttle_process(Name) of
+        {ok, Throttler} ->
+            raise_event_on_slave_node(Name, request),
+            Msg = amoc_throttle_process:wait(Throttler, Msg),
+            raise_event_on_slave_node(Name, execute);
         Error ->
             Error
     end.

@@ -144,17 +144,12 @@ send(Name, Pid, Msg) ->
     amoc_throttle_controller:send(Name, Pid, Msg).
 
 %% @doc Sends and receives the given message `Msg'.
-%% Can be used to halt execution if we want a process to be idle when waiting for rate increase or other processes finishing their tasks.
+%%
+%% Can be used to halt execution if we want a process to be idle when waiting for rate increase
+%% or other processes finishing their tasks.
 -spec send_and_wait(name(), any()) -> ok | {error, any()}.
 send_and_wait(Name, Msg) ->
-    case send(Name, Msg) of
-        ok ->
-            receive
-                Msg -> ok
-            end;
-        Error ->
-            Error
-    end.
+    amoc_throttle_controller:wait(Name, Msg).
 
 %% @doc Stops the throttle mechanism for the given `Name'.
 -spec stop(name()) -> ok | {error, any()}.
