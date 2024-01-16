@@ -23,11 +23,12 @@
 
 -type name() :: atom().
 -type rate() :: pos_integer().
+-type action() :: fun(() -> any()).
 -type interval() :: non_neg_integer().
 %% In milliseconds, defaults to 60000 (one minute) when not given.
 %% An interval of 0 means no delay at all, only the number of simultaneous executions will be
 %% controlled, which corresponds to the number of processes started
--export_type([name/0, rate/0, interval/0]).
+-export_type([name/0, rate/0, interval/0, action/0]).
 
 %% @see start/4
 -spec start(name(), rate()) -> ok | {error, any()}.
@@ -125,7 +126,7 @@ change_rate_gradually(Name, FromRate, ToRate, RateInterval, StepInterval, NoOfSt
 %%        destroy Async runner
 %% '''
 %% for the local execution, req/exec rates are increased only by throttle process.
--spec run(name(), fun(() -> any())) -> ok | {error, any()}.
+-spec run(name(), action()) -> ok | {error, any()}.
 run(Name, Fn) ->
     amoc_throttle_controller:run(Name, Fn).
 

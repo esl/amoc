@@ -60,16 +60,10 @@ ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses) ->
 -spec run(name(), fun(() -> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
     case amoc_throttle_process:get_throttle_process(Name) of
-        {ok, Pid} ->
-            raise_event_on_slave_node(Name, request),
-            Fun =
-                fun() ->
-                    raise_event_on_slave_node(Name, execute),
-                    Fn()
-                end,
-            amoc_throttle_process:run(Pid, Fun),
-            ok;
-        Error -> Error
+        {ok, Throttler} ->
+            amoc_throttle_process:run(Throttler, Name, Fn);
+        Error ->
+            Error
     end.
 
 -spec pause(name()) -> ok | {error, any()}.
