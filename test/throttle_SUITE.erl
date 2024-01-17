@@ -6,6 +6,7 @@
 
 -define(DEFAULT_NO_PROCESSES, 10).
 -define(DEFAULT_INTERVAL, 60000). %% one minute
+-define(RECV(Msg, Timeout), receive Msg -> ok after Timeout -> {error, not_received_yet} end).
 
 all() ->
     [
@@ -124,12 +125,12 @@ send_and_wait(_) ->
     ?assertMatch(ok, amoc_throttle:send_and_wait(?FUNCTION_NAME, receive_this)),
     %% One message is received sufficiently fast
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 100)),
+    ?assertMatch(ok, ?RECV(receive_this, 100)),
     %% If someone else fills the throttle heavily,
     %% it will take proportionally so long to execute for me
     fill_throttle(?FUNCTION_NAME, 100 * 10),
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch({error, not_received_yet}, receive_msg_in_timeout(receive_this, 200)).
+    ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)).
 
 just_wait(_) ->
     %% it failts if the throttle wasn't started yet
@@ -141,12 +142,12 @@ just_wait(_) ->
     ?assertMatch(ok, amoc_throttle:wait(?FUNCTION_NAME)),
     %% One message is received sufficiently fast
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 100)),
+    ?assertMatch(ok, ?RECV(receive_this, 100)),
     %% If someone else fills the throttle heavily,
     %% it will take proportionally so long to execute for me
     fill_throttle(?FUNCTION_NAME, 100 * 10),
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch({error, not_received_yet}, receive_msg_in_timeout(receive_this, 200)).
+    ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)).
 
 run_with_interval_zero_limits_only_number_of_parallel_executions(_) ->
     %% Start 10 actions at once in 10 processes
@@ -155,7 +156,7 @@ run_with_interval_zero_limits_only_number_of_parallel_executions(_) ->
     %% it will take proportionally so long to execute for me
     fill_throttle(?FUNCTION_NAME, 100),
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 200)).
+    ?assertMatch(ok, ?RECV(receive_this, 200)).
 
 pause_and_resume(_) ->
     %% Start 100-per-10ms throttle with a single process
@@ -166,10 +167,10 @@ pause_and_resume(_) ->
     ?assertMatch(ok, amoc_throttle:pause(?FUNCTION_NAME)),
     %% It is paused, so messages aren't received
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch({error, not_received_yet}, receive_msg_in_timeout(receive_this, 200)),
+    ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)),
     %% After resume the message is then received
     ?assertMatch(ok, amoc_throttle:resume(?FUNCTION_NAME)),
-    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 200)).
+    ?assertMatch(ok, ?RECV(receive_this, 200)).
 
 get_state(_) ->
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 60000, 1)),
@@ -210,14 +211,6 @@ fill_throttle(Name, Num) ->
           end),
     receive
         continue -> ok
-    end.
-
-receive_msg_in_timeout(Msg, Timeout) ->
-    receive
-        Msg ->
-            ok
-    after Timeout ->
-              {error, not_received_yet}
     end.
 
 %% Helpers
