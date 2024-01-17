@@ -1,20 +1,19 @@
 %% @private
 %% @see amoc_throttle
-%% @doc Asynchronous runner that always runs together with the `amoc_user' process.
 %% @copyright 2024 Erlang Solutions Ltd.
+%% @doc Asynchronous runner that always runs together with the `amoc_user' process.
 -module(amoc_throttle_runner).
 
--export([spawn_run/2, spawn_send/3]).
+-export([spawn/2, run/1]).
+-export([async_runner/2]).
 
--spec spawn_run(amoc_throttle:name(), amoc_throttle:action()) -> pid().
-spawn_run(Name, Fun) ->
-    amoc_throttle_controller:raise_event_on_slave_node(Name, request),
-    erlang:spawn(fun() -> async_runner(Name, Fun) end).
+-type runner() :: pid().
+-export_type([runner/0]).
 
--spec spawn_send(amoc_throttle:name(), pid(), term()) -> pid().
-spawn_send(Name, Pid, Msg) ->
+-spec spawn(amoc_throttle:name(), amoc_throttle:action()) -> pid().
+spawn(Name, Fun) ->
     amoc_throttle_controller:raise_event_on_slave_node(Name, request),
-    erlang:spawn(fun() -> async_sender(Name, Pid, Msg) end).
+    erlang:spawn(?MODULE, async_runner, [Name, Fun]).
 
 -spec async_runner(amoc_throttle:name(), amoc_throttle:action()) -> no_return().
 async_runner(Name, Fun) ->
@@ -24,10 +23,8 @@ async_runner(Name, Fun) ->
             Fun()
     end.
 
--spec async_sender(amoc_throttle:name(), pid(), term()) -> no_return().
-async_sender(Name, Pid, Msg) ->
-    receive
-        scheduled ->
-            amoc_throttle_controller:raise_event_on_slave_node(Name, execute),
-            Pid ! Msg
-    end.
+-spec run(runner()) -> reference().
+run(RunnerPid) ->
+    Ref = erlang:monitor(process, RunnerPid),
+    RunnerPid ! scheduled,
+    Ref.

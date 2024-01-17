@@ -127,8 +127,8 @@ change_rate_gradually(Name, FromRate, ToRate, RateInterval, StepInterval, NoOfSt
 %% '''
 %% for the local execution, req/exec rates are increased only by throttle process.
 -spec run(name(), action()) -> ok | {error, any()}.
-run(Name, Fn) ->
-    amoc_throttle_controller:run(Name, Fn).
+run(Name, Action) ->
+    amoc_throttle_controller:run(Name, Action).
 
 %% @see send/3
 %% @doc Sends a given message to `erlang:self()'
@@ -141,7 +141,7 @@ send(Name, Msg) ->
 %% May be used to schedule tasks.
 -spec send(name(), pid(), any()) -> ok | {error, any()}.
 send(Name, Pid, Msg) ->
-    amoc_throttle_controller:send(Name, Pid, Msg).
+    run(Name, fun() -> Pid ! Msg end).
 
 %% @doc Sends and receives the given message `Msg'.
 %%
@@ -149,7 +149,14 @@ send(Name, Pid, Msg) ->
 %% or other processes finishing their tasks.
 -spec send_and_wait(name(), any()) -> ok | {error, any()}.
 send_and_wait(Name, Msg) ->
-    amoc_throttle_controller:wait(Name, Msg).
+    case send(Name, Msg) of
+        ok ->
+            receive
+                Msg -> ok
+            end;
+        Error ->
+            Error
+    end.
 
 %% @doc Stops the throttle mechanism for the given `Name'.
 -spec stop(name()) -> ok | {error, any()}.
