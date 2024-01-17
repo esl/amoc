@@ -48,10 +48,10 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec(ensure_throttle_processes_started(name(), amoc_throttle:rate(),
+-spec ensure_throttle_processes_started(name(), amoc_throttle:rate(),
                                         amoc_throttle:interval(), pos_integer()) ->
     {ok, started | already_started} |
-    {error, wrong_reconfiguration | wrong_no_of_procs}).
+    {error, wrong_reconfiguration | wrong_no_of_procs}.
 ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses) ->
     maybe_raise_event(Name, init),
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Rate, Interval, NoOfProcesses}).
