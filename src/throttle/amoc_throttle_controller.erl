@@ -11,7 +11,7 @@
          ensure_throttle_processes_started/4,
          pause/1, resume/1, stop/1,
          change_rate/3, change_rate_gradually/6,
-         run/2, raise_event_on_slave_node/2, telemetry_event/2]).
+         raise_event_on_slave_node/2, telemetry_event/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -57,15 +57,6 @@ start_link() ->
 ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses) ->
     raise_event_on_slave_node(Name, init),
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Rate, Interval, NoOfProcesses}).
-
--spec run(name(), amoc_throttle:action()) -> ok | {error, any()}.
-run(Name, Action) ->
-    case amoc_throttle_process:get_throttle_process(Name) of
-        {ok, Throttler} ->
-            amoc_throttle_process:run(Throttler, Name, Action);
-        Error ->
-            Error
-    end.
 
 -spec pause(name()) -> ok | {error, any()}.
 pause(Name) ->

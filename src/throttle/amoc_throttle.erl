@@ -128,7 +128,13 @@ change_rate_gradually(Name, FromRate, ToRate, RateInterval, StepInterval, NoOfSt
 %% for the local execution, req/exec rates are increased only by throttle process.
 -spec run(name(), action()) -> ok | {error, any()}.
 run(Name, Action) ->
-    amoc_throttle_controller:run(Name, Action).
+    case amoc_throttle_process:get_throttle_process(Name) of
+        {ok, Throttler} ->
+            RunnerPid = amoc_throttle_runner:spawn(Name, Action),
+            amoc_throttle_process:run(Throttler, RunnerPid);
+        Error ->
+            Error
+    end.
 
 %% @see send/3
 %% @doc Sends a given message to `erlang:self()'

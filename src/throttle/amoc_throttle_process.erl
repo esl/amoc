@@ -8,7 +8,7 @@
 
 %% API
 -export([stop/1,
-         run/3,
+         run/2,
          update/3,
          pause/1,
          resume/1,
@@ -53,9 +53,8 @@ start_link(Name, Interval, Rate) ->
 stop(Pid) ->
     gen_server:cast(Pid, stop_process).
 
--spec run(pid(), amoc_throttle:name(), amoc_throttle:action()) -> ok.
-run(Pid, Name, Action) ->
-    RunnerPid = amoc_throttle_runner:spawn(Name, Action),
+-spec run(pid(), amoc_throttle_runner:runner()) -> ok.
+run(Pid, RunnerPid) ->
     gen_server:cast(Pid, {schedule, RunnerPid}).
 
 -spec update(pid(), amoc_throttle:interval(), amoc_throttle:rate()) -> ok.
