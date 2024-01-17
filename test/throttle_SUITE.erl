@@ -26,6 +26,8 @@ groups() ->
        change_rate_gradually,
        send_and_wait,
        just_wait,
+       wait_for_process_to_die_sends_a_kill,
+       async_runner_dies_while_waiting_raises_exit,
        run_with_interval_zero_limits_only_number_of_parallel_executions,
        pause_and_resume,
        get_state
@@ -149,6 +151,17 @@ just_wait(_) ->
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
     ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)).
 
+wait_for_process_to_die_sends_a_kill(_) ->
+    erlang:process_flag(trap_exit, true),
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 10, 1)),
+    amoc_throttle:run(?FUNCTION_NAME, fun() -> exit(?FUNCTION_NAME) end),
+    ?assertMatch(ok, ?RECV({'EXIT', _, ?FUNCTION_NAME}, 100)).
+
+async_runner_dies_while_waiting_raises_exit(_) ->
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 1, 1, 1)),
+    find_new_link_and_kill_it(self()),
+    ?assertExit({throttle_wait_died, _, killed}, amoc_throttle:wait(?FUNCTION_NAME)).
+
 run_with_interval_zero_limits_only_number_of_parallel_executions(_) ->
     %% Start 10 actions at once in 10 processes
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 10, 0, 1)),
@@ -212,6 +225,20 @@ fill_throttle(Name, Num) ->
     receive
         continue -> ok
     end.
+
+find_new_link_and_kill_it(Self) ->
+    erlang:process_flag(trap_exit, true),
+    {links, OriginalLinks} = erlang:process_info(Self, links),
+    spawn(?MODULE, kill_async_runner, [Self, OriginalLinks]).
+
+kill_async_runner(Pid, OriginalLinks) ->
+    GetLinksFun = fun() ->
+                          {links, Links} = erlang:process_info(Pid, links),
+                          Links -- OriginalLinks
+                  end,
+    Validator = fun(Res) -> 1 =:= length(Res) end,
+    {ok, [AsyncRunner]} = wait_helper:wait_until(GetLinksFun, ok, #{validator => Validator}),
+    exit(AsyncRunner, kill).
 
 %% Helpers
 amoc_do(Scenario) ->
