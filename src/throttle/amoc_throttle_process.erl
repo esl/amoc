@@ -117,9 +117,13 @@ init({Name, Interval, Rate}) ->
     StateWithTimer = maybe_start_timer(InitialState),
     {ok, StateWithTimer#state{name = Name}, timeout(InitialState)}.
 
--spec handle_info(term(), state()) -> {noreply, state(), {continue, maybe_run_fn}}.
-handle_info({'DOWN', _, process, _, _}, State) ->
+-spec handle_info(term(), state()) ->
+    {noreply, state(), {continue, maybe_run_fn}} | {stop, atom(), state()}.
+handle_info({'DOWN', _, process, _, normal}, State) ->
     {noreply, inc_n(State), {continue, maybe_run_fn}};
+handle_info({'DOWN', _, process, Pid, Reason}, State) ->
+    %% The async_runner crashed and the operation will never happen, test is invalid
+    {stop, {error, {async_runner_died, Pid, Reason}}, State};
 handle_info(delay_between_executions, State) ->
     {noreply, State#state{can_run_fn = true}, {continue, maybe_run_fn}};
 handle_info(timeout, State) ->
