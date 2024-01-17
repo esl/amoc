@@ -9,12 +9,15 @@
          send/3,
          send/2,
          send_and_wait/2,
+         wait/1,
          run/2,
          pause/1,
          resume/1,
          change_rate/3,
          change_rate_gradually/6,
          stop/1]).
+
+-deprecated([{send_and_wait, 2, "use wait/1 instead"}]).
 
 -define(DEFAULT_NO_PROCESSES, 10).
 -define(DEFAULT_INTERVAL, 60000). %% one minute
@@ -23,12 +26,11 @@
 
 -type name() :: atom().
 -type rate() :: pos_integer().
--type action() :: fun(() -> any()).
 -type interval() :: non_neg_integer().
 %% In milliseconds, defaults to 60000 (one minute) when not given.
 %% An interval of 0 means no delay at all, only the number of simultaneous executions will be
 %% controlled, which corresponds to the number of processes started
--export_type([name/0, rate/0, interval/0, action/0]).
+-export_type([name/0, rate/0, interval/0]).
 
 %% @see start/4
 -spec start(name(), rate()) -> ok | {error, any()}.
@@ -126,46 +128,36 @@ change_rate_gradually(Name, FromRate, ToRate, RateInterval, StepInterval, NoOfSt
 %%        destroy Async runner
 %% '''
 %% for the local execution, req/exec rates are increased only by throttle process.
--spec run(name(), action()) -> ok | {error, any()}.
-run(Name, Action) ->
-    case amoc_throttle_process:get_throttle_process(Name) of
-        {ok, Throttler} ->
-            RunnerPid = amoc_throttle_runner:spawn(Name, Action),
-            amoc_throttle_process:run(Throttler, RunnerPid);
-        Error ->
-            Error
-    end.
+-spec run(name(), fun(() -> any())) -> ok | {error, any()}.
+run(Name, Fn) ->
+    amoc_throttle_runner:throttle(Name, Fn).
 
 %% @see send/3
 %% @doc Sends a given message to `erlang:self()'
 -spec send(name(), any()) -> ok | {error, any()}.
 send(Name, Msg) ->
-    send(Name, self(), Msg).
+    amoc_throttle_runner:throttle(Name, {self(), Msg}).
 
 %% @doc Sends a given message `Msg' to a given `Pid' when the rate for `Name' allows for that.
 %%
 %% May be used to schedule tasks.
 -spec send(name(), pid(), any()) -> ok | {error, any()}.
 send(Name, Pid, Msg) ->
-    run(Name, fun() -> Pid ! Msg end).
+    amoc_throttle_runner:throttle(Name, {Pid, Msg}).
 
 %% @doc Sends and receives the given message `Msg'.
 %%
-%% Can be used to halt execution if we want a process to be idle when waiting for rate increase
-%% or other processes finishing their tasks.
+%% Deprecated in favour of `wait/1'
 -spec send_and_wait(name(), any()) -> ok | {error, any()}.
-send_and_wait(Name, Msg) ->
-    case send(Name, Msg) of
-        ok ->
-            receive
-                Msg -> ok
-            end;
-        Error ->
-            Error
-    end.
+send_and_wait(Name, _) ->
+    amoc_throttle_runner:throttle(Name, wait).
+
+%% @doc Blocks the caller until the throttle mechanism allows.
+-spec wait(name()) -> ok | {error, any()}.
+wait(Name) ->
+    amoc_throttle_runner:throttle(Name, wait).
 
 %% @doc Stops the throttle mechanism for the given `Name'.
 -spec stop(name()) -> ok | {error, any()}.
 stop(Name) ->
-    amoc_throttle_controller:stop(Name),
-    ok.
+    amoc_throttle_controller:stop(Name).

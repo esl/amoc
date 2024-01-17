@@ -24,6 +24,7 @@ groups() ->
        change_rate,
        change_rate_gradually,
        send_and_wait,
+       just_wait,
        run_with_interval_zero_limits_only_number_of_parallel_executions,
        pause_and_resume,
        get_state
@@ -121,6 +122,23 @@ send_and_wait(_) ->
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 10, 1)),
     %% send_and_wait passes fine
     ?assertMatch(ok, amoc_throttle:send_and_wait(?FUNCTION_NAME, receive_this)),
+    %% One message is received sufficiently fast
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 100)),
+    %% If someone else fills the throttle heavily,
+    %% it will take proportionally so long to execute for me
+    fill_throttle(?FUNCTION_NAME, 100 * 10),
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    ?assertMatch({error, not_received_yet}, receive_msg_in_timeout(receive_this, 200)).
+
+just_wait(_) ->
+    %% it failts if the throttle wasn't started yet
+    ?assertMatch({error, no_throttle_process_registered},
+                 amoc_throttle:wait(?FUNCTION_NAME)),
+    %% Start 100-per-10ms throttle with a single process
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 10, 1)),
+    %% wait passes fine
+    ?assertMatch(ok, amoc_throttle:wait(?FUNCTION_NAME)),
     %% One message is received sufficiently fast
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
     ?assertMatch(ok, receive_msg_in_timeout(receive_this, 100)),
