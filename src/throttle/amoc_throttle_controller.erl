@@ -1,6 +1,7 @@
 %% @private
 %% @see amoc_throttle
 %% @copyright 2024 Erlang Solutions Ltd.
+%% @doc Manages throttle processes and rate changes.
 -module(amoc_throttle_controller).
 
 -behaviour(gen_server).
@@ -10,7 +11,7 @@
          ensure_throttle_processes_started/4,
          pause/1, resume/1, stop/1,
          change_rate/3, change_rate_gradually/6,
-         run/2, telemetry_event/2]).
+         raise_event_on_slave_node/2, telemetry_event/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -38,6 +39,7 @@
 -type change_rate_plan() :: #change_rate_plan{}.
 -type throttle_info() :: #throttle_info{}.
 -type state() :: #{name() => throttle_info()}.
+-type event() :: init | execute | request.
 
 %%%===================================================================
 %%% API
@@ -48,28 +50,13 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec(ensure_throttle_processes_started(name(), amoc_throttle:rate(),
+-spec ensure_throttle_processes_started(name(), amoc_throttle:rate(),
                                         amoc_throttle:interval(), pos_integer()) ->
     {ok, started | already_started} |
-    {error, wrong_reconfiguration | wrong_no_of_procs}).
+    {error, wrong_reconfiguration | wrong_no_of_procs}.
 ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses) ->
-    maybe_raise_event(Name, init),
+    raise_event_on_slave_node(Name, init),
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Rate, Interval, NoOfProcesses}).
-
--spec run(name(), fun(() -> any())) -> ok | {error, any()}.
-run(Name, Fn) ->
-    case amoc_throttle_process:get_throttle_process(Name) of
-        {ok, Pid} ->
-            maybe_raise_event(Name, request),
-            Fun =
-                fun() ->
-                    maybe_raise_event(Name, execute),
-                    Fn()
-                end,
-            amoc_throttle_process:run(Pid, Fun),
-            ok;
-        Error -> Error
-    end.
 
 -spec pause(name()) -> ok | {error, any()}.
 pause(Name) ->
@@ -97,6 +84,15 @@ stop(Name) ->
 -spec telemetry_event(name(), request | execute) -> ok.
 telemetry_event(Name, Event) when Event =:= request; Event =:= execute ->
     raise_event(Name, Event).
+
+%% The purpose of this function is to ensure that there are no event duplicates if we are running in
+%% a single (non-distributed) node, as the throttle process will already raise this event.
+-spec raise_event_on_slave_node(name(), event()) -> ok.
+raise_event_on_slave_node(Name, Event) ->
+    case amoc_cluster:master_node() =:= node() of
+        true -> ok;
+        _ -> raise_event(Name, Event)
+    end.
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -203,12 +199,6 @@ handle_info({change_plan, Name}, State) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-maybe_raise_event(Name, Event) ->
-    case amoc_cluster:master_node() =:= node() of
-        true -> ok;
-        _ -> raise_event(Name, Event)
-    end.
 
 raise_event(Name, Event) when Event =:= request; Event =:= execute; Event =:= init ->
     amoc_telemetry:execute([throttle, Event], #{count => 1}, #{name => Name}).

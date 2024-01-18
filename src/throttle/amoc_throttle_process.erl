@@ -1,6 +1,8 @@
 %% @private
 %% @see amoc_throttle
 %% @copyright 2024 Erlang Solutions Ltd.
+%% @doc This process's only responsibility is to notify runners that
+%% they can run exactly when allowed by the throttling mechanism.
 -module(amoc_throttle_process).
 -behaviour(gen_server).
 
@@ -35,8 +37,8 @@
                 interval = 0 :: amoc_throttle:interval(),  %%ms
                 delay_between_executions = 0 :: non_neg_integer(),  %%ms
                 tref :: timer:tref() | undefined,
-                schedule = [] :: [pid()],
-                schedule_reversed = [] :: [pid()]}).
+                schedule = [] :: [AmocThrottleRunnerProcess :: pid()],
+                schedule_reversed = [] :: [AmocThrottleRunnerProcess :: pid()]}).
 
 -type state() :: #state{}.
 %%------------------------------------------------------------------------------
@@ -51,9 +53,8 @@ start_link(Name, Interval, Rate) ->
 stop(Pid) ->
     gen_server:cast(Pid, stop_process).
 
--spec run(pid(), fun(() -> any())) -> ok.
-run(Pid, Fun) ->
-    RunnerPid = spawn(fun() -> async_runner(Fun) end),
+-spec run(pid(), pid()) -> ok.
+run(Pid, RunnerPid) ->
     gen_server:cast(Pid, {schedule, RunnerPid}).
 
 -spec update(pid(), amoc_throttle:interval(), amoc_throttle:rate()) -> ok.
@@ -216,14 +217,9 @@ maybe_run_fn(State) ->
 
 run_fn(#state{schedule = [RunnerPid | T], name = Name, n = N} = State) ->
     erlang:monitor(process, RunnerPid),
-    RunnerPid ! scheduled,
+    amoc_throttle_runner:run(RunnerPid),
     amoc_throttle_controller:telemetry_event(Name, execute),
     State#state{schedule = T, n = N - 1}.
-
-async_runner(Fun) ->
-    receive
-        scheduled -> Fun()
-    end.
 
 timeout(State) ->
     State#state.interval + ?DEFAULT_MSG_TIMEOUT.

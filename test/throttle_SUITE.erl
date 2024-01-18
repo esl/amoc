@@ -6,6 +6,7 @@
 
 -define(DEFAULT_NO_PROCESSES, 10).
 -define(DEFAULT_INTERVAL, 60000). %% one minute
+-define(RECV(Msg, Timeout), receive Msg -> ok after Timeout -> {error, not_received_yet} end).
 
 all() ->
     [
@@ -24,6 +25,10 @@ groups() ->
        change_rate,
        change_rate_gradually,
        send_and_wait,
+       just_wait,
+       wait_for_process_to_die_sends_a_kill,
+       async_runner_dies_while_waiting_raises_exit,
+       async_runner_dies_when_throttler_dies,
        run_with_interval_zero_limits_only_number_of_parallel_executions,
        pause_and_resume,
        get_state
@@ -123,12 +128,50 @@ send_and_wait(_) ->
     ?assertMatch(ok, amoc_throttle:send_and_wait(?FUNCTION_NAME, receive_this)),
     %% One message is received sufficiently fast
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 100)),
+    ?assertMatch(ok, ?RECV(receive_this, 100)),
     %% If someone else fills the throttle heavily,
     %% it will take proportionally so long to execute for me
     fill_throttle(?FUNCTION_NAME, 100 * 10),
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch({error, not_received_yet}, receive_msg_in_timeout(receive_this, 200)).
+    ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)).
+
+just_wait(_) ->
+    %% it failts if the throttle wasn't started yet
+    ?assertMatch({error, no_throttle_process_registered},
+                 amoc_throttle:wait(?FUNCTION_NAME)),
+    %% Start 100-per-10ms throttle with a single process
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 10, 1)),
+    %% wait passes fine
+    ?assertMatch(ok, amoc_throttle:wait(?FUNCTION_NAME)),
+    %% One message is received sufficiently fast
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    ?assertMatch(ok, ?RECV(receive_this, 100)),
+    %% If someone else fills the throttle heavily,
+    %% it will take proportionally so long to execute for me
+    fill_throttle(?FUNCTION_NAME, 100 * 10),
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)).
+
+wait_for_process_to_die_sends_a_kill(_) ->
+    erlang:process_flag(trap_exit, true),
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 10, 1)),
+    amoc_throttle:run(?FUNCTION_NAME, fun() -> exit(?FUNCTION_NAME) end),
+    ?assertMatch(ok, ?RECV({'EXIT', _, ?FUNCTION_NAME}, 100)).
+
+async_runner_dies_while_waiting_raises_exit(_) ->
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 1, 1, 1)),
+    find_new_link_and_kill_it(self()),
+    ?assertExit({throttle_wait_died, _, killed}, amoc_throttle:wait(?FUNCTION_NAME)).
+
+async_runner_dies_when_throttler_dies(_) ->
+    erlang:process_flag(trap_exit, true),
+    {links, OriginalLinks} = erlang:process_info(self(), links),
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 1, 60000, 1)),
+    wait_until_one_throttle_worker(?FUNCTION_NAME),
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    wait_until_one_async_runner(self(), OriginalLinks),
+    amoc_throttle:stop(?FUNCTION_NAME),
+    ?assertMatch(ok, ?RECV({'EXIT', _, {throttler_worker_died, _, _}}, 100)).
 
 run_with_interval_zero_limits_only_number_of_parallel_executions(_) ->
     %% Start 10 actions at once in 10 processes
@@ -137,7 +180,7 @@ run_with_interval_zero_limits_only_number_of_parallel_executions(_) ->
     %% it will take proportionally so long to execute for me
     fill_throttle(?FUNCTION_NAME, 100),
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 200)).
+    ?assertMatch(ok, ?RECV(receive_this, 200)).
 
 pause_and_resume(_) ->
     %% Start 100-per-10ms throttle with a single process
@@ -148,10 +191,10 @@ pause_and_resume(_) ->
     ?assertMatch(ok, amoc_throttle:pause(?FUNCTION_NAME)),
     %% It is paused, so messages aren't received
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch({error, not_received_yet}, receive_msg_in_timeout(receive_this, 200)),
+    ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)),
     %% After resume the message is then received
     ?assertMatch(ok, amoc_throttle:resume(?FUNCTION_NAME)),
-    ?assertMatch(ok, receive_msg_in_timeout(receive_this, 200)).
+    ?assertMatch(ok, ?RECV(receive_this, 200)).
 
 get_state(_) ->
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 60000, 1)),
@@ -174,15 +217,24 @@ assert_telemetry_event(Name, Measurement, Throttle, Rate, Interval) ->
                        end,
     ?assert(lists:any(IsLowRateEventFn, TelemetryEvents)).
 
+get_throttle_workers(Name) ->
+    pg:get_members(amoc_throttle, Name).
+
 get_number_of_workers(Name) ->
-    Processes = pg:get_members(amoc_throttle, Name),
+    Processes = get_throttle_workers(Name),
     length(Processes).
 
 get_state_of_one_process(Name) ->
-    Processes = pg:get_members(amoc_throttle, Name),
+    Processes = get_throttle_workers(Name),
     ?assertMatch([_ | _], Processes),
     [Process | _] = Processes,
     amoc_throttle_process:get_state(Process).
+
+wait_until_one_throttle_worker(Name) ->
+    GetWorkers = fun() -> get_throttle_workers(Name) end,
+    Validator = fun(Res) -> 0 < length(Res) end,
+    {ok, [Worker | _]} = wait_helper:wait_until(GetWorkers, ok, #{validator => Validator}),
+    Worker.
 
 fill_throttle(Name, Num) ->
     Parent = self(),
@@ -194,13 +246,26 @@ fill_throttle(Name, Num) ->
         continue -> ok
     end.
 
-receive_msg_in_timeout(Msg, Timeout) ->
-    receive
-        Msg ->
-            ok
-    after Timeout ->
-              {error, not_received_yet}
-    end.
+maybe_get_new_async_runners(Pid, OriginalLinks) ->
+    {links, Links} = erlang:process_info(Pid, links),
+    Links -- OriginalLinks.
+
+wait_until_one_async_runner(Pid, OriginalLinks) ->
+    GetLinksFun = fun() -> maybe_get_new_async_runners(Pid, OriginalLinks) end,
+    Validator = fun(Res) -> 0 < length(Res) end,
+    {ok, [AsyncRunner | _]} = wait_helper:wait_until(GetLinksFun, ok, #{validator => Validator}),
+    AsyncRunner.
+
+find_new_link_and_kill_it(Pid) ->
+    erlang:process_flag(trap_exit, true),
+    {links, OriginalLinks} = erlang:process_info(Pid, links),
+    spawn(?MODULE, kill_async_runner, [Pid, OriginalLinks]).
+
+kill_async_runner(Pid, OriginalLinks) ->
+    GetLinksFun = fun() -> maybe_get_new_async_runners(Pid, OriginalLinks) end,
+    Validator = fun(Res) -> 1 =:= length(Res) end,
+    {ok, [AsyncRunner]} = wait_helper:wait_until(GetLinksFun, ok, #{validator => Validator}),
+    exit(AsyncRunner, kill).
 
 %% Helpers
 amoc_do(Scenario) ->
