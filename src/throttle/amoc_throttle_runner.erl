@@ -7,7 +7,7 @@
 -module(amoc_throttle_runner).
 
 -export([throttle/2, run/1]).
--export([async_runner/3]).
+-export([async_runner/4]).
 
 -type action() :: wait | {pid(), term()} | fun(() -> any()).
 
@@ -18,9 +18,10 @@ run(RunnerPid) ->
 -spec throttle(amoc_throttle:name(), action()) -> ok | {error, any()}.
 throttle(Name, Action) ->
     case amoc_throttle_process:get_throttle_process(Name) of
-        {ok, Throttler} ->
-            RunnerPid = erlang:spawn_link(?MODULE, async_runner, [Name, self(), Action]),
-            amoc_throttle_process:run(Throttler, RunnerPid),
+        {ok, ThrottlerPid} ->
+            Args = [Name, self(), ThrottlerPid, Action],
+            RunnerPid = erlang:spawn_link(?MODULE, async_runner, Args),
+            amoc_throttle_process:run(ThrottlerPid, RunnerPid),
             maybe_wait(Action, RunnerPid);
         Error ->
             Error
@@ -37,10 +38,13 @@ maybe_wait(wait, RunnerPid) ->
 maybe_wait(_, _) ->
     ok.
 
--spec async_runner(amoc_throttle:name(), pid(), term()) -> no_return().
-async_runner(Name, Caller, Action) ->
+-spec async_runner(amoc_throttle:name(), pid(), pid(), term()) -> no_return().
+async_runner(Name, Caller, ThrottlerPid, Action) ->
+    ThrottlerMonitor = erlang:monitor(process, ThrottlerPid),
     amoc_throttle_controller:raise_event_on_slave_node(Name, request),
     receive
+        {'DOWN', ThrottlerMonitor, process, ThrottlerPid, Reason} ->
+            exit({throttler_worker_died, ThrottlerPid, Reason});
         '$scheduled' ->
             execute(Caller, Action),
             amoc_throttle_controller:raise_event_on_slave_node(Name, execute),

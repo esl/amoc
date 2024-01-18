@@ -28,6 +28,7 @@ groups() ->
        just_wait,
        wait_for_process_to_die_sends_a_kill,
        async_runner_dies_while_waiting_raises_exit,
+       async_runner_dies_when_throttler_dies,
        run_with_interval_zero_limits_only_number_of_parallel_executions,
        pause_and_resume,
        get_state
@@ -162,6 +163,16 @@ async_runner_dies_while_waiting_raises_exit(_) ->
     find_new_link_and_kill_it(self()),
     ?assertExit({throttle_wait_died, _, killed}, amoc_throttle:wait(?FUNCTION_NAME)).
 
+async_runner_dies_when_throttler_dies(_) ->
+    erlang:process_flag(trap_exit, true),
+    {links, OriginalLinks} = erlang:process_info(self(), links),
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 1, 60000, 1)),
+    wait_until_one_throttle_worker(?FUNCTION_NAME),
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    wait_until_one_async_runner(self(), OriginalLinks),
+    amoc_throttle:stop(?FUNCTION_NAME),
+    ?assertMatch(ok, ?RECV({'EXIT', _, {throttler_worker_died, _, _}}, 100)).
+
 run_with_interval_zero_limits_only_number_of_parallel_executions(_) ->
     %% Start 10 actions at once in 10 processes
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 10, 0, 1)),
@@ -206,15 +217,24 @@ assert_telemetry_event(Name, Measurement, Throttle, Rate, Interval) ->
                        end,
     ?assert(lists:any(IsLowRateEventFn, TelemetryEvents)).
 
+get_throttle_workers(Name) ->
+    pg:get_members(amoc_throttle, Name).
+
 get_number_of_workers(Name) ->
-    Processes = pg:get_members(amoc_throttle, Name),
+    Processes = get_throttle_workers(Name),
     length(Processes).
 
 get_state_of_one_process(Name) ->
-    Processes = pg:get_members(amoc_throttle, Name),
+    Processes = get_throttle_workers(Name),
     ?assertMatch([_ | _], Processes),
     [Process | _] = Processes,
     amoc_throttle_process:get_state(Process).
+
+wait_until_one_throttle_worker(Name) ->
+    GetWorkers = fun() -> get_throttle_workers(Name) end,
+    Validator = fun(Res) -> 0 < length(Res) end,
+    {ok, [Worker | _]} = wait_helper:wait_until(GetWorkers, ok, #{validator => Validator}),
+    Worker.
 
 fill_throttle(Name, Num) ->
     Parent = self(),
@@ -226,16 +246,23 @@ fill_throttle(Name, Num) ->
         continue -> ok
     end.
 
-find_new_link_and_kill_it(Self) ->
+maybe_get_new_async_runners(Pid, OriginalLinks) ->
+    {links, Links} = erlang:process_info(Pid, links),
+    Links -- OriginalLinks.
+
+wait_until_one_async_runner(Pid, OriginalLinks) ->
+    GetLinksFun = fun() -> maybe_get_new_async_runners(Pid, OriginalLinks) end,
+    Validator = fun(Res) -> 0 < length(Res) end,
+    {ok, [AsyncRunner | _]} = wait_helper:wait_until(GetLinksFun, ok, #{validator => Validator}),
+    AsyncRunner.
+
+find_new_link_and_kill_it(Pid) ->
     erlang:process_flag(trap_exit, true),
-    {links, OriginalLinks} = erlang:process_info(Self, links),
-    spawn(?MODULE, kill_async_runner, [Self, OriginalLinks]).
+    {links, OriginalLinks} = erlang:process_info(Pid, links),
+    spawn(?MODULE, kill_async_runner, [Pid, OriginalLinks]).
 
 kill_async_runner(Pid, OriginalLinks) ->
-    GetLinksFun = fun() ->
-                          {links, Links} = erlang:process_info(Pid, links),
-                          Links -- OriginalLinks
-                  end,
+    GetLinksFun = fun() -> maybe_get_new_async_runners(Pid, OriginalLinks) end,
     Validator = fun(Res) -> 1 =:= length(Res) end,
     {ok, [AsyncRunner]} = wait_helper:wait_until(GetLinksFun, ok, #{validator => Validator}),
     exit(AsyncRunner, kill).
