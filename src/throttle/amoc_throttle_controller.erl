@@ -85,6 +85,8 @@ stop(Name) ->
 telemetry_event(Name, Event) when Event =:= request; Event =:= execute ->
     raise_event(Name, Event).
 
+%% The purpose of this function is to ensure that there are no event duplicates if we are running in
+%% a single (non-distributed) node, as the throttle process will already raise this event.
 -spec raise_event_on_slave_node(name(), event()) -> ok.
 raise_event_on_slave_node(Name, Event) ->
     case amoc_cluster:master_node() =:= node() of

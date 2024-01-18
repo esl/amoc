@@ -37,8 +37,8 @@
                 interval = 0 :: amoc_throttle:interval(),  %%ms
                 delay_between_executions = 0 :: non_neg_integer(),  %%ms
                 tref :: timer:tref() | undefined,
-                schedule = [] :: [amoc_throttle_runner:runner()],
-                schedule_reversed = [] :: [amoc_throttle_runner:runner()]}).
+                schedule = [] :: [AmocThrottleRunnerProcess :: pid()],
+                schedule_reversed = [] :: [AmocThrottleRunnerProcess :: pid()]}).
 
 -type state() :: #state{}.
 %%------------------------------------------------------------------------------
@@ -53,7 +53,7 @@ start_link(Name, Interval, Rate) ->
 stop(Pid) ->
     gen_server:cast(Pid, stop_process).
 
--spec run(pid(), amoc_throttle_runner:runner()) -> ok.
+-spec run(pid(), pid()) -> ok.
 run(Pid, RunnerPid) ->
     gen_server:cast(Pid, {schedule, RunnerPid}).
 

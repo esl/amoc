@@ -10,14 +10,10 @@
 -export([async_runner/3]).
 
 -type action() :: wait | {pid(), term()} | fun(() -> any()).
--type runner() :: pid().
--export_type([runner/0]).
 
--spec run(runner()) -> reference().
+-spec run(pid()) -> term().
 run(RunnerPid) ->
-    Ref = erlang:monitor(process, RunnerPid),
-    RunnerPid ! '$scheduled',
-    Ref.
+    RunnerPid ! '$scheduled'.
 
 -spec throttle(amoc_throttle:name(), action()) -> ok | {error, any()}.
 throttle(Name, Action) ->
@@ -30,7 +26,7 @@ throttle(Name, Action) ->
             Error
     end.
 
--spec maybe_wait(action(), runner()) -> ok.
+-spec maybe_wait(action(), pid()) -> ok.
 maybe_wait(wait, RunnerPid) ->
     receive
         {'EXIT', RunnerPid, Reason} ->
