@@ -16,8 +16,7 @@
 -export([start_link/0, init/1]).
 
 %% API
--export([init_storage/0, clean_storage/0,
-         incr_no_of_users/1, decr_no_of_users/1, count_no_of_users/0,
+-export([incr_no_of_users/1, decr_no_of_users/1, count_no_of_users/0,
          start_child/3, start_children/3, stop_children/2, terminate_all_children/0]).
 
 -export([get_all_children/0]).
@@ -37,7 +36,15 @@
 %% @private
 -spec start_link() -> supervisor:startlink_ret().
 start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, no_args).
+    Ret = supervisor:start_link({local, ?MODULE}, ?MODULE, no_args),
+    UserSups = lists:reverse(supervisor:which_children(?MODULE)),
+    UserSupPids = [ Pid || {_, Pid, _, _} <- UserSups ],
+    UserSupPidsTuple = erlang:list_to_tuple(UserSupPids),
+    NumOfSupervisors = tuple_size(UserSupPidsTuple),
+    Atomics = atomics:new(1 + NumOfSupervisors, [{signed, false}]),
+    Storage = #storage{user_count = Atomics, sups = UserSupPidsTuple},
+    persistent_term:put(?MODULE, Storage),
+    Ret.
 
 %% @private
 -spec init(no_args) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
@@ -56,20 +63,6 @@ init(no_args) ->
     {ok, {Strategy, Specs}}.
 
 %% API
--spec init_storage() -> any().
-init_storage() ->
-    UserSups = lists:reverse(supervisor:which_children(?MODULE)),
-    UserSupPids = [ Pid || {_, Pid, _, _} <- UserSups ],
-    UserSupPidsTuple = erlang:list_to_tuple(UserSupPids),
-    NumOfSupervisors = tuple_size(UserSupPidsTuple),
-    Atomics = atomics:new(1 + NumOfSupervisors, [{signed, false}]),
-    Storage = #storage{user_count = Atomics, sups = UserSupPidsTuple},
-    persistent_term:put(?MODULE, Storage).
-
--spec clean_storage() -> any().
-clean_storage() ->
-    persistent_term:erase(?MODULE).
-
 -spec count_no_of_users() -> count().
 count_no_of_users() ->
     #storage{user_count = Atomics} = persistent_term:get(?MODULE),

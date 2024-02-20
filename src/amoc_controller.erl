@@ -72,7 +72,7 @@
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -144,7 +144,6 @@ zero_users_running() ->
 -spec init([]) -> {ok, state()}.
 init([]) ->
     start_tables(),
-    amoc_users_sup:init_storage(),
     {ok, #state{}}.
 
 %% @private
@@ -199,11 +198,6 @@ handle_info(start_all_users, State) ->
     {noreply, NewSate};
 handle_info(_Msg, State) ->
     {noreply, State}.
-
-%% @private
--spec terminate(term(), state()) -> any().
-terminate(_Reason, _State) ->
-    amoc_users_sup:clean_storage().
 
 %% ------------------------------------------------------------------
 %% internal functions
