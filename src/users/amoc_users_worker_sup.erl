@@ -17,6 +17,10 @@
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
+-export([start_child/4, start_children/4, stop_children/3, terminate_all_children/1]).
+
+-export([get_all_children/1]).
+
 -record(state, {
           index :: non_neg_integer(),
           tid :: ets:tid(),
@@ -31,11 +35,31 @@
 start_link(N) ->
     gen_server:start_link(?MODULE, N, []).
 
+-spec start_child(gen_server:server_ref(), amoc:scenario(), amoc_scenario:user_id(), any()) -> ok.
+start_child(Sup, Scenario, Id, ScenarioState) ->
+    gen_server:cast(Sup, {start_child, Scenario, Id, ScenarioState}).
+
+-spec start_children(gen_server:server_ref(), amoc:scenario(), [amoc_scenario:user_id()], any()) -> ok.
+start_children(Sup, Scenario, UserIds, ScenarioState) ->
+    gen_server:cast(Sup, {start_children, Scenario, UserIds, ScenarioState}).
+
+-spec stop_children(gen_server:server_ref(), non_neg_integer(), boolean()) -> ok.
+stop_children(Sup, Count, Force) ->
+    gen_server:cast(Sup, {stop_children, Count, Force}).
+
+-spec terminate_all_children(gen_server:server_ref()) -> any().
+terminate_all_children(Sup) ->
+    gen_server:cast(Sup, terminate_all_children).
+
+-spec get_all_children(gen_server:server_ref()) -> [{pid(), amoc_scenario:user_id()}].
+get_all_children(Sup) ->
+    gen_server:call(Sup, get_all_children, infinity).
+
 %% @private
 -spec init(non_neg_integer()) -> {ok, term()}.
 init(N) ->
     process_flag(trap_exit, true),
-    Tid = ets:new(?MODULE,  [ordered_set, private]),
+    Tid = ets:new(?MODULE,  [ordered_set, protected]),
     {ok, #state{index = N, tid = Tid}}.
 
 %% @private
@@ -46,21 +70,11 @@ handle_call(get_all_children, _From, #state{tid = Tid} = State) ->
 
 %% @private
 -spec handle_cast(any(), state()) -> {noreply, state()}.
-handle_cast({start_child, Scenario, Id, ScenarioState}, #state{index = N, tid = Tid} = State) ->
-    case amoc_user:start_link(Scenario, Id, ScenarioState) of
-        {ok, Pid} ->
-            handle_up_user(Tid, Pid, Id, N),
-            {noreply, State};
-        _ ->
-            {noreply, State}
-    end;
-handle_cast({start_children, Scenario, Ids, ScenarioState}, #state{index = N, tid = Tid} = State) ->
-    [ case amoc_user:start_link(Scenario, Id, ScenarioState) of
-          {ok, Pid} ->
-              handle_up_user(Tid, Pid, Id, N);
-          _ ->
-              ok
-      end || Id <- Ids],
+handle_cast({start_child, Scenario, Id, ScenarioState}, State) ->
+    do_start_child(Scenario, Id, ScenarioState, State),
+    {noreply, State};
+handle_cast({start_children, Scenario, Ids, ScenarioState}, State) ->
+    [ do_start_child(Scenario, Id, ScenarioState, State) || Id <- Ids],
     {noreply, State};
 handle_cast({stop_children, Int, ForceRemove}, #state{tid = Tid} = State) ->
     Pids = case ets:match_object(Tid, '$1', Int) of
@@ -93,6 +107,15 @@ terminate(_Reason, State) ->
     do_terminate_all_my_children(State).
 
 %% Helpers
+
+-spec do_start_child(module(), amoc_scenario:user_id(), term(), state()) -> any().
+do_start_child(Scenario, Id, ScenarioState, #state{index = N, tid = Tid}) ->
+    case amoc_user:start_link(Scenario, Id, ScenarioState) of
+        {ok, Pid} ->
+            handle_up_user(Tid, Pid, Id, N);
+        _ ->
+            ok
+    end.
 
 -spec handle_up_user(ets:tid(), pid(), amoc_scenario:user_id(), non_neg_integer()) -> ok.
 handle_up_user(Tid, Pid, Id, SupNum) ->

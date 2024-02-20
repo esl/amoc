@@ -95,7 +95,7 @@ decr_no_of_users(SupNum) when SupNum > 1 ->
 -spec start_child(amoc:scenario(), amoc_scenario:user_id(), any()) -> ok.
 start_child(Scenario, Id, ScenarioState) ->
     Sup = get_sup_for_user_id(Id),
-    gen_server:cast(Sup, {start_child, Scenario, Id, ScenarioState}).
+    amoc_users_worker_sup:start_child(Sup, Scenario, Id, ScenarioState).
 
 %% Group all children based on ID to their respective worker supervisor and cast a request with each
 %% group at once. This way we reduce the number of casts to each worker to always one, instead of
@@ -107,7 +107,7 @@ start_children(Scenario, UserIds, ScenarioState) ->
              end,
     Assignments = maps:groups_from_list(KeyFun, UserIds),
     CastFun = fun (Sup, Users) ->
-                      gen_server:cast(Sup, {start_children, Scenario, Users, ScenarioState})
+                      amoc_users_worker_sup:start_children(Sup, Scenario, Users, ScenarioState)
               end,
     maps:foreach(CastFun, Assignments).
 
@@ -116,19 +116,19 @@ start_children(Scenario, UserIds, ScenarioState) ->
 -spec stop_children(non_neg_integer(), boolean()) -> non_neg_integer().
 stop_children(Count, Force) ->
     {CountRemove, Assignments} = assign_counts(Count),
-    [ gen_server:cast(Sup, {stop_children, Int, Force}) || {Sup, Int} <- Assignments ],
+    [ amoc_users_worker_sup:stop_children(Sup, Int, Force) || {Sup, Int} <- Assignments ],
     CountRemove.
 
 -spec get_all_children() -> [{pid(), amoc_scenario:user_id()}].
 get_all_children() ->
     #storage{sups = Sups} = persistent_term:get(?MODULE),
-    All = [ gen_server:call(Sup, get_all_children, infinity) || Sup <- tuple_to_list(Sups) ],
+    All = [ amoc_users_worker_sup:get_all_children(Sup) || Sup <- tuple_to_list(Sups) ],
     lists:flatten(All).
 
 -spec terminate_all_children() -> any().
 terminate_all_children() ->
     #storage{sups = Sups} = persistent_term:get(?MODULE),
-    [ gen_server:cast(Sup, terminate_all_children) || Sup <- tuple_to_list(Sups) ].
+    [ amoc_users_worker_sup:terminate_all_children(Sup) || Sup <- tuple_to_list(Sups) ].
 
 %% Helpers
 -spec get_sup_for_user_id(amoc_scenario:user_id()) -> pid().
