@@ -17,7 +17,7 @@
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
--export([start_child/4, start_children/4, stop_children/3, terminate_all_children/1]).
+-export([start_child/4, stop_child/2, start_children/4, stop_children/3, terminate_all_children/1]).
 
 -export([get_all_children/1]).
 
@@ -50,6 +50,14 @@ stop_children(Sup, Count, Force) ->
 -spec terminate_all_children(pid()) -> any().
 terminate_all_children(Sup) ->
     gen_server:cast(Sup, terminate_all_children).
+
+-spec stop_child(pid(), boolean()) -> ok.
+stop_child(Pid, false) ->
+    exit(Pid, shutdown),
+    ok;
+stop_child(Pids, true) ->
+    spawn(shutdown_and_kill_after_timeout_fun(Pids)),
+    ok.
 
 -spec get_all_children(pid()) -> [{pid(), amoc_scenario:user_id()}].
 get_all_children(Sup) ->
@@ -137,13 +145,16 @@ maybe_track_task_to_stop_my_children(State, Pids, false) ->
     [ exit(Pid, shutdown) || Pid <- Pids ],
     State;
 maybe_track_task_to_stop_my_children(#state{tasks = Tasks} = State, Pids, true) ->
-    Fun = fun() ->
-                  [ exit(Pid, shutdown) || Pid <- Pids ],
-                  timer:sleep(?SHUTDOWN_TIMEOUT),
-                  [ exit(Pid, kill) || Pid <- Pids ]
-          end,
-    {Pid, Ref} = spawn_monitor(Fun),
+    {Pid, Ref} = spawn_monitor(shutdown_and_kill_after_timeout_fun(Pids)),
     State#state{tasks = Tasks#{Pid => Ref}}.
+
+-spec shutdown_and_kill_after_timeout_fun([pid()]) -> fun(() -> term()).
+shutdown_and_kill_after_timeout_fun(Pids) ->
+    fun() ->
+            [ exit(Pid, shutdown) || Pid <- Pids ],
+            timer:sleep(?SHUTDOWN_TIMEOUT),
+            [ exit(Pid, kill) || Pid <- Pids ]
+    end.
 
 -spec do_terminate_all_my_children(state()) -> any().
 do_terminate_all_my_children(#state{tid = Tid} = State) ->

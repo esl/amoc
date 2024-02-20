@@ -17,7 +17,7 @@
 
 %% API
 -export([incr_no_of_users/1, decr_no_of_users/1, count_no_of_users/0,
-         start_child/3, start_children/3, stop_children/2, terminate_all_children/0]).
+         start_child/3, stop_child/2, start_children/3, stop_children/2, terminate_all_children/0]).
 
 -export([get_all_children/0]).
 
@@ -89,6 +89,10 @@ decr_no_of_users(SupNum) when SupNum > 1 ->
 start_child(Scenario, Id, ScenarioState) ->
     Sup = get_sup_for_user_id(Id),
     amoc_users_worker_sup:start_child(Sup, Scenario, Id, ScenarioState).
+
+-spec stop_child(pid(), boolean()) -> ok.
+stop_child(Pid, Force) ->
+    amoc_users_worker_sup:stop_child(Pid, Force).
 
 %% Group all children based on ID to their respective worker supervisor and cast a request with each
 %% group at once. This way we reduce the number of casts to each worker to always one, instead of
