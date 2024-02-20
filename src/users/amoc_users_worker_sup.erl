@@ -35,23 +35,23 @@
 start_link(N) ->
     gen_server:start_link(?MODULE, N, []).
 
--spec start_child(gen_server:server_ref(), amoc:scenario(), amoc_scenario:user_id(), any()) -> ok.
+-spec start_child(pid(), amoc:scenario(), amoc_scenario:user_id(), any()) -> ok.
 start_child(Sup, Scenario, Id, ScenarioState) ->
     gen_server:cast(Sup, {start_child, Scenario, Id, ScenarioState}).
 
--spec start_children(gen_server:server_ref(), amoc:scenario(), [amoc_scenario:user_id()], any()) -> ok.
+-spec start_children(pid(), amoc:scenario(), [amoc_scenario:user_id()], any()) -> ok.
 start_children(Sup, Scenario, UserIds, ScenarioState) ->
     gen_server:cast(Sup, {start_children, Scenario, UserIds, ScenarioState}).
 
--spec stop_children(gen_server:server_ref(), non_neg_integer(), boolean()) -> ok.
+-spec stop_children(pid(), non_neg_integer(), boolean()) -> ok.
 stop_children(Sup, Count, Force) ->
     gen_server:cast(Sup, {stop_children, Count, Force}).
 
--spec terminate_all_children(gen_server:server_ref()) -> any().
+-spec terminate_all_children(pid()) -> any().
 terminate_all_children(Sup) ->
     gen_server:cast(Sup, terminate_all_children).
 
--spec get_all_children(gen_server:server_ref()) -> [{pid(), amoc_scenario:user_id()}].
+-spec get_all_children(pid()) -> [{pid(), amoc_scenario:user_id()}].
 get_all_children(Sup) ->
     gen_server:call(Sup, get_all_children, infinity).
 

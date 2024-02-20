@@ -95,11 +95,11 @@ start_child(Scenario, Id, ScenarioState) ->
 %% depending on the number of users.
 -spec start_children(amoc:scenario(), [amoc_scenario:user_id()], any()) -> ok.
 start_children(Scenario, UserIds, ScenarioState) ->
-    KeyFun = fun(UserId) ->
-                     get_sup_for_user_id(UserId)
-             end,
-    Assignments = maps:groups_from_list(KeyFun, UserIds),
-    CastFun = fun (Sup, Users) ->
+    #storage{sups = Supervisors} = persistent_term:get(?MODULE),
+    NumOfSupervisors = tuple_size(Supervisors),
+    Acc = maps:from_list([ {Sup, []} || Sup <- tuple_to_list(Supervisors) ]),
+    Assignments = assign_users_to_sups(NumOfSupervisors, Supervisors, UserIds, Acc),
+    CastFun = fun(Sup, Users) ->
                       amoc_users_worker_sup:start_children(Sup, Scenario, Users, ScenarioState)
               end,
     maps:foreach(CastFun, Assignments).
@@ -161,3 +161,15 @@ distribute(Acc, Data, [{Sup, Count} | Rest], Left) ->
                       maps:put(Sup, Count - 1, Data)
               end,
     distribute(NewAcc, NewData, Rest, Left - 1).
+
+%% assign which users each worker will be requested to add
+-spec assign_users_to_sups(pos_integer(), tuple(), [amoc_scenario:user_id()], Acc) ->
+    Acc when Acc :: #{pid() := [amoc_scenario:user_id()]}.
+assign_users_to_sups(NumOfSupervisors, Supervisors, [Id | Ids], Acc) ->
+    Index = Id rem NumOfSupervisors + 1,
+    ChosenSup = element(Index, Supervisors),
+    Vs = maps:get(ChosenSup, Acc),
+    NewAcc = Acc#{ChosenSup := [Id | Vs]},
+    assign_users_to_sups(NumOfSupervisors, Supervisors, Ids, NewAcc);
+assign_users_to_sups(_, _, [], Acc) ->
+    Acc.

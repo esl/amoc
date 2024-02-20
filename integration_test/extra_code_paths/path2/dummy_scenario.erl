@@ -74,4 +74,4 @@ init() ->
 start(_Id) ->
     %%sleep 15 minutes
     timer:sleep(timer:minutes(15)),
-    exit(shutdown).
+    amoc_user:stop().
