@@ -26,12 +26,9 @@ start_link() ->
 %% Supervisor callbacks
 %% ===================================================================
 -spec init(term()) ->
-    {ok, {SupFlags :: {RestartStrategy :: supervisor:strategy(),
-                       MaxR :: non_neg_integer(), MaxT :: pos_integer()},
-          [ChildSpec :: supervisor:child_spec()]
-    }}.
+    {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
-    {ok, {{rest_for_one, 5, 10},
+    {ok, {#{strategy => one_for_all, intensity => 0},
           [
               ?SUP(amoc_users_sup, supervisor),
               ?SUP(amoc_throttle_sup, supervisor),
