@@ -25,6 +25,9 @@
 -type count() :: non_neg_integer().
 
 -record(storage, {
+          %% an array of atomics whose index works as follows:
+          %% * index=1 - overall number of Users
+          %% * index>1 - number of users supervised by worker
           user_count :: atomics:atomics_ref(),
           sups :: tuple()
          }).
@@ -48,7 +51,7 @@ init(no_args) ->
                type => worker,
                modules => [amoc_users_worker_sup]
               }
-             || N <- lists:seq(1, erlang:system_info(schedulers_online)) ],
+             || N <- lists:seq(2, erlang:system_info(schedulers_online) + 1) ],
     Strategy = #{strategy => one_for_one, intensity => 0},
     {ok, {Strategy, Specs}}.
 
@@ -73,15 +76,15 @@ count_no_of_users() ->
     atomics:get(Atomics, 1).
 
 -spec incr_no_of_users(non_neg_integer()) -> any().
-incr_no_of_users(SupNum) ->
+incr_no_of_users(SupNum) when SupNum > 1 ->
     #storage{user_count = Atomics} = persistent_term:get(?MODULE),
-    atomics:add(Atomics, 1, 1),
-    atomics:add(Atomics, SupNum + 1, 1).
+    atomics:add(Atomics, SupNum, 1),
+    atomics:add(Atomics, 1, 1).
 
 -spec decr_no_of_users(non_neg_integer()) -> ok.
-decr_no_of_users(SupNum) ->
+decr_no_of_users(SupNum) when SupNum > 1 ->
     #storage{user_count = Atomics} = persistent_term:get(?MODULE),
-    atomics:sub(Atomics, SupNum + 1, 1),
+    atomics:sub(Atomics, SupNum, 1),
     case atomics:sub_get(Atomics, 1, 1) of
         0 ->
             amoc_controller:zero_users_running();
