@@ -15,10 +15,10 @@
          handle_call/3,
          handle_cast/2]).
 
--type event_type() :: amoc_coordinator:coordination_event_type().
+-type event_type() :: amoc_coordinator:event_type().
 -type event() :: amoc_coordinator:coordination_event().
--type action() :: amoc_coordinator:coordination_action().
--type data() :: amoc_coordinator:coordination_data().
+-type action() :: amoc_coordinator:action().
+-type data() :: amoc_coordinator:data().
 
 -record(state, {configured = all :: {pos_integer(), pos_integer()} | pos_integer() | all,
                 required_n = all :: pos_integer() | all,
