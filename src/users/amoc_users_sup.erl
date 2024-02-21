@@ -19,10 +19,10 @@
 -export([incr_no_of_users/1, decr_no_of_users/1, count_no_of_users/0,
          start_child/3, stop_child/2, start_children/3, stop_children/2, terminate_all_children/0]).
 
--export([get_all_children/0]).
+-export([distribute/2, get_all_children/0]).
 
 -type count() :: non_neg_integer().
--type assignment() ::[{pid(), count()}].
+-type assignment() :: [{pid(), count()}].
 
 -record(storage, {
           %% an array of atomics whose index works as follows:
