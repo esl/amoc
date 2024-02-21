@@ -22,6 +22,7 @@
 -export([get_all_children/0]).
 
 -type count() :: non_neg_integer().
+-type assignment() ::[{pid(), count()}].
 
 -record(storage, {
           %% an array of atomics whose index works as follows:
@@ -141,36 +142,6 @@ get_sup_for_user_id(Id) ->
     Index = Id rem SupCount + 1,
     element(Index, Supervisors).
 
-%% assign how many users each worker will be requested to remove,
-%% taking care of the fact that worker might not have enough users
-assign_counts(Total) ->
-    State = persistent_term:get(?MODULE),
-    #storage{user_count = Atomics, sups_indexed = IndexedSups} = State,
-    UsersPerSup = [ {Sup, atomics:get(Atomics, SupPos)} || {Sup, SupPos} <- IndexedSups ],
-    SupervisorWithPositiveCounts = [ T || T = {_, Count} <- UsersPerSup, Count =/= 0],
-    Data = maps:from_list(SupervisorWithPositiveCounts),
-    distribute(#{}, Data, SupervisorWithPositiveCounts, Total).
-
--spec distribute(#{pid() := count()}, #{pid() := count()}, [{pid(), count()}], count()) ->
-    {count(), [{pid(), count()}]}.
-%% Assigned all or not enough active users, already assigned all possible
-distribute(Acc, Data, _, Left) when 0 =:= Left; 0 =:= map_size(Data) ->
-    {lists:sum(maps:values(Acc)), maps:to_list(Acc)};
-%% Already assigned one round and still have counts left and running users available, loop again
-distribute(Acc, Data, [], Left) ->
-    distribute(Acc, Data, maps:to_list(Data), Left);
-distribute(Acc, Data, [{Sup, Count} | Rest], Left) ->
-    NewAcc = maps:put(Sup, maps:get(Sup, Acc, 0) + 1, Acc),
-    NewData = case Count of
-                  1 ->
-                      %% Assigning last possible user to this sup, remove from data
-                      maps:remove(Sup, Data);
-                  _ ->
-                      %% Assign one more to this sup and continue assigning
-                      maps:put(Sup, Count - 1, Data)
-              end,
-    distribute(NewAcc, NewData, Rest, Left - 1).
-
 %% assign which users each worker will be requested to add
 -spec assign_users_to_sups(pos_integer(), tuple(), [amoc_scenario:user_id()], Acc) ->
     Acc when Acc :: #{pid() := [amoc_scenario:user_id()]}.
@@ -182,3 +153,52 @@ assign_users_to_sups(SupCount, Supervisors, [Id | Ids], Acc) ->
     assign_users_to_sups(SupCount, Supervisors, Ids, NewAcc);
 assign_users_to_sups(_, _, [], Acc) ->
     Acc.
+
+%% assign how many users each worker will be requested to remove,
+%% taking care of the fact that worker might not have enough users.
+-spec assign_counts(count()) -> {count(), assignment()}.
+assign_counts(Total) ->
+    #storage{user_count = Atomics, sups_indexed = Indexed} = persistent_term:get(?MODULE),
+    SupervisorsWithCounts = [ {Sup, atomics:get(Atomics, SupPos)} || {Sup, SupPos} <- Indexed ],
+    distribute(Total, SupervisorsWithCounts).
+
+-spec distribute(count(), assignment()) -> {count(), assignment()}.
+distribute(Total, SupervisorsWithCounts) ->
+    Data = maps:from_list(SupervisorsWithCounts),
+    N = remove_n(Total, Data),
+    distribute(#{}, Data, SupervisorsWithCounts, Total, N).
+
+-spec remove_n(count(), map()) -> non_neg_integer().
+remove_n(Total, Data) when map_size(Data) > 0 ->
+    case Total div map_size(Data) of
+        0 -> 1;
+        N -> N
+    end;
+remove_n(_Total, _Data) -> 0.
+
+-spec distribute(#{pid() := count()}, #{pid() := count()}, assignment(), count(), count()) ->
+    {count(), assignment()}.
+%% Already assigned all, or not enough active users, we're done
+distribute(Acc, Data, _, Left, _N) when 0 =:= Left; 0 =:= map_size(Data) ->
+    {lists:sum(maps:values(Acc)), maps:to_list(Acc)};
+%% Already assigned one round and still have counts left and running users available, loop again
+distribute(Acc, Data, [], Left, _N) ->
+    NewData = maps:filter(fun(_K, V) -> V > 0 end, Data),
+    NewN = remove_n(Left, NewData),
+    distribute(Acc, NewData, maps:to_list(NewData), Left, NewN);
+distribute(Acc, Data, [{Sup, UsersInSup} | Rest], Left, N) ->
+    case UsersInSup =< N of
+        true ->
+            %% Assigning the last possible users to this supervisor
+            NewAcc = increment(Sup, UsersInSup, Acc),
+            NewData = maps:put(Sup, 0, Data),
+            distribute(NewAcc, NewData, Rest, Left - UsersInSup, N);
+        false ->
+            %% Assign N more to this supervisor and continue assigning
+            NewAcc = increment(Sup, N, Acc),
+            NewData = maps:put(Sup, UsersInSup - N, Data),
+            distribute(NewAcc, NewData, Rest, Left - N, N)
+    end.
+
+increment(Key, Increment, Acc) ->
+    maps:update_with(Key, fun(V) -> V + Increment end, Increment, Acc).
