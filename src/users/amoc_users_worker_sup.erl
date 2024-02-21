@@ -67,7 +67,8 @@ get_all_children(Sup) ->
 -spec init(non_neg_integer()) -> {ok, term()}.
 init(N) ->
     process_flag(trap_exit, true),
-    Tid = ets:new(?MODULE,  [ordered_set, protected]),
+    Name = list_to_atom(atom_to_list(?MODULE) ++ "_" ++ integer_to_list(N)),
+    Tid = ets:new(Name, [ordered_set, protected, named_table]),
     {ok, #state{index = N, tid = Tid}}.
 
 %% @private

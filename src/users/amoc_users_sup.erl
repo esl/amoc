@@ -40,12 +40,12 @@
 -spec start_link() -> supervisor:startlink_ret().
 start_link() ->
     Ret = supervisor:start_link({local, ?MODULE}, ?MODULE, no_args),
-    UserSups = lists:reverse(supervisor:which_children(?MODULE)),
-    UserSupPids = [ Pid || {_, Pid, _, _} <- UserSups ],
-    UserSupPidsTuple = list_to_tuple(UserSupPids),
+    UserSups = supervisor:which_children(?MODULE),
+    IndexedSupsUnsorted = [ {Pid, N} || {{amoc_users_worker_sup, N}, Pid, _, _} <- UserSups],
+    IndexedSups = lists:keysort(2, IndexedSupsUnsorted),
+    UserSupPidsTuple = list_to_tuple([ Pid || {Pid, _} <- IndexedSups ]),
     SupCount = tuple_size(UserSupPidsTuple),
     Atomics = atomics:new(1 + SupCount, [{signed, false}]),
-    IndexedSups = lists:zip(UserSupPids, indexes()),
     Storage = #storage{user_count = Atomics, sups = UserSupPidsTuple,
                        sups_indexed = IndexedSups, sups_count = SupCount},
     persistent_term:put(?MODULE, Storage),
@@ -164,9 +164,10 @@ assign_counts(Total) ->
 
 -spec distribute(count(), assignment()) -> {count(), assignment()}.
 distribute(Total, SupervisorsWithCounts) ->
-    Data = maps:from_list(SupervisorsWithCounts),
+    SupervisorWithPositiveCounts = [ T || T = {_, Count} <- SupervisorsWithCounts, Count =/= 0],
+    Data = maps:from_list(SupervisorWithPositiveCounts),
     N = remove_n(Total, Data),
-    distribute(#{}, Data, SupervisorsWithCounts, Total, N).
+    distribute(#{}, Data, SupervisorWithPositiveCounts, Total, N).
 
 -spec remove_n(count(), map()) -> non_neg_integer().
 remove_n(Total, Data) when map_size(Data) > 0 ->

@@ -18,10 +18,10 @@ groups() ->
 
 distribute() ->
     [
-     each_assignment_is_less_than_or_equal_in_the_input,
-     total_count_is_always_less_than_or_equal_the_requested_amount,
+     each_assignment_is_less_than_or_equal_than_the_request,
      total_count_is_equal_to_the_requested_amount_or_the_sum_of_values_in_the_input,
-     total_count_is_the_exact_sum_of_the_values_in_the_input
+     total_count_is_the_exact_sum_of_the_values_in_the_output,
+     distribution_is_done_among_maximum_number_of_workers
     ].
 
 all_tests() ->
@@ -70,43 +70,43 @@ end_per_testcase(_TestCase, Config) ->
 
 %% test cases
 
-each_assignment_is_less_than_or_equal_in_the_input(_) ->
-    Prop = ?FORALL({Total, Counts}, {pos_integer(), sups_with_counts()},
+each_assignment_is_less_than_or_equal_than_the_request(_) ->
+    Prop = ?FORALL({Request, Counts}, {non_neg_integer(), sups_with_counts()},
               begin
                   SupervisorWithCounts = [ {dummy_pid(), Count} || Count <- Counts ],
-                  {_, Assignments} = amoc_users_sup:distribute(Total, SupervisorWithCounts),
+                  {_, Assignments} = amoc_users_sup:distribute(Request, SupervisorWithCounts),
                   Data = maps:from_list(SupervisorWithCounts),
                   lists:all(fun({Pid, N}) -> N =< maps:get(Pid, Data) end, Assignments)
               end),
     run_prop(?FUNCTION_NAME, Prop, 100, 1).
 
-total_count_is_always_less_than_or_equal_the_requested_amount(_) ->
-    Prop = ?FORALL({Total, Counts}, {pos_integer(), sups_with_counts()},
-              begin
-                  SupervisorWithCounts = [ {dummy_pid(), Count} || Count <- Counts ],
-                  {Count, _} = amoc_users_sup:distribute(Total, SupervisorWithCounts),
-                  Count =< Total
-              end),
-    run_prop(?FUNCTION_NAME, Prop, 100, 1).
-
 total_count_is_equal_to_the_requested_amount_or_the_sum_of_values_in_the_input(_) ->
-    Prop = ?FORALL({Total, Counts}, {pos_integer(), sups_with_counts()},
+    Prop = ?FORALL({Request, Counts}, {non_neg_integer(), sups_with_counts()},
               begin
                   SupervisorWithCounts = [ {dummy_pid(), Count} || Count <- Counts ],
-                  {Count, Assignments} = amoc_users_sup:distribute(Total, SupervisorWithCounts),
-                  Assinged = lists:sum([ N || {_, N} <- Assignments ]),
-                  Count =:= Total orelse Count =:= Assinged
+                  {Result, _} = amoc_users_sup:distribute(Request, SupervisorWithCounts),
+                  Available = lists:sum([ N || {_, N} <- SupervisorWithCounts ]),
+                  Result =:= min(Request, Available)
               end),
     run_prop(?FUNCTION_NAME, Prop, 100, 1).
 
-% • The total count of the users is the exact sum of the values in the KV list
-total_count_is_the_exact_sum_of_the_values_in_the_input(_) ->
-    Prop = ?FORALL({Total, Counts}, {pos_integer(), sups_with_counts()},
+total_count_is_the_exact_sum_of_the_values_in_the_output(_) ->
+    Prop = ?FORALL({Request, Counts}, {non_neg_integer(), sups_with_counts()},
               begin
                   SupervisorWithCounts = [ {dummy_pid(), Count} || Count <- Counts ],
-                  {Count, Assignments} = amoc_users_sup:distribute(Total, SupervisorWithCounts),
+                  {Result, Assignments} = amoc_users_sup:distribute(Request, SupervisorWithCounts),
                   Assinged = lists:sum([ N || {_, N} <- Assignments ]),
-                  Count =:= Assinged
+                  Result =:= Assinged
+              end),
+    run_prop(?FUNCTION_NAME, Prop, 100, 1).
+
+distribution_is_done_among_maximum_number_of_workers(_) ->
+    Prop = ?FORALL({Request, Counts}, {pos_integer(), sups_with_counts()},
+              begin
+                  SupervisorWithCounts = [ {dummy_pid(), Count} || Count <- Counts ],
+                  {_, Assignments} = amoc_users_sup:distribute(Request, SupervisorWithCounts),
+                  NonZeroInInput = length([ Count || Count <- Counts, Count =/= 0 ]),
+                  length(Assignments) =:= min(Request, NonZeroInInput)
               end),
     run_prop(?FUNCTION_NAME, Prop, 100, 1).
 
