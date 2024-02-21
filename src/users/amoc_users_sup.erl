@@ -28,7 +28,9 @@
           %% * index=1 - overall number of Users
           %% * index>1 - number of users supervised by worker
           user_count :: atomics:atomics_ref(),
-          sups :: tuple()
+          sups :: tuple(),
+          sups_indexed :: [{pid(), pos_integer()}],
+          sups_count :: pos_integer()
          }).
 
 %% Supervisor
@@ -39,10 +41,12 @@ start_link() ->
     Ret = supervisor:start_link({local, ?MODULE}, ?MODULE, no_args),
     UserSups = lists:reverse(supervisor:which_children(?MODULE)),
     UserSupPids = [ Pid || {_, Pid, _, _} <- UserSups ],
-    UserSupPidsTuple = erlang:list_to_tuple(UserSupPids),
-    NumOfSupervisors = tuple_size(UserSupPidsTuple),
-    Atomics = atomics:new(1 + NumOfSupervisors, [{signed, false}]),
-    Storage = #storage{user_count = Atomics, sups = UserSupPidsTuple},
+    UserSupPidsTuple = list_to_tuple(UserSupPids),
+    SupCount = tuple_size(UserSupPidsTuple),
+    Atomics = atomics:new(1 + SupCount, [{signed, false}]),
+    IndexedSups = lists:zip(UserSupPids, indexes()),
+    Storage = #storage{user_count = Atomics, sups = UserSupPidsTuple,
+                       sups_indexed = IndexedSups, sups_count = SupCount},
     persistent_term:put(?MODULE, Storage),
     Ret.
 
@@ -58,9 +62,12 @@ init(no_args) ->
                type => worker,
                modules => [amoc_users_worker_sup]
               }
-             || N <- lists:seq(2, erlang:system_info(schedulers_online) + 1) ],
+             || N <- indexes() ],
     Strategy = #{strategy => one_for_one, intensity => 0},
     {ok, {Strategy, Specs}}.
+
+indexes() ->
+    lists:seq(2, erlang:system_info(schedulers_online) + 1).
 
 %% API
 -spec count_no_of_users() -> count().
@@ -99,10 +106,10 @@ stop_child(Pid, Force) ->
 %% depending on the number of users.
 -spec start_children(amoc:scenario(), [amoc_scenario:user_id()], any()) -> ok.
 start_children(Scenario, UserIds, ScenarioState) ->
-    #storage{sups = Supervisors} = persistent_term:get(?MODULE),
-    NumOfSupervisors = tuple_size(Supervisors),
-    Acc = maps:from_list([ {Sup, []} || Sup <- tuple_to_list(Supervisors) ]),
-    Assignments = assign_users_to_sups(NumOfSupervisors, Supervisors, UserIds, Acc),
+    State = persistent_term:get(?MODULE),
+    #storage{sups = Supervisors, sups_indexed = IndexedSups, sups_count = SupCount} = State,
+    Acc = maps:from_list([ {Sup, []} || {Sup, _} <- IndexedSups ]),
+    Assignments = assign_users_to_sups(SupCount, Supervisors, UserIds, Acc),
     CastFun = fun(Sup, Users) ->
                       amoc_users_worker_sup:start_children(Sup, Scenario, Users, ScenarioState)
               end,
@@ -118,31 +125,29 @@ stop_children(Count, Force) ->
 
 -spec get_all_children() -> [{pid(), amoc_scenario:user_id()}].
 get_all_children() ->
-    #storage{sups = Sups} = persistent_term:get(?MODULE),
-    All = [ amoc_users_worker_sup:get_all_children(Sup) || Sup <- tuple_to_list(Sups) ],
+    #storage{sups_indexed = IndexedSups} = persistent_term:get(?MODULE),
+    All = [ amoc_users_worker_sup:get_all_children(Sup) || {Sup, _} <- IndexedSups ],
     lists:flatten(All).
 
 -spec terminate_all_children() -> any().
 terminate_all_children() ->
-    #storage{sups = Sups} = persistent_term:get(?MODULE),
-    [ amoc_users_worker_sup:terminate_all_children(Sup) || Sup <- tuple_to_list(Sups) ].
+    #storage{sups_indexed = IndexedSups} = persistent_term:get(?MODULE),
+    [ amoc_users_worker_sup:terminate_all_children(Sup) || {Sup, _} <- IndexedSups ].
 
 %% Helpers
 -spec get_sup_for_user_id(amoc_scenario:user_id()) -> pid().
 get_sup_for_user_id(Id) ->
-    #storage{sups = Supervisors} = persistent_term:get(?MODULE),
-    Index = Id rem tuple_size(Supervisors) + 1,
+    #storage{sups = Supervisors, sups_count = SupCount} = persistent_term:get(?MODULE),
+    Index = Id rem SupCount + 1,
     element(Index, Supervisors).
 
 %% assign how many users each worker will be requested to remove,
 %% taking care of the fact that worker might not have enough users
 assign_counts(Total) ->
-    #storage{user_count = Atomics, sups = Sups} = persistent_term:get(?MODULE),
-    NumOfSupervisors = tuple_size(Sups),
-    Supervisors = tuple_to_list(Sups),
-    UsersPerSup = [ atomics:get(Atomics, SupPos) || SupPos <- lists:seq(2, NumOfSupervisors + 1) ],
-    SupervisorsWithCounts = lists:zip(Supervisors, UsersPerSup),
-    SupervisorWithPositiveCounts = [ T || T = {_, Count} <- SupervisorsWithCounts, Count =/= 0],
+    State = persistent_term:get(?MODULE),
+    #storage{user_count = Atomics, sups_indexed = IndexedSups} = State,
+    UsersPerSup = [ {Sup, atomics:get(Atomics, SupPos)} || {Sup, SupPos} <- IndexedSups ],
+    SupervisorWithPositiveCounts = [ T || T = {_, Count} <- UsersPerSup, Count =/= 0],
     Data = maps:from_list(SupervisorWithPositiveCounts),
     distribute(#{}, Data, SupervisorWithPositiveCounts, Total).
 
@@ -169,11 +174,11 @@ distribute(Acc, Data, [{Sup, Count} | Rest], Left) ->
 %% assign which users each worker will be requested to add
 -spec assign_users_to_sups(pos_integer(), tuple(), [amoc_scenario:user_id()], Acc) ->
     Acc when Acc :: #{pid() := [amoc_scenario:user_id()]}.
-assign_users_to_sups(NumOfSupervisors, Supervisors, [Id | Ids], Acc) ->
-    Index = Id rem NumOfSupervisors + 1,
+assign_users_to_sups(SupCount, Supervisors, [Id | Ids], Acc) ->
+    Index = Id rem SupCount + 1,
     ChosenSup = element(Index, Supervisors),
     Vs = maps:get(ChosenSup, Acc),
     NewAcc = Acc#{ChosenSup := [Id | Vs]},
-    assign_users_to_sups(NumOfSupervisors, Supervisors, Ids, NewAcc);
+    assign_users_to_sups(SupCount, Supervisors, Ids, NewAcc);
 assign_users_to_sups(_, _, [], Acc) ->
     Acc.
