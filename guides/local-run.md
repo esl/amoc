@@ -28,6 +28,10 @@ amoc:remove(10, true).
 :amoc.remove(10, true).
 ```
 
+Note that removal operation is asynchronous, and if we call `amoc_controller:remove_users/2` two times in a row, it may select the same users for removal.
+
+Also note that all the user processes trap exits.
+
 #### Many independent Amoc nodes
 
 Sometimes a need arises to run several Amoc nodes independently from each other.

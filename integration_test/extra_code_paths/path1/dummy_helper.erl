@@ -66,7 +66,7 @@ test_amoc_dist() ->
 get_users_info(SlaveNodes) ->
     Users = [{Node, Id} ||
         Node <- SlaveNodes,
-        {Id, _Pid} <- rpc:call(Node, ets, tab2list, [amoc_users])],
+        {_Pid, Id} <- rpc:call(Node, amoc_users_sup, get_all_children, [])],
     Ids = lists:usort([Id || {_, Id} <- Users]),
     Nodes = lists:usort([Node || {Node, _} <- Users]),
     N = length(Ids),

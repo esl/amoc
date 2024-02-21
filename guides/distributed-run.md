@@ -36,14 +36,16 @@ amoc_dist:remove(50, Force).
 ```elixir
 :amoc_dist.remove(50, force).
 ```
-Remove 50 sessions. 
+Remove 50 sessions.
 
 Where ``Force`` is a boolean of value:
 
 * ``true``  - to kill the user processes using ``supervisor:terminate_child/2`` function
 * ``false`` - to send ``exit(User,shutdown)`` signal to the user process (can be ignored by the user)
 
-All the users are `temporary` children of the `simple_one_for_one` supervisor with the `shutdown` key set to `2000`.
+All the users are `temporary` children of a `simple_one_for_one` supervisor with the `shutdown` key set to `2000`.
+
+Note that removal operation is asynchronous, and if we call `amoc_controller:remove_users/2` two times in a row, it may select the same users for removal.
 
 Also all the user processes trap exits.
 

@@ -1,5 +1,5 @@
 %% @private
-%% @copyright 2023 Erlang Solutions Ltd.
+%% @copyright 2024 Erlang Solutions Ltd.
 -module(amoc_user).
 
 %% API
@@ -10,7 +10,7 @@
 -type state() :: term().
 
 -spec start_link(amoc:scenario(), amoc_scenario:user_id(), state()) ->
-    {ok, pid()}.
+    {ok, pid()} | {error, term()}.
 start_link(Scenario, Id, State) ->
     proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
 
@@ -18,7 +18,7 @@ start_link(Scenario, Id, State) ->
 stop() ->
     stop(self(), false).
 
--spec stop(pid(), boolean()) -> no_return() | ok | {error, any()}.
+-spec stop(pid(), boolean()) -> ok.
 stop(Pid, Force) when is_pid(Pid) ->
     amoc_users_sup:stop_child(Pid, Force).
 
