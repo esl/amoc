@@ -18,6 +18,8 @@ A typical scenario file will look like this:
 ```erlang
 -module(my_scenario).
 
+-behaviour(amoc_scenario).
+
 -export([init/0]).
 -export([start/1]).
 
@@ -33,13 +35,13 @@ start(Id) ->
     %% send some messages again
     ok.
 ```
+
 ```elixir
 defmodule LoadTest do
   @behaviour :amoc_scenario
 
   def init do
     ## initialize some metrics
-    settings = get_settings()
     :ok
   end
 
@@ -49,14 +51,18 @@ defmodule LoadTest do
     ## send some messages
     ## wait a little bit
     ## send some messages again
-    ok.
+    :ok
   end
 
 end
 ```
+
 or, using the `start/2` function:
+
 ```erlang
 -module(my_scenario).
+
+-behaviour(amoc_scenario).
 
 -export([init/0]).
 -export([start/2]).
@@ -74,6 +80,7 @@ start(Id, Settings) ->
     %% send some messages again
     ok.
 ```
+
 ```elixir
 defmodule LoadTest do
   @behaviour :amoc_scenario
@@ -81,7 +88,7 @@ defmodule LoadTest do
   def init do
     ## initialize some metrics
     settings = get_settings()
-    {:ok, Settings}
+    {:ok, settings}
   end
 
   def start(id, settings) do
@@ -90,7 +97,7 @@ defmodule LoadTest do
     ## send some messages
     ## wait a little bit
     ## send some messages again
-    ok.
+    :ok
   end
 
 end
@@ -103,7 +110,9 @@ a `rebar.config` file can be created inside the `scenario` dir
 and `deps` from that file will be merged with Amoc's dependencies.
 
 ## Coordinate users
-See `amoc_coordinator`.
+
+See [Amoc coordinator](coordinator.html).
 
 ## Throttle actions
-See `amoc_throttle`.
+
+See [Amoc throttle](throttle.md).

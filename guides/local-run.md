@@ -9,7 +9,7 @@ Start `my_scenario` spawning 10 amoc users with IDs from range (1,10) inclusive.
 amoc:do(my_scenario, 10, []).
 ```
 ```elixir
-:amoc.do(:my_scenario, 10, []).
+:amoc.do(:my_scenario, 10, [])
 ```
 
 Add 10 more user sessions.
@@ -17,7 +17,7 @@ Add 10 more user sessions.
 amoc:add(10).
 ```
 ```elixir
-:amoc.add(10).
+:amoc.add(10)
 ```
 
 Remove 10 users.
@@ -25,7 +25,7 @@ Remove 10 users.
 amoc:remove(10, true).
 ```
 ```elixir
-:amoc.remove(10, true).
+:amoc.remove(10, true)
 ```
 
 Note that removal operation is asynchronous, and if we call `amoc_controller:remove_users/2` two times in a row, it may select the same users for removal.
@@ -38,7 +38,7 @@ Sometimes a need arises to run several Amoc nodes independently from each other.
 In this case we would like to be able to run different ranges of user ids on every node.
 To do so, the following trick could be applied:
 
-1. `amoc:start(my_scenario,0,[]).`
+1. `amoc:start(my_scenario, 0, []).`
 2. `amoc_controller:add_users(StartId, StopId).`
 
 NODE: in case of independent Amoc nodes, it's also possible to run different scenarios on different nodes.

@@ -42,6 +42,8 @@ This scenario shows how the `users` interact with `amoc_coordinator`:
 ```erlang
 -module(example).
 
+-behaviour(amoc_scenario).
+
 -export([init/0]).
 -export([start/2]).
 
@@ -80,7 +82,6 @@ start(Id, _Settings) ->
     ok.
 ```
 
-
 To run it:
 
 ```bash
@@ -90,7 +91,7 @@ $ _build/default/rel/amoc/bin/amoc console
 1> amoc:do(example, 5, []).
 ```
 
-Filtered, formated and explained output:
+Filtered, formatted and explained output:
 
 ```erlang
 User = 1  % First user is started

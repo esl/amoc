@@ -1,25 +1,25 @@
 ## Configuration
 
-Amoc is configured through environment variables (uppercase with prefix ``AMOC_``).
+Amoc is configured through environment variables (uppercase with prefix `AMOC_`).
 Note that by default, environment variables values are deserialized as Erlang terms. This behavior can be customized by providing an alternative parsing module in the `config_parser_mod` configuration parameter for the amoc application. It can be done using the [application:set_env/4](https://www.erlang.org/doc/man/application#set_env-4) interface or via a [config file](https://www.erlang.org/doc/man/config). The custom parsing module must implement the `amoc_config_env` behavior.
 
 Amoc supports the following generic configuration parameters:
 
-* ``nodes`` - required for the distributed scenario execution, a list of nodes that should be clustered together:
+* `nodes` - required for the distributed scenario execution, a list of nodes that should be clustered together:
     * default value - empty list (`[]`)
     * example: `AMOC_NODES="['amoc@amoc-1', 'amoc@amoc-2']"`
 
-* ``api_port`` - a port for the amoc REST interfaces:
+* `api_port` - a port for the amoc REST interfaces:
     * default value - 4000
     * example: `AMOC_API_PORT="4000"`
 
-* ``interarrival`` - a delay (in ms, for each node in the cluster independently) between creating the processes
+* `interarrival` - a delay (in ms, for each node in the cluster independently) between creating the processes
   for two consecutive users:
     * default value - 50 ms.
     * example: `AMOC_INTERARRIVAL="50"`
     * this parameter can be updated at runtime (in the same way as scenario configuration).
 
-* ``extra_code_paths`` - a list of paths that should be included using `code:add_pathsz/1` interface
+* `extra_code_paths` - a list of paths that should be included using `code:add_pathsz/1` interface
     * default value - empty list (`[]`)
     * example: `AMOC_EXTRA_CODE_PATHS='["/some/path", "/another/path"]'`
 
@@ -27,10 +27,10 @@ In the same manner you can also define your own entries to configure the scenari
 
 ## Required Variables
 
-The ``amoc_config:get/1`` and ``amoc_config:get/2`` interfaces can be used to get
+The `amoc_config:get/1` and `amoc_config:get/2` interfaces can be used to get
 parameters required for your scenario, however every scenario must declare (using
 `-required_variable(...)`/`@required_variable ...` attributes) all the required parameters in advance.
-For more information, see the example [scenario module](../integration_test/dummy_scenario.erl)
+For more information, see the example `dummy_scenario` in integration tests.
 
 Scenario configuration also can be set/updated at runtime using an API.
 
@@ -42,37 +42,45 @@ Scenario configuration also can be set/updated at runtime using an API.
       verification => VerificationMfa}
   ).
 ```
+
 ```elixir
   ## Note that the attribute needs to be marked as persisted
   ## for the Elixir compiler to store it in the generated BEAM file.
-  Module.register_attribute(__MODULE__, :required_variable, persist: true)
-  @required_variable [
-    %{:name => name, :description => description,
-      :default_value => 6,
-      :update => updateMfa,
-      :verification => verificationMfa}
-  ]
+  Module.register_attribute(__MODULE__, :required_variable, accumulate: true, persist: true)
+
+  @required_variable %{
+    name: name,
+    description: description,
+    default_value: 6,
+    update: updated_mfa,
+    verification: verification_mfa
+  }
 ```
+
 where
 
 ### `name`
+
 * **Syntax:** atom
-* **Example:** `name = var1`
+* **Example:** `var1`
 * **Default:** this field is mandatory
 
 ### `description`
+
 * **Syntax:** A string describing how this variable is used, can be extracted by APIs to document the behavior
-* **Example:** `description = "a description of this variable"`
+* **Example:** `"a description of this variable"`
 * **Default:** this field is mandatory
 
 ### `default_value`
+
 * **Syntax:** value of the expected type
-* **Example:** `default_value = 10`
+* **Example:** `10`
 * **Default:** `undefined`
 
 ### `verification`
+
 * **Syntax:** `none`, a list of allowed values, or an `mfa` of arity `1`
-* **Example:** `verification = {?MODULE, is_binary, 1}`
+* **Example:** `{?MODULE, is_binary, 1}`
 * **Default:** `none`
 
 A verification function that will check the given value is correct. It is trigger for verifying the initial values, including the default value, and before updated values are applied.
@@ -82,8 +90,9 @@ A verification function that will check the given value is correct. It is trigge
 must be pure and return a boolean or a `{true, NewValue} | {false, Reason}`. It can also be used for preprocessing of the input value by returning `{true, NewValue}`.
 
 ### `update`
+
 * **Syntax:** `read_only`, `none`, or an `mfa` of arity 2
-* **Example:** `update = {?MODULE, update, 2}`
+* **Example:** `{?MODULE, update, 2}`
 * **Default:** `read_only`
 
 An action to take when the value of this variable is updated. It is triggered at runtime when updates to the value are applied.
@@ -97,6 +106,7 @@ The reason why the `-required_variable(...)` is preferred over the usual behavio
 callback is because the orchestration tools can easily extract the attributes even
 without the compilation, while configuring via a callback, requires a successful
 compilation of the module. As an example, a module:
+
 ```erlang
 -module(example).
 -include("some_unavailable_header.hrl").
@@ -104,8 +114,10 @@ compilation of the module. As an example, a module:
 -some_attr([{another, "value"},
             {yet, <<"another">>, "value"}]).
 ```
-cannot be compiled without the ``some_unavailable_header.hrl`` file, but we still
+
+cannot be compiled without the `some_unavailable_header.hrl` file, but we still
 can parse it and extract the attributes:
+
 ```
 Eshell V14.0 (press Ctrl+G to abort, type help(). for help)
 1> c(example).

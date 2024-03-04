@@ -21,11 +21,13 @@ A typical use of Amoc throttle will look something like this:
 ```erlang
 -module(scenario_with_throttle).
 
+-behaviour(amoc_scenario).
+
 -export([init/0]).
 -export([start/1]).
 
 init() ->
-    amoc_throttle:start(messages_rate, 100),        %% 100 messages per minute
+    amoc_throttle:start(messages_rate, 100), %% 100 messages per minute
     %% continue initialization
     ok.
 
@@ -38,14 +40,13 @@ user_loop(Id) ->
     amoc_throttle:send_and_wait(messages_rate, some_message),
     send_message(Id),
     user_loop(Id).
-
 ```
 Here a system should be under a continuous load of 100 messages per minute.
 Note that if we used something like `amoc_throttle:run(messages_rate, fun() -> send_message(Id) end)` instead of `amoc_throttle:send_and_wait/2` the system would be flooded with requests.
 
 A test may of course be much more complicated.
 For example it can have the load changing in time.
-A plan for that can be set for the whole test in `init()`:
+A plan for that can be set for the whole test in `init/1`:
 ```erlang
 init() ->
     %% init metrics
@@ -53,14 +54,15 @@ init() ->
     %% 9 steps of 100 increases in Rate, each lasting one minute
     amoc_throttle:change_rate_gradually(messages_rate, 100, 1000, 60000, 60000, 9),
     ok.
-
 ```
+
 Normal Erlang messages can be used to schedule tasks for users by themselves or by some controller process.
 Below is a sketch of a user's behaviour during a test.
 It waits for messages in a loop, and sends one after receiving the message `{send_message, To}`.
 The rate of messages sent during a test will not exceed the one set in the `message_rate`.
 Sending messages is scheduled in the `set_up/1` function and in the user loop if some arbitrary condition is met.
 This models the behaviour common across load tests, when users respond only to some messages.
+
 ```erlang
 set_up(Users) ->
     [User ! {send_message, To} || User <- Users, To <- Users].
@@ -83,7 +85,6 @@ process_message(Message) ->
         false ->
             ok
     end.
-
 ```
 
 For a more comprehensive example please refer to the `throttle_test` scenario, which shows possible usages of the Amoc throttle.
