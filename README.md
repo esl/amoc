@@ -4,7 +4,8 @@
 [![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/amoc/)
 [![codecov](https://codecov.io/github/esl/amoc/graph/badge.svg?token=R1zXAjO7H7)](https://codecov.io/github/esl/amoc)
 
-----------------------------------------------------------------------------------------------
+---
+
 A Murder of Crows, aka amoc, is a simple framework for running massively parallel tests in a distributed environment.
 
 It can be used as a `rebar3` dependency:
@@ -16,6 +17,7 @@ It can be used as a `rebar3` dependency:
 ```
 
 or in `mix`:
+
 ```elixir
 defp deps() do
   [
@@ -27,11 +29,12 @@ end
 [MongooseIM](https://github.com/esl/MongooseIM) is continuously being load tested with Amoc.
 All the XMPP scenarios can be found [here](https://github.com/esl/amoc-arsenal-xmpp).
 
----------------------------------------------------------------------
+---
+
 In order to implement and run locally your scenarios, follow the chapters about
-[developing](guides/scenario.md) and [running](guides/local-run.md) a scenario
-locally.
-Before [setting up the distributed environment](guides/distributed.md),
+[developing](https://hexdocs.pm/amoc/scenario.html) and [running](https://hexdocs.pm/amoc/local-run.html)
+a scenario locally.
+Before [setting up the distributed environment](https://hexdocs.pm/amoc/distributed.html),
 please read through the configuration overview.
 
 To see the full documentation, see [hexdocs](https://hexdocs.pm/amoc).
