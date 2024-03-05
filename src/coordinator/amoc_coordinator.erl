@@ -37,7 +37,7 @@
 
 -type coordination_actions() :: [action()] | action().
 
--type num_of_users() :: pos_integer() | {pos_integer(), pos_integer()} | all.
+-type num_of_users() :: pos_integer() | {Min :: pos_integer(), Max :: pos_integer()} | all.
 
 -type coordination_item() :: {num_of_users(), coordination_actions()}.
 
@@ -168,7 +168,7 @@ normalize_coordination_item({NoOfUsers, Actions}) when ?IS_N_OF_USERS(NoOfUsers)
 normalize_coordination_item({{Min, Max}, Actions}) when ?IS_POS_INT(Min), ?IS_POS_INT(Max),
                                                         Max > Min, is_list(Actions) ->
     [assert_action({Min, Max}, A) || A <- Actions],
-    {{Min, Max - Min}, Actions}.
+    {{Min, Max}, Actions}.
 
 assert_action(all, Action) when is_function(Action, 1);
                                 is_function(Action, 2) ->

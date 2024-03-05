@@ -20,7 +20,7 @@
 -type action() :: amoc_coordinator:action().
 -type data() :: amoc_coordinator:data().
 
--record(state, {configured = all :: {pos_integer(), pos_integer()} | pos_integer() | all,
+-record(state, {configured = all :: amoc_coordinator:num_of_users(),
                 required_n = all :: pos_integer() | all,
                 n = 0 :: non_neg_integer(),
                 actions = [] :: [action()],
@@ -131,8 +131,8 @@ safe_executions(Fun, Args) ->
     end.
 
 -spec calculate_n(amoc_coordinator:num_of_users()) -> all | pos_integer().
-calculate_n({Min, Diff}) ->
-    Min + rand:uniform(Diff);
+calculate_n({Min, Max}) ->
+    Min - 1 + rand:uniform(Max - Min);
 calculate_n(Value) ->
     Value.
 

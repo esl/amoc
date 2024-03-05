@@ -60,7 +60,7 @@ execute_with_range_without_timeout(_Config) ->
 
     History = meck:history(?MOCK_MOD),
     NumOfEvents = length(History),
-    ?assert(3 =< NumOfEvents andalso NumOfEvents =< 6),
+    ?assert(3 =< NumOfEvents andalso NumOfEvents =< 5),
 
     nothing_after_tags(History, [all]),
     assert_telemetry_events(Name, [start, {N, add}, stop]).
