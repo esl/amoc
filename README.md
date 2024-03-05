@@ -12,7 +12,7 @@ It can be used as a `rebar3` dependency:
 
 ```erlang
 {deps, [
-    {amoc, "3.0.0"}
+    {amoc, "3.2.0"}
 ]}.
 ```
 
@@ -21,7 +21,7 @@ or in `mix`:
 ```elixir
 defp deps() do
   [
-    {:amoc, "~> 3.0"}
+    {:amoc, "~> 3.2"}
   ]
 end
 ```
