@@ -19,7 +19,7 @@
 -define(IS_N_OF_USERS(N), (?IS_POS_INT(N) orelse N =:= all)).
 -define(IS_TIMEOUT(Timeout), (?IS_POS_INT(Timeout) orelse Timeout =:= infinity)).
 
--type name() :: atom().
+-type name() :: term().
 
 -type data() :: {pid(), Data :: any()}.
 
@@ -102,11 +102,11 @@ reset(Name) ->
     notify(Name, reset_coordinator).
 
 -spec notify(name(), coordinator_timeout | reset_coordinator | {coordinate, {pid(), term()}}) -> ok.
-notify(Name, coordinator_timeout) when is_atom(Name) ->
+notify(Name, coordinator_timeout) ->
     do_notify(Name, coordinator_timeout);
-notify(Name, reset_coordinator) when is_atom(Name) ->
+notify(Name, reset_coordinator) ->
     do_notify(Name, reset_coordinator);
-notify(Name, {coordinate, _} = Event) when is_atom(Name) ->
+notify(Name, {coordinate, _} = Event) ->
     do_notify(Name, Event).
 
 do_notify(Name, Event) ->
