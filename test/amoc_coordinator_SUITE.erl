@@ -14,6 +14,7 @@ all() ->
      plan_normalises_successfully,
      ordering_plan_sets_all_at_the_end,
      failing_action_does_not_kill_the_worker,
+     coordinator_name_can_be_dynamic_terms,
      execute_with_range_without_timeout,
      execute_plan_without_timeout,
      reset_plan_without_timeout,
@@ -219,6 +220,17 @@ execute_plan_with_timeout(_Config) ->
 
     assert_telemetry_events(Name, [start, {N1, add}, timeout,
                                    {N2, add}, timeout, stop]).
+
+coordinator_name_can_be_dynamic_terms(_) ->
+    BinName = <<(atom_to_binary(?FUNCTION_NAME))/binary, (crypto:strong_rand_bytes(8))/binary>>,
+    SomePlan = [{1000, fun(_Event) -> ok end}],
+    Names = [{some_composed_tuple},
+             [list, made_of, atoms],
+             base64:encode(BinName)],
+    [ ?assertEqual(ok, amoc_coordinator:start(Name, SomePlan)) || Name <- Names ],
+    [ {ok, _, _Workers} = amoc_coordinator_sup:get_workers(Name) || Name <- Names ],
+    [ [amoc_coordinator:add(Name, User) || User <- lists:seq(1, 10)] || Name <- Names ],
+    [ amoc_coordinator:stop(Name) || Name <- Names ].
 
 failing_action_does_not_kill_the_worker(_) ->
     Name = ?FUNCTION_NAME,
