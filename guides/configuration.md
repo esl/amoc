@@ -9,9 +9,6 @@ Amoc supports the following generic configuration parameters:
     * default value - empty list (`[]`)
     * example: `AMOC_NODES="['amoc@amoc-1', 'amoc@amoc-2']"`
 
-* `api_port` - a port for the amoc REST interfaces:
-    * default value - 4000
-    * example: `AMOC_API_PORT="4000"`
 
 * `interarrival` - a delay (in ms, for each node in the cluster independently) between creating the processes
   for two consecutive users:
