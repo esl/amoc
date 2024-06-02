@@ -13,18 +13,18 @@ wait_until_scenario_has_users(Scenario, Current, HighestId, ExtraConfig) ->
     wait_helper:wait_until(WaitUntilFun, WaitUntilValue, ExtraConfig).
 
 all_vars() ->
-    [{interarrival, 1}, {testing_var1, def1},
+    [{interarrival, #{rate => 60000, interval => 60000}}, {testing_var1, def1},
      {config_scenario_var1, unused_value}].
 
 regular_vars() ->
-    [{interarrival, 1}, {testing_var1, def1}].
+    [{interarrival, #{rate => 60000, interval => 60000}}, {testing_var1, def1}].
 
 all_vars_with_state() ->
-    [{interarrival, 1}, {testing_state_var1, def1},
+    [{interarrival, #{rate => 60000, interval => 60000}}, {testing_state_var1, def1},
      {config_scenario_var1, unused_value}].
 
 regular_vars_with_state() ->
-    [{interarrival, 1}, {testing_state_var1, def1}].
+    [{interarrival, #{rate => 60000, interval => 60000}}, {testing_state_var1, def1}].
 
 other_vars_to_keep_quiet() ->
     [{config_scenario_var1, unused_value}].

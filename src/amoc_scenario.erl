@@ -91,6 +91,7 @@ start(Scenario, Id, State) ->
                {false, false} ->
                    exit("the scenario module must export either start/2 or start/1 function")
            end,
+    infinity =:= amoc_controller:get_interarrival() orelse amoc_throttle:wait(interarrival),
     telemetry:span([amoc, scenario, start], Metadata, Span).
 
 %% ------------------------------------------------------------------
