@@ -18,12 +18,15 @@ groups() ->
      {api, [parallel],
       [
        start,
+       start_descriptive,
        rate_zero_is_not_accepted,
        low_rate_gets_remapped,
        low_interval_get_remapped,
        start_and_stop,
        change_rate,
        change_rate_gradually,
+       change_rate_gradually_descriptive,
+       change_rate_gradually_verify_descriptions,
        send_and_wait,
        just_wait,
        wait_for_process_to_die_sends_a_kill,
@@ -69,6 +72,11 @@ start(_) ->
                  amoc_throttle:start(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL,
                                      ?DEFAULT_NO_PROCESSES + 1)).
 
+start_descriptive(_) ->
+    %% Starts successfully
+    Description = #{rate => 100, interval => 5000, parallelism => 12},
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, Description)).
+
 rate_zero_is_not_accepted(_) ->
     ?assertMatch({error, invalid_throttle}, amoc_throttle:start(?FUNCTION_NAME, 0, 100, 1)).
 
@@ -105,7 +113,9 @@ change_rate(_) ->
                  amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL)),
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
     ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL)),
-    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)).
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)),
+    E1 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 2},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E1)).
 
 change_rate_gradually(_) ->
     ?assertMatch({error, {no_throttle_by_name, ?FUNCTION_NAME}},
@@ -117,6 +127,71 @@ change_rate_gradually(_) ->
                  amoc_throttle:change_rate_gradually(?FUNCTION_NAME, 50, 200, 1, 1, 1)),
     ?assertMatch({error, cannot_change_rate},
                  amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)).
+
+change_rate_gradually_descriptive(_) ->
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
+    %% Bad description fails to change rate
+    D1 = #{from_rate => 50, to_rate => 200, interval => 1,
+           step_interval => 1, step_count => 1, step_size => 1},
+    ?assertMatch({error, _}, amoc_throttle:change_rate_gradually(?FUNCTION_NAME, D1)),
+    %% Good description changes rate successfully
+    Description = #{from_rate => 10, to_rate => 3000, interval => 1,
+                    step_interval => 100, step_count => 300, step_size => 9},
+    ?assertMatch(ok, amoc_throttle:change_rate_gradually(?FUNCTION_NAME, Description)).
+
+%% Bad description also fails
+change_rate_gradually_verify_descriptions(_) ->
+    %% Condition 0
+    D0 = #{from_rate => 1000, to_rate => 3000, duration => 30000},
+    ?assertMatch(
+       #{interval := 60000, step_size := 1, step_count := 2000, step_interval := 15},
+       amoc_throttle_controller:verify_config(D0)),
+    %% Condition 1
+    D1 = #{from_rate => 3000, to_rate => 100, duration => 30000},
+    ?assertMatch(
+       #{interval := 60000, step_size := -1, step_count := 2900, step_interval := 10},
+       amoc_throttle_controller:verify_config(D1)),
+    %% Condition 2A
+    D2A = #{from_rate => 0, to_rate => 3000, interval => 10000, step_size => 2},
+    ?assertMatch(
+       #{step_size := 2, step_count := 1500, step_interval := 2},
+       amoc_throttle_controller:verify_config(D2A)),
+    %% Condition 2B
+    D2B = #{from_rate => 3000, to_rate => 0, interval => 10000, step_size => -2},
+    ?assertMatch(
+       #{step_size := -2, step_count := 1500, step_interval := 2},
+       amoc_throttle_controller:verify_config(D2B)),
+    %% Condition 3
+    D3 = #{from_rate => 80, to_rate => 5000, interval => 1000, step_interval => 10},
+    ?assertMatch(
+       #{step_size := 1, step_count := 4920, step_interval := 10},
+       amoc_throttle_controller:verify_config(D3)),
+    %% Condition 4
+    D4 = #{from_rate => 80, to_rate => 5000, interval => 15000, step_count => 90},
+    ?assertMatch(
+       #{step_size := 1, step_count := 90, step_interval := 54},
+       amoc_throttle_controller:verify_config(D4)),
+    %% Condition 5
+    D5 = #{from_rate => 80, to_rate => 5000, interval => 15000,
+           step_size => 5, step_interval => 50},
+    ?assertMatch(
+       #{step_size := 5, step_count := 984, step_interval := 50},
+       amoc_throttle_controller:verify_config(D5)),
+    %% Condition 6
+    D6 = #{from_rate => 80, to_rate => 5000},
+    ?assertMatch(
+       #{interval := 60000, step_size := 1, step_count := 4920, step_interval := 1},
+       amoc_throttle_controller:verify_config(D6)),
+    %% Condition 7
+    D7 = #{from_rate => 4000, to_rate => 1200},
+    ?assertMatch(
+       #{interval := 60000, step_size := -1, step_count := 2800, step_interval := 1},
+       amoc_throttle_controller:verify_config(D7)),
+    %% Error 1
+    E1 = #{from_rate => 100, to_rate => 10, step_size => 1},
+    ?assertMatch(
+       {error, _},
+       amoc_throttle_controller:verify_config(E1)).
 
 send_and_wait(_) ->
     %% it failts if the throttle wasn't started yet
