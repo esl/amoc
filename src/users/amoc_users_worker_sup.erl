@@ -17,13 +17,15 @@
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
--export([start_child/4, stop_child/2, start_children/4, stop_children/3, terminate_all_children/1]).
+-export([start_child/4, stop_child/2, child_up/2,
+         start_children/4, stop_children/3, terminate_all_children/1]).
 
 -export([get_all_children/1]).
 
 -record(state, {
           index :: non_neg_integer(),
           table :: ets:table(),
+          waiting = #{} :: #{reference() := pid()},
           tasks = #{} :: #{reference() := pid()}
          }).
 -type state() :: #state{}.
@@ -38,6 +40,10 @@ start_link(N) ->
 -spec start_child(pid(), amoc:scenario(), amoc_scenario:user_id(), any()) -> ok.
 start_child(Sup, Scenario, Id, ScenarioState) ->
     gen_server:cast(Sup, {start_child, Scenario, Id, ScenarioState}).
+
+-spec child_up(pid(), amoc_scenario:user_id()) -> any().
+child_up(Sup, Id) ->
+    gen_server:cast(Sup, {child_up, self(), Id}).
 
 -spec start_children(pid(), amoc:scenario(), [amoc_scenario:user_id()], any()) -> ok.
 start_children(Sup, Scenario, UserIds, ScenarioState) ->
@@ -84,10 +90,13 @@ handle_call(get_all_children, _From, #state{table = Table} = State) ->
              {stop_children, non_neg_integer(), boolean()} |
              terminate_all_children.
 handle_cast({start_child, Scenario, Id, ScenarioState}, State) ->
-    do_start_child(Scenario, Id, ScenarioState, State),
-    {noreply, State};
+    NewState = do_start_child(Scenario, [Id], ScenarioState, State),
+    {noreply, NewState};
 handle_cast({start_children, Scenario, Ids, ScenarioState}, State) ->
-    [ do_start_child(Scenario, Id, ScenarioState, State) || Id <- Ids],
+    NewState = do_start_child(Scenario, Ids, ScenarioState, State),
+    {noreply, NewState};
+handle_cast({child_up, Pid, Id}, #state{index = N, table = Tid} = State) ->
+    handle_up_user(Tid, Pid, Id, N),
     {noreply, State};
 handle_cast({stop_children, 0, _}, State) ->
     {noreply, State};
@@ -102,19 +111,26 @@ handle_cast({stop_children, Int, ForceRemove}, #state{table = Table} = State) ->
     {noreply, NewState};
 handle_cast(terminate_all_children, State) ->
     NewState = do_terminate_all_my_children(State),
-    {noreply, NewState};
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+    {noreply, NewState}.
 
 %% @private
 -spec handle_info(Request, state()) -> {noreply, state()} when
       Request :: {child_up, pid(), amoc_scenario:user_id()} |
                  {'DOWN', reference(), process, pid(), term()} |
                  {'EXIT', pid(), term()}.
-handle_info({'DOWN', Ref, process, _Pid, _Reason}, #state{tasks = Tasks} = State) ->
-    {noreply, State#state{tasks = maps:remove(Ref, Tasks)}};
-handle_info({'EXIT', Pid, _Reason}, #state{index = N, table = Table} = State) ->
-    handle_down_user(Table, Pid, N),
+handle_info({'DOWN', Ref, process, Pid, _Reason},
+            #state{waiting = Waiting, tasks = Tasks} = State) ->
+    case {Waiting, Tasks} of
+        {#{Pid := Ref}, _} ->
+            flush_exit(Pid),
+            {noreply, State#state{waiting = maps:remove(Pid, Waiting)}};
+        {_, #{Ref := Pid}} ->
+            {noreply, State#state{tasks = maps:remove(Ref, Tasks)}};
+        _ ->
+            {noreply, State}
+    end;
+handle_info({'EXIT', Pid, _Reason}, #state{index = N, table = Tid} = State) ->
+    handle_down_user(Tid, Pid, N),
     {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -126,14 +142,19 @@ terminate(_Reason, State) ->
 
 %% Helpers
 
--spec do_start_child(module(), amoc_scenario:user_id(), term(), state()) -> any().
-do_start_child(Scenario, Id, ScenarioState, #state{index = N, table = Table}) ->
-    case amoc_user:start_link(Scenario, Id, ScenarioState) of
-        {ok, Pid} ->
-            handle_up_user(Table, Pid, Id, N);
-        _ ->
-            ok
-    end.
+-spec flush_exit(pid()) -> ok.
+flush_exit(Pid) ->
+    unlink(Pid),
+    receive {'EXIT', Pid, _} -> ok after 0 -> ok end.
+
+-spec do_start_child(amoc:scenario(), [amoc_scenario:user_id()], term(), state()) -> state().
+do_start_child(Scenario, Ids, ScenarioState, #state{waiting = Waiting} = State) ->
+    Fun = fun(Id, Acc) ->
+                  {Pid, Ref} = amoc_user:start_link(Scenario, Id, ScenarioState),
+                  Acc#{Pid => Ref}
+          end,
+    NewWaiting = lists:foldl(Fun, Waiting, Ids),
+    State#state{waiting = NewWaiting}.
 
 -spec handle_up_user(ets:table(), pid(), amoc_scenario:user_id(), non_neg_integer()) -> any().
 handle_up_user(Table, Pid, Id, SupNum) ->
@@ -156,7 +177,7 @@ maybe_track_task_to_stop_my_children(State, Pids, false) ->
     State;
 maybe_track_task_to_stop_my_children(#state{tasks = Tasks} = State, Pids, true) ->
     {Pid, Ref} = spawn_monitor(shutdown_and_kill_after_timeout_fun(Pids)),
-    State#state{tasks = Tasks#{Pid => Ref}}.
+    State#state{tasks = Tasks#{Ref => Pid}}.
 
 -spec shutdown_and_kill_after_timeout_fun(pid() | [pid()]) -> fun(() -> term()).
 shutdown_and_kill_after_timeout_fun([_ | _] = Pids) ->
