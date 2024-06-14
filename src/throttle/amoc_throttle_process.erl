@@ -24,7 +24,7 @@
          handle_info/2,
          handle_cast/2,
          handle_continue/2,
-         format_status/2]).
+         format_status/1]).
 
 -define(PG_SCOPE, amoc_throttle).
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
@@ -143,12 +143,13 @@ handle_continue(maybe_run_fn, State) ->
     NewState = maybe_run_fn(State),
     {noreply, NewState, timeout(NewState)}.
 
--spec format_status(term(), term()) -> term().
-format_status(_Opt, [_PDict, State]) ->
+-spec format_status(gen_server:format_status()) -> gen_server:format_status().
+format_status(#{state := #state{} = State} = FormatStatus) ->
     ScheduleLen = length(State#state.schedule),
     ScheduleRevLen = length(State#state.schedule_reversed),
     State1 = setelement(#state.schedule, State, ScheduleLen),
-    setelement(#state.schedule_reversed, State1, ScheduleRevLen).
+    State2 = setelement(#state.schedule_reversed, State1, ScheduleRevLen),
+    FormatStatus#{state := State2}.
 
 %%------------------------------------------------------------------------------
 %% internal functions

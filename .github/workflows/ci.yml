@@ -11,10 +11,10 @@ jobs:
     name: ${{ matrix.test-type }} test on OTP ${{matrix.otp_vsn}}
     strategy:
       matrix:
-        otp_vsn: ['26.2', '25.3', '24.3']
-        rebar_vsn: ['3.22.0']
+        otp_vsn: ['27', '26', '25']
+        rebar_vsn: ['3.23.0']
         test-type: ['regular', 'integration']
-    runs-on: 'ubuntu-22.04'
+    runs-on: 'ubuntu-24.04'
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
