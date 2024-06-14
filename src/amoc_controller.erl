@@ -71,7 +71,7 @@
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
--export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -197,6 +197,11 @@ handle_cast(_Msg, State) ->
 -spec handle_info(any(), state()) -> {noreply, state()}.
 handle_info(_Msg, State) ->
     {noreply, State}.
+
+%% @private
+-spec terminate(term(), state()) -> any().
+terminate(_Reason, _State) ->
+    amoc_users_sup:terminate_all_children().
 
 %% ------------------------------------------------------------------
 %% internal functions
