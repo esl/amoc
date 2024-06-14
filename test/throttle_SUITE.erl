@@ -19,6 +19,7 @@ groups() ->
       [
        start,
        start_descriptive,
+       start_interarrival,
        rate_zero_is_not_accepted,
        low_rate_gets_remapped,
        low_interval_get_remapped,
@@ -76,6 +77,17 @@ start_descriptive(_) ->
     %% Starts successfully
     Description = #{rate => 100, interval => 5000, parallelism => 12},
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, Description)).
+
+start_interarrival(_) ->
+    %% Starts successfully
+    Description = #{interarrival => 50, parallelism => 1},
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, Description)),
+    State = get_state_of_one_process(?FUNCTION_NAME),
+    ?assertMatch(#{name := ?FUNCTION_NAME,
+                   interval := 60000,
+                   delay_between_executions := 50,
+                   n := 1200},
+                 State).
 
 rate_zero_is_not_accepted(_) ->
     ?assertMatch({error, invalid_throttle}, amoc_throttle:start(?FUNCTION_NAME, 0, 100, 1)).

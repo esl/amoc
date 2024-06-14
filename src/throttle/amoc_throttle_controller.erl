@@ -71,6 +71,13 @@ start_link() ->
     {ok, started | already_started} |
     {error, invalid_throttle | wrong_reconfiguration | wrong_no_of_procs}.
 ensure_throttle_processes_started(
+  Name, #{interarrival := EveryMs} = Config)
+  when is_atom(Name), ?NONNEG_INT(EveryMs) ->
+    raise_event_on_slave_node(Name, init),
+    Config1 = #{rate => ?DEFAULT_INTERVAL div EveryMs, interval => ?DEFAULT_INTERVAL},
+    Config2 = Config1#{parallelism => maps:get(parallelism, Config, ?DEFAULT_NO_PROCESSES)},
+    gen_server:call(?MASTER_SERVER, {start_processes, Name, Config2});
+ensure_throttle_processes_started(
   Name, #{rate := Rate, interval := Interval, parallelism := NoOfProcesses} = Config)
   when is_atom(Name), ?POS_INT(Rate), ?NONNEG_INT(Interval), ?POS_INT(NoOfProcesses) ->
     raise_event_on_slave_node(Name, init),
