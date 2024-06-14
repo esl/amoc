@@ -14,7 +14,7 @@
 start_link(Scenario, Id, State) ->
     proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
 
--spec stop() -> no_return().
+-spec stop() -> ok.
 stop() ->
     stop(self(), false).
 
@@ -22,8 +22,7 @@ stop() ->
 stop(Pid, Force) when is_pid(Pid) ->
     amoc_users_sup:stop_child(Pid, Force).
 
--spec init(pid(), amoc:scenario(), amoc_scenario:user_id(), state()) ->
-    no_return().
+-spec init(pid(), amoc:scenario(), amoc_scenario:user_id(), state()) -> term().
 init(Parent, Scenario, Id, State) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     process_flag(trap_exit, true),
