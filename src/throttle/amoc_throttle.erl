@@ -26,8 +26,12 @@
 %% Throttle unit of measurement
 -type config() :: #{rate := rate(),
                     interval => interval(),
+                    parallelism => non_neg_integer()}
+                | #{every := non_neg_integer(),
                     parallelism => non_neg_integer()}.
-%% Literal throttle configuration
+%% Literal throttle configuration. It can state `every', in milliseconds,
+%% in which case the rate per interval is calculated to allow one event every given milliseconds,
+%% or, literally give the rate per interval.
 -type gradual_rate_config() :: #{from_rate := rate(),
                                  to_rate := rate(),
                                  interval => interval(),
