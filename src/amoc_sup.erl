@@ -11,14 +11,14 @@
 -export([init/1]).
 
 %% Helper macro for declaring children of supervisor
--define(WORKER(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
--define(SUP(I, Type), {I, {I, start_link, []}, permanent, infinity, Type, [I]}).
+-define(WORKER(I), {I, {I, start_link, []}, permanent, 5000, worker, [I]}).
+-define(SUP(I), {I, {I, start_link, []}, permanent, infinity, supervisor, [I]}).
 
 %% ===================================================================
 %% API functions
 %% ===================================================================
 
--spec start_link() -> {ok, Pid :: pid()}.
+-spec start_link() -> supervisor:startlink_ret().
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
@@ -30,10 +30,10 @@ start_link() ->
 init([]) ->
     {ok, {#{strategy => one_for_all, intensity => 0},
           [
-              ?SUP(amoc_users_sup, supervisor),
-              ?SUP(amoc_throttle_sup, supervisor),
-              ?SUP(amoc_coordinator_sup, supervisor),
-              ?WORKER(amoc_controller, worker),
-              ?WORKER(amoc_cluster, worker),
-              ?WORKER(amoc_code_server, worker)
+              ?SUP(amoc_users_sup),
+              ?SUP(amoc_throttle_sup),
+              ?SUP(amoc_coordinator_sup),
+              ?WORKER(amoc_controller),
+              ?WORKER(amoc_cluster),
+              ?WORKER(amoc_code_server)
           ]}}.
