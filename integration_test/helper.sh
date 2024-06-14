@@ -18,6 +18,7 @@ function compile_file() {
 
 function contains_all() {
     local output="$(cat -)"
+    echo "Checking if \""$*"\" are contained in \"$output\""
     local ret= acc=0
     for pattern in "$@"; do
         ret="$(echo "$output" | grep -L -e "$pattern" | wc -l)"
