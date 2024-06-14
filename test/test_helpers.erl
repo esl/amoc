@@ -3,7 +3,7 @@
 -compile([export_all, nowarn_export_all]).
 
 wait_until_scenario_has_users(Scenario, Current, HighestId) ->
-    wait_until_scenario_has_users(Scenario, Current, HighestId, #{}).
+    wait_until_scenario_has_users(Scenario, Current, HighestId, #{time_left => timer:seconds(1)}).
 
 wait_until_scenario_has_users(Scenario, Current, HighestId, ExtraConfig) ->
     WaitUntilFun = fun amoc_controller:get_status/0,
