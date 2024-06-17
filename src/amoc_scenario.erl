@@ -73,7 +73,7 @@ terminate(Scenario, State) ->
 %% if scenario module exports both functions, `Scenario:start/2' is used.
 %%
 %% Runs on the user process and spans a `[amoc, scenario, user, _]' telemetry event.
--spec start(amoc:scenario(), user_id(), state()) -> any().
+-spec start(amoc:scenario(), user_id(), state()) -> term().
 start(Scenario, Id, State) ->
     Metadata = #{scenario => Scenario, state => State, user_id => Id},
     Span = case {erlang:function_exported(Scenario, start, 2),

@@ -13,6 +13,7 @@ all() ->
      start_and_then_force_remove_some_users,
      start_and_then_soft_remove_some_users,
      start_and_then_force_remove_more_users_than_running,
+     force_remove_more_users_with_no_running,
      start_and_then_soft_remove_users_that_ignore_the_error,
      start_and_then_stop_cannot_rerun,
      after_reset_can_run_again
@@ -80,6 +81,14 @@ start_and_then_force_remove_more_users_than_running(_) ->
     Removed = amoc:remove(10, true),
     ?assertEqual({ok, 2}, Removed),
     test_helpers:wait_until_scenario_has_users(testing_scenario, 0, 2).
+
+force_remove_more_users_with_no_running(_) ->
+    Ret = amoc_do(testing_scenario, 0),
+    ?assertEqual(ok, Ret),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, 0, 0),
+    Removed = amoc:remove(10, true),
+    ?assertEqual({ok, 0}, Removed),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, 0, 0).
 
 start_and_then_soft_remove_users_that_ignore_the_error(_) ->
     Ret = amoc_do(testing_scenario_with_state, 2, test_helpers:all_vars_with_state()),

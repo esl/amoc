@@ -139,14 +139,14 @@ terminate_all_children() ->
 -spec get_sup_for_user_id(amoc_scenario:user_id()) -> pid().
 get_sup_for_user_id(Id) ->
     #storage{sups = Supervisors, sups_count = SupCount} = persistent_term:get(?MODULE),
-    Index = Id rem SupCount + 1,
+    Index = erlang:phash2(Id, SupCount) + 1,
     element(Index, Supervisors).
 
 %% assign which users each worker will be requested to add
 -spec assign_users_to_sups(pos_integer(), tuple(), [amoc_scenario:user_id()], Acc) ->
     Acc when Acc :: #{pid() := [amoc_scenario:user_id()]}.
 assign_users_to_sups(SupCount, Supervisors, [Id | Ids], Acc) ->
-    Index = Id rem SupCount + 1,
+    Index = erlang:phash2(Id, SupCount) + 1,
     ChosenSup = element(Index, Supervisors),
     Vs = maps:get(ChosenSup, Acc),
     NewAcc = Acc#{ChosenSup := [Id | Vs]},

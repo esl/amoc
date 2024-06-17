@@ -94,7 +94,7 @@ get_state() ->
     case {amoc_cluster:master_node(), get_param(state)} of
         {undefined, undefined} -> idle;
         {_, {ok, State}} -> State;
-        {Node, undefined} -> rpc:call(Node, ?MODULE, ?FUNCTION_NAME, [])
+        {Node, undefined} -> erpc:call(Node, ?MODULE, ?FUNCTION_NAME, [])
     end.
 
 %% ------------------------------------------------------------------
@@ -172,7 +172,7 @@ setup_slave_node(Node) ->
         {ok, _} ->
             {ok, Scenario} = get_param(scenario),
             {ok, Settings} = get_param(settings),
-            rpc:call(Node, amoc_controller, start_scenario, [Scenario, Settings]);
+            erpc:call(Node, amoc_controller, start_scenario, [Scenario, Settings]);
         Error -> Error
     end.
 
@@ -196,7 +196,7 @@ add_users(Result, LastId, Count, [Node | T] = Nodes) ->
         0 ->
             add_users([{Node, {ok, node_skipped}} | Result], LastId, Count, T);
         N ->
-            Ret = rpc:call(Node, amoc_controller, add_users, [LastId + 1, LastId + N]),
+            Ret = erpc:call(Node, amoc_controller, add_users, [LastId + 1, LastId + N]),
             add_users([{Node, Ret} | Result], LastId + N, Count - N, T)
     end.
 
@@ -213,7 +213,7 @@ remove_users(Result, Count, ForceRemove, [Node | T] = Nodes) ->
         0 ->
             remove_users([{Node, {ok, node_skipped}} | Result], Count, ForceRemove, T);
         N ->
-            Ret = rpc:call(Node, amoc_controller, remove_users, [N, ForceRemove]),
+            Ret = erpc:call(Node, amoc_controller, remove_users, [N, ForceRemove]),
             remove_users([{Node, Ret} | Result], Count - N, ForceRemove, T)
     end.
 
@@ -225,7 +225,7 @@ update_settings_on_nodes(Settings, Nodes) ->
 -spec update_settings_on_node(amoc_config:settings(), node()) ->
           ok | {badrpc, any()} | {error, any()}.
 update_settings_on_node(Settings, Node) ->
-    rpc:call(Node, amoc_controller, update_settings, [Settings]).
+    erpc:call(Node, amoc_controller, update_settings, [Settings]).
 
 -spec stop_cluster() -> {ok, any()} | {error, any()}.
 stop_cluster() ->
@@ -234,7 +234,7 @@ stop_cluster() ->
         {_, []} -> {error, no_slave_nodes};
         {MasterNode, Slaves} ->
             set_state(stopped),
-            Result = [{Node, rpc:call(Node, amoc_controller, stop_scenario, [])} ||
+            Result = [{Node, erpc:call(Node, amoc_controller, stop_scenario, [])} ||
                          Node <- Slaves],
             maybe_error(Result);
         {_, _} -> {error, not_a_master}
