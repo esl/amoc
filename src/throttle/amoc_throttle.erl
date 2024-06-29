@@ -5,7 +5,7 @@
 %% API
 -export([start/2, stop/1,
          send/2, send/3, wait/1,
-         run/2, pause/1, resume/1,
+         run/2, pause/1, resume/1, unlock/1,
          change_rate/2, change_rate/3,
          change_rate_gradually/2, change_rate_gradually/6]).
 
@@ -73,6 +73,11 @@ pause(Name) ->
 -spec resume(name()) -> ok | {error, any()}.
 resume(Name) ->
     amoc_throttle_controller:resume(Name).
+
+%% @doc Unlocks executions for the given `Name' as if `Rate' was set to `infinity'.
+-spec unlock(name()) -> ok | {error, any()}.
+unlock(Name) ->
+    amoc_throttle_controller:unlock(Name).
 
 %% @doc Sets `Throttle' for `Name' according to the given values.
 %%

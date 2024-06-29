@@ -34,7 +34,7 @@ groups() ->
        async_runner_dies_while_waiting_raises_exit,
        async_runner_dies_when_throttler_dies,
        run_with_interval_zero_limits_only_number_of_parallel_executions,
-       pause_and_resume,
+       pause_and_resume_and_unlock,
        get_state
      ]}
     ].
@@ -286,7 +286,7 @@ run_with_interval_zero_limits_only_number_of_parallel_executions(_) ->
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
     ?assertMatch(ok, ?RECV(receive_this, 200)).
 
-pause_and_resume(_) ->
+pause_and_resume_and_unlock(_) ->
     %% Start 100-per-10ms throttle with a single process
     ?assertMatch({ok, started},
                  amoc_throttle:start(?FUNCTION_NAME,
@@ -299,7 +299,17 @@ pause_and_resume(_) ->
     ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)),
     %% After resume the message is then received
     ?assertMatch(ok, amoc_throttle:resume(?FUNCTION_NAME)),
-    ?assertMatch(ok, ?RECV(receive_this, 200)).
+    ?assertMatch(ok, ?RECV(receive_this, 200)),
+    %% If unlocked, all messages are always received
+    ?assertMatch(ok, amoc_throttle:unlock(?FUNCTION_NAME)),
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    ?assertMatch(ok, ?RECV(receive_this, 200)),
+    %% From unlock it can resume
+    ?assertMatch(ok, amoc_throttle:resume(?FUNCTION_NAME)),
+    State = get_state_of_one_process(?FUNCTION_NAME),
+    ?assertMatch(#{name := ?FUNCTION_NAME,
+                   delay_between_executions := 12},
+                 State).
 
 get_state(_) ->
     ?assertMatch({ok, started},

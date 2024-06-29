@@ -12,6 +12,7 @@
          update/3,
          pause/1,
          resume/1,
+         unlock/1,
          get_state/1,
          get_throttle_process/1,
          get_throttle_processes/1
@@ -30,7 +31,7 @@
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
 -record(state, {can_run_fn = true :: boolean(),
-                status = running :: running | paused,
+                status = running :: running | paused | unlocked,
                 max_n :: infinity | non_neg_integer(),
                 name :: atom(),
                 n :: infinity | non_neg_integer(),
@@ -68,6 +69,10 @@ pause(Pid) ->
 -spec resume(pid()) -> ok.
 resume(Pid) ->
     gen_server:cast(Pid, resume_process).
+
+-spec unlock(pid()) -> ok.
+unlock(Pid) ->
+    gen_server:cast(Pid, unlock_process).
 
 -spec get_state(pid()) -> map().
 get_state(Pid) ->
@@ -123,6 +128,8 @@ handle_cast(pause_process, State) ->
     {noreply, State#state{status = paused}, {continue, maybe_run_fn}};
 handle_cast(resume_process, State) ->
     {noreply, State#state{status = running}, {continue, maybe_run_fn}};
+handle_cast(unlock_process, State) ->
+    {noreply, State#state{status = unlocked}, {continue, maybe_run_fn}};
 handle_cast({schedule, RunnerPid}, #state{schedule_reversed = SchRev, name = Name} = State) ->
     amoc_throttle_controller:telemetry_event(Name, request),
     {noreply, State#state{schedule_reversed = [RunnerPid | SchRev]}, {continue, maybe_run_fn}};
@@ -211,6 +218,9 @@ maybe_run_fn(#state{schedule = [], schedule_reversed = []} = State) ->
 maybe_run_fn(#state{schedule = [], schedule_reversed = SchRev} = State) ->
     NewSchedule = lists:reverse(SchRev),
     NewState = State#state{schedule = NewSchedule, schedule_reversed = []},
+    maybe_run_fn(NewState);
+maybe_run_fn(#state{interval = _, status = unlocked, n = N} = State) when N > 0 ->
+    NewState = run_fn(State),
     maybe_run_fn(NewState);
 maybe_run_fn(#state{interval = 0, status = running, n = N} = State) when N > 0 ->
     NewState = run_fn(State),

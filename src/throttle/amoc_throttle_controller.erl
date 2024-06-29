@@ -9,7 +9,7 @@
 %% API
 -export([start_link/0,
          ensure_throttle_processes_started/2,
-         pause/1, resume/1, stop/1,
+         pause/1, resume/1, unlock/1, stop/1,
          change_rate/3, change_rate_gradually/2,
          raise_event_on_slave_node/2, telemetry_event/2]).
 
@@ -111,6 +111,10 @@ pause(Name) ->
 -spec resume(name()) -> ok | {error, any()}.
 resume(Name) ->
     gen_server:call(?MASTER_SERVER, {resume, Name}).
+
+-spec unlock(name()) -> ok | {error, any()}.
+unlock(Name) ->
+    gen_server:call(?MASTER_SERVER, {unlock, Name}).
 
 -spec change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval()) -> ok | {error, any()}.
 change_rate(Name, Rate, Interval) ->
@@ -362,7 +366,9 @@ run_cmd(Pid, stop) ->
 run_cmd(Pid, pause) ->
     amoc_throttle_process:pause(Pid);
 run_cmd(Pid, resume) ->
-    amoc_throttle_process:resume(Pid).
+    amoc_throttle_process:resume(Pid);
+run_cmd(Pid, unlock) ->
+    amoc_throttle_process:unlock(Pid).
 
 -spec verify_config(amoc_throttle:gradual_rate_config()) -> gradual_rate_change() | {error, any()}.
 verify_config(Config) ->
