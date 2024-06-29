@@ -3,40 +3,41 @@
 -module(amoc_throttle).
 
 %% API
--export([start/2, start/3, start/4, stop/1,
-         send/2, send/3, send_and_wait/2, wait/1,
+-export([start/2, stop/1,
+         send/2, send/3, wait/1,
          run/2, pause/1, resume/1,
          change_rate/2, change_rate/3,
          change_rate_gradually/2, change_rate_gradually/6]).
 
--deprecated([
-             {start, 3, "use start/2 with a config"},
-             {start, 4, "use start/2 with a config"},
-             {send_and_wait, 2, "use wait/1 instead"}
-            ]).
-
 -type name() :: atom().
--type rate() :: pos_integer().
+%% Atom representing the name of the throttle.
+-type rate() :: infinity | non_neg_integer().
+%% Number of events per given `t:interval/0', or infinity for effectively unlocking all throttling.
+%% Note that a rate of zero means effectively pausing the throttle.
+-type interarrival() :: infinity | non_neg_integer().
+%% Time in milliseconds between two events, or infinity for effectively pausing the throttle. Note
+%% that an interarrival of zero means effectively unlocking all throttling.
 -type interval() :: non_neg_integer().
-%% In milliseconds, defaults to 60000 (one minute) when not given.
-%% An interval of 0 means no delay at all, only the number of simultaneous executions will be
-%% controlled, which corresponds to the number of processes started
--type throttle() :: #{rate := rate(),
-                      interval := interval()}.
--type interarrival() :: #{interarrival := non_neg_integer()}.
+%% In milliseconds, defaults to 60000 (one minute).
+-type throttle() :: #{rate := rate(), interval := interval()} |
+                    #{interarrival := interarrival()}.
 %% Throttle unit of measurement
 -type config() :: #{rate := rate(),
                     interval => interval(),
                     parallelism => non_neg_integer()}
-                | #{interarrival := non_neg_integer(),
+                | #{interarrival := interarrival(),
                     parallelism => non_neg_integer()}.
-%% Literal throttle configuration. It can state `interarrival', in milliseconds,
-%% in which case the rate per interval is calculated to allow one event every given milliseconds,
-%% or, literally give the rate per interval.
+%% Literal throttle configuration.
 
--type gradual_rate_config() :: #{from_rate := rate(),
-                                 to_rate := rate(),
+-type gradual_rate_config() :: #{from_rate := non_neg_integer(),
+                                 to_rate := non_neg_integer(),
                                  interval => interval(),
+                                 step_interval => pos_integer(),
+                                 step_size => pos_integer(),
+                                 step_count => pos_integer(),
+                                 duration => pos_integer()} |
+                               #{from_interarrival := interarrival(),
+                                 to_interarrival := interarrival(),
                                  step_interval => pos_integer(),
                                  step_size => pos_integer(),
                                  step_count => pos_integer(),
@@ -50,30 +51,16 @@
 
 -export_type([name/0, rate/0, interval/0, throttle/0, config/0, gradual_rate_config/0]).
 
-%% @see start/4
+%% @doc Starts the throttle mechanism for a given `Name' with a given config.
+%%
+%% The optional arguments are an `Interval' (default is one minute) and a ` NoOfProcesses' (default is 10).
+%% `Name' is needed to identify the rate as a single test can have different rates for different tasks.
+%% `Interval' is given in milliseconds and can be changed to a different value for convenience or higher granularity.
 -spec start(name(), config() | rate()) -> {ok, started | already_started} | {error, any()}.
 start(Name, #{} = Config) ->
     amoc_throttle_controller:ensure_throttle_processes_started(Name, Config);
 start(Name, Rate) ->
     amoc_throttle_controller:ensure_throttle_processes_started(Name, #{rate => Rate}).
-
-%% @see start/4
--spec start(name(), rate(), non_neg_integer()) -> {ok, started | already_started} | {error, any()}.
-start(Name, Rate, Interval) ->
-    Config = #{rate => Rate, interval => Interval},
-    amoc_throttle_controller:ensure_throttle_processes_started(Name, Config).
-
-%% @doc Starts the throttle mechanism for a given `Name' with a given `Rate' per `Interval'.
-%%
-%% The optional arguments are an `Interval' (default is one minute) and a ` NoOfProcesses' (default is 10).
-%% `Name' is needed to identify the rate as a single test can have different rates for different tasks.
-%% `Interval' is given in milliseconds and can be changed to a different value for convenience or higher granularity.
-%% It also accepts a special value of `0' which limits the number of parallel executions associated with `Name' to `Rate'.
--spec start(name(), rate(), interval(), pos_integer()) ->
-    {ok, started | already_started} | {error, any()}.
-start(Name, Rate, Interval, NoOfProcesses) ->
-    Config = #{rate => Rate, interval => Interval, parallelism => NoOfProcesses},
-    amoc_throttle_controller:ensure_throttle_processes_started(Name, Config).
 
 %% @doc Pauses executions for the given `Name' as if `Rate' was set to `0'.
 %%
@@ -127,8 +114,6 @@ change_rate_gradually(Name, FromRate, ToRate, RateInterval, StepInterval, StepCo
 %%
 %% `Fn' is executed in the context of a new process spawned on the same node on which
 %% the process executing `run/2' runs, so a call to `run/2' is non-blocking.
-%% This function is used internally by both `send' and `send_and_wait/2' functions,
-%% so all those actions will be limited to the same rate when called with the same `Name'.
 %%
 %% Diagram showing function execution flow in distributed environment,
 %% generated using https://sequencediagram.org/:
@@ -177,13 +162,6 @@ send(Name, Msg) ->
 -spec send(name(), pid(), any()) -> ok | {error, any()}.
 send(Name, Pid, Msg) ->
     amoc_throttle_runner:throttle(Name, {Pid, Msg}).
-
-%% @doc Sends and receives the given message `Msg'.
-%%
-%% Deprecated in favour of `wait/1'
--spec send_and_wait(name(), any()) -> ok | {error, any()}.
-send_and_wait(Name, _) ->
-    amoc_throttle_runner:throttle(Name, wait).
 
 %% @doc Blocks the caller until the throttle mechanism allows.
 -spec wait(name()) -> ok | {error, any()}.

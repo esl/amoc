@@ -30,12 +30,12 @@
 -define(DEFAULT_MSG_TIMEOUT, 60000).%% one minute
 
 -record(state, {can_run_fn = true :: boolean(),
-                pause = false :: boolean(),
-                max_n :: non_neg_integer(),
+                status = running :: running | paused,
+                max_n :: infinity | non_neg_integer(),
                 name :: atom(),
-                n :: integer(),
+                n :: infinity | non_neg_integer(),
                 interval = 0 :: amoc_throttle:interval(),  %%ms
-                delay_between_executions = 0 :: non_neg_integer(),  %%ms
+                delay_between_executions = 0 :: timeout(),  %%ms
                 tref :: timer:tref() | undefined,
                 schedule = [] :: [AmocThrottleRunnerProcess :: pid()],
                 schedule_reversed = [] :: [AmocThrottleRunnerProcess :: pid()]}).
@@ -120,9 +120,9 @@ handle_info(timeout, State) ->
 handle_cast(stop_process, State) ->
     {stop, normal, State};
 handle_cast(pause_process, State) ->
-    {noreply, State#state{pause = true}, {continue, maybe_run_fn}};
+    {noreply, State#state{status = paused}, {continue, maybe_run_fn}};
 handle_cast(resume_process, State) ->
-    {noreply, State#state{pause = false}, {continue, maybe_run_fn}};
+    {noreply, State#state{status = running}, {continue, maybe_run_fn}};
 handle_cast({schedule, RunnerPid}, #state{schedule_reversed = SchRev, name = Name} = State) ->
     amoc_throttle_controller:telemetry_event(Name, request),
     {noreply, State#state{schedule_reversed = [RunnerPid | SchRev]}, {continue, maybe_run_fn}};
@@ -155,25 +155,28 @@ format_status(#{state := #state{} = State} = FormatStatus) ->
 %% internal functions
 %%------------------------------------------------------------------------------
 
+initial_state(_Name, Interval, infinity) ->
+    #state{interval = Interval, n = infinity, max_n = infinity, delay_between_executions = 0};
+initial_state(_Name, Interval, 0) ->
+    #state{interval = Interval, n = 0, max_n = 0, delay_between_executions = infinity};
 initial_state(Name, Interval, Rate) when Rate > 0 ->
-    NewRate = case Rate < 5 of
-                  true ->
-                      Msg = <<"too low rate, please reduce NoOfProcesses">>,
-                      internal_error(Msg, Name, Rate, Interval),
-                      Rate;
-                  false ->
-                      Rate
-              end,
-    Delay = case {Interval, Interval div NewRate, Interval rem NewRate} of
+    case Rate < 5 of
+        true ->
+            Msg = <<"too low rate, please reduce NoOfProcesses">>,
+            internal_warning(Msg, Name, Rate, Interval);
+        false ->
+            ok
+    end,
+    Delay = case {Interval, Interval div Rate, Interval rem Rate} of
                 {0, _, _} -> 0; %% limit only No of simultaneous executions
                 {_, I, _} when I < 10 ->
                     Message = <<"too high rate, please increase NoOfProcesses">>,
-                    internal_error(Message, Name, Rate, Interval),
+                    internal_warning(Message, Name, Rate, Interval),
                     10;
                 {_, DelayBetweenExecutions, 0} -> DelayBetweenExecutions;
                 {_, DelayBetweenExecutions, _} -> DelayBetweenExecutions + 1
             end,
-    #state{interval = Interval, n = NewRate, max_n = NewRate, delay_between_executions = Delay}.
+    #state{interval = Interval, n = Rate, max_n = Rate, delay_between_executions = Delay}.
 
 merge_state(#state{interval = I, delay_between_executions = D, n = N, max_n = MaxN},
             #state{n = OldN, max_n = OldMaxN} = OldState) ->
@@ -183,6 +186,8 @@ merge_state(#state{interval = I, delay_between_executions = D, n = N, max_n = Ma
                               max_n = MaxN, tref = undefined},
     maybe_start_timer(NewState).
 
+maybe_start_timer(#state{delay_between_executions = infinity, tref = undefined} = State) ->
+    State#state{can_run_fn = false};
 maybe_start_timer(#state{delay_between_executions = 0, tref = undefined} = State) ->
     State#state{can_run_fn = true};
 maybe_start_timer(#state{delay_between_executions = D, tref = undefined} = State) ->
@@ -207,15 +212,20 @@ maybe_run_fn(#state{schedule = [], schedule_reversed = SchRev} = State) ->
     NewSchedule = lists:reverse(SchRev),
     NewState = State#state{schedule = NewSchedule, schedule_reversed = []},
     maybe_run_fn(NewState);
-maybe_run_fn(#state{interval = 0, pause = false, n = N} = State) when N > 0 ->
+maybe_run_fn(#state{interval = 0, status = running, n = N} = State) when N > 0 ->
     NewState = run_fn(State),
     maybe_run_fn(NewState);
-maybe_run_fn(#state{can_run_fn = true, pause = false, n = N} = State) when N > 0 ->
+maybe_run_fn(#state{can_run_fn = true, status = running, n = N} = State) when N > 0 ->
     NewState = run_fn(State),
     NewState#state{can_run_fn = false};
 maybe_run_fn(State) ->
     State.
 
+run_fn(#state{schedule = [RunnerPid | T], name = Name, n = infinity} = State) ->
+    erlang:monitor(process, RunnerPid),
+    amoc_throttle_runner:run(RunnerPid),
+    amoc_throttle_controller:telemetry_event(Name, execute),
+    State#state{schedule = T};
 run_fn(#state{schedule = [RunnerPid | T], name = Name, n = N} = State) ->
     erlang:monitor(process, RunnerPid),
     amoc_throttle_runner:run(RunnerPid),
@@ -244,10 +254,10 @@ internal_event(Msg, #state{name = Name} = State) ->
     amoc_telemetry:execute_log(
       debug, [throttle, process], #{self => self(), name => Name, state => PrintableState}, Msg).
 
--spec internal_error(binary(), atom(), amoc_throttle:rate(), amoc_throttle:interval()) -> any().
-internal_error(Msg, Name, Rate, Interval) ->
+-spec internal_warning(binary(), atom(), amoc_throttle:rate(), amoc_throttle:interval()) -> any().
+internal_warning(Msg, Name, Rate, Interval) ->
     amoc_telemetry:execute_log(
-      error, [throttle, process], #{name => Name, rate => Rate, interval => Interval}, Msg).
+      warning, [throttle, process], #{name => Name, rate => Rate, interval => Interval}, Msg).
 
 printable_state(#state{} = State) ->
     Fields = record_info(fields, state),

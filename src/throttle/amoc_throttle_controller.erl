@@ -25,6 +25,7 @@
 -define(DEFAULT_STEP_SIZE, 1).
 -define(DEFAULT_INTERVAL, 60000). %% one minute
 -define(DEFAULT_NO_PROCESSES, 10).
+-define(TIMEOUT(N), (infinity =:= N orelse is_integer(N) andalso N >= 0)).
 -define(NONNEG_INT(N), (is_integer(N) andalso N >= 0)).
 -define(POS_INT(N), (is_integer(N) andalso N > 0)).
 
@@ -51,8 +52,8 @@
 -type config() :: #{rate := amoc_throttle:rate(),
                     interval := amoc_throttle:interval(),
                     parallelism := non_neg_integer()}.
--type gradual_rate_change() :: #{from_rate := amoc_throttle:rate(),
-                                 to_rate := amoc_throttle:rate(),
+-type gradual_rate_change() :: #{from_rate := non_neg_integer(),
+                                 to_rate := non_neg_integer(),
                                  interval := amoc_throttle:interval(),
                                  step_interval := pos_integer(),
                                  step_size := pos_integer(),
@@ -71,26 +72,32 @@ start_link() ->
     {ok, started | already_started} |
     {error, invalid_throttle | wrong_reconfiguration | wrong_no_of_procs}.
 ensure_throttle_processes_started(
-  Name, #{interarrival := EveryMs} = Config)
-  when is_atom(Name), ?NONNEG_INT(EveryMs) ->
+  Name, #{interarrival := Interarrival} = Config)
+  when is_atom(Name), ?TIMEOUT(Interarrival) ->
     raise_event_on_slave_node(Name, init),
-    Config1 = #{rate => ?DEFAULT_INTERVAL div EveryMs, interval => ?DEFAULT_INTERVAL},
+    Config1 = #{rate => ?DEFAULT_INTERVAL div Interarrival, interval => ?DEFAULT_INTERVAL},
     Config2 = Config1#{parallelism => maps:get(parallelism, Config, ?DEFAULT_NO_PROCESSES)},
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Config2});
 ensure_throttle_processes_started(
   Name, #{rate := Rate, interval := Interval, parallelism := NoOfProcesses} = Config)
-  when is_atom(Name), ?POS_INT(Rate), ?NONNEG_INT(Interval), ?POS_INT(NoOfProcesses) ->
+  when is_atom(Name), ?TIMEOUT(Rate), ?NONNEG_INT(Interval), ?POS_INT(NoOfProcesses) ->
     raise_event_on_slave_node(Name, init),
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Config});
 ensure_throttle_processes_started(
   Name, #{rate := Rate, interval := Interval} = Config)
-  when is_atom(Name), ?POS_INT(Rate), ?NONNEG_INT(Interval) ->
+  when is_atom(Name), ?TIMEOUT(Rate), ?NONNEG_INT(Interval) ->
     raise_event_on_slave_node(Name, init),
     Config1 = Config#{parallelism => ?DEFAULT_NO_PROCESSES},
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Config1});
 ensure_throttle_processes_started(
+  Name, #{rate := Rate, parallelism := NoOfProcesses} = Config)
+  when is_atom(Name), ?TIMEOUT(Rate), ?POS_INT(NoOfProcesses) ->
+    raise_event_on_slave_node(Name, init),
+    Config1 = Config#{interval => ?DEFAULT_INTERVAL},
+    gen_server:call(?MASTER_SERVER, {start_processes, Name, Config1});
+ensure_throttle_processes_started(
   Name, #{rate := Rate} = Config)
-  when is_atom(Name), ?POS_INT(Rate) ->
+  when is_atom(Name), ?TIMEOUT(Rate) ->
     raise_event_on_slave_node(Name, init),
     Config1 = Config#{interval => ?DEFAULT_INTERVAL, parallelism => ?DEFAULT_NO_PROCESSES},
     gen_server:call(?MASTER_SERVER, {start_processes, Name, Config1});
@@ -147,7 +154,7 @@ init([]) ->
                   From :: {pid(), Tag :: term()}, state()) ->
                      {reply, {ok, started | already_started}, state()} |
                      {reply, {error, wrong_reconfiguration | wrong_no_of_procs}, state()};
-                 ({pause | resume | stop}, From :: {pid(), Tag :: term()}, state()) ->
+                 ({pause | resume | unlock | stop}, From :: {pid(), Tag :: term()}, state()) ->
                      {reply, ok, state()} |
                      {reply, Error :: any(), state()};
                  ({change_rate, name(), amoc_throttle:rate(), amoc_throttle:interval()},
@@ -175,8 +182,8 @@ handle_call({pause, Name}, _From, State) ->
         Error ->
             {reply, Error, State}
     end;
-handle_call({resume, Name}, _From, State) ->
-    case run_in_all_processes(Name, resume) of
+handle_call({Op, Name}, _From, State) when unlock =:= Op; resume =:= Op ->
+    case run_in_all_processes(Name, Op) of
         ok ->
             Info = maps:get(Name, State),
             {reply, ok, State#{Name => Info#throttle_info{active = true}}};
@@ -266,6 +273,7 @@ continue_plan(Name, State, Info, Plan) ->
     State#{Name => Info#throttle_info{rate = NewRate, change_plan = NewPlan}}.
 
 -spec rate_per_minute(amoc_throttle:rate(), amoc_throttle:interval()) -> amoc_throttle:rate().
+rate_per_minute(infinity, _) -> infinity;
 rate_per_minute(_, 0) -> 0;
 rate_per_minute(Rate, Interval) ->
     (Rate * 60000) div Interval.
@@ -275,7 +283,7 @@ start_processes(Name, #{rate := Rate, interval := Interval, parallelism := NoOfP
     raise_event(Name, init),
     RatePerMinute = rate_per_minute(Rate, Interval),
     report_rate(Name, RatePerMinute),
-    RealNoOfProcs = min(Rate, NoOfProcesses),
+    RealNoOfProcs = expected_no_of_processes(Rate, NoOfProcesses),
     start_throttle_processes(Name, Interval, Rate, RealNoOfProcs),
     #throttle_info{rate = Rate, interval = Interval, active = true, no_of_procs = RealNoOfProcs}.
 
@@ -334,7 +342,7 @@ run_in_all_processes(Name, Cmd) ->
 
 verify_new_start_matches_running(Name, Config, Group, State) ->
     #{rate := Rate, interval := Interval, parallelism := NoOfProcesses} = Config,
-    ExpectedNoOfProcesses = min(Rate, NoOfProcesses),
+    ExpectedNoOfProcesses = expected_no_of_processes(Rate, NoOfProcesses),
     case {length(Group), State} of
         {ExpectedNoOfProcesses, #{Name := #throttle_info{rate = Rate, interval = Interval}}} ->
             {reply, {ok, already_started}, State};
@@ -343,6 +351,11 @@ verify_new_start_matches_running(Name, Config, Group, State) ->
         _ ->
             {reply, {error, wrong_no_of_procs}, State}
     end.
+
+expected_no_of_processes(0, NoOfProcesses) ->
+    min(1, NoOfProcesses);
+expected_no_of_processes(Rate, NoOfProcesses) ->
+    min(Rate, NoOfProcesses).
 
 run_cmd(Pid, stop) ->
     amoc_throttle_process:stop(Pid);

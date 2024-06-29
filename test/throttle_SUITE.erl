@@ -20,7 +20,8 @@ groups() ->
        start,
        start_descriptive,
        start_interarrival,
-       rate_zero_is_not_accepted,
+       start_rate_zero,
+       start_rate_infinity,
        low_rate_gets_remapped,
        low_interval_get_remapped,
        start_and_stop,
@@ -28,7 +29,6 @@ groups() ->
        change_rate_gradually,
        change_rate_gradually_descriptive,
        change_rate_gradually_verify_descriptions,
-       send_and_wait,
        just_wait,
        wait_for_process_to_die_sends_a_kill,
        async_runner_dies_while_waiting_raises_exit,
@@ -68,10 +68,11 @@ start(_) ->
     ?assertMatch({ok, already_started},
                  amoc_throttle:start(?FUNCTION_NAME, 100)),
     ?assertMatch({error, wrong_reconfiguration},
-                 amoc_throttle:start(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)),
+                 amoc_throttle:start(?FUNCTION_NAME, 101)),
     ?assertMatch({error, wrong_no_of_procs},
-                 amoc_throttle:start(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL,
-                                     ?DEFAULT_NO_PROCESSES + 1)).
+                 amoc_throttle:start(?FUNCTION_NAME,
+                                     #{rate => 100,
+                                       parallelism => ?DEFAULT_NO_PROCESSES + 1})).
 
 start_descriptive(_) ->
     %% Starts successfully
@@ -89,26 +90,49 @@ start_interarrival(_) ->
                    n := 1200},
                  State).
 
-rate_zero_is_not_accepted(_) ->
-    ?assertMatch({error, invalid_throttle}, amoc_throttle:start(?FUNCTION_NAME, 0, 100, 1)).
+start_rate_zero(_) ->
+    %% Starts successfully
+    Description = #{rate => 0, parallelism => 1},
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, Description)),
+    State = get_state_of_one_process(?FUNCTION_NAME),
+    ?assertMatch(#{name := ?FUNCTION_NAME,
+                   interval := 60000,
+                   delay_between_executions := infinity,
+                   n := 0},
+                 State).
+
+start_rate_infinity(_) ->
+    %% Starts successfully
+    Description = #{rate => infinity, parallelism => 1},
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, Description)),
+    State = get_state_of_one_process(?FUNCTION_NAME),
+    ?assertMatch(#{name := ?FUNCTION_NAME,
+                   interval := 60000,
+                   delay_between_executions := 0,
+                   n := infinity},
+                 State).
 
 low_rate_gets_remapped(_) ->
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 2, 100, 1)),
+    ?assertMatch({ok, started},
+                 amoc_throttle:start(?FUNCTION_NAME,
+                                     #{rate => 2, interval => 100, parallelism => 1})),
     State = get_state_of_one_process(?FUNCTION_NAME),
     ?assertMatch(#{name := ?FUNCTION_NAME,
                    interval := 100,
                    delay_between_executions := 50},
                  State),
-    assert_telemetry_event([amoc, throttle, process], error, ?FUNCTION_NAME, 2, 100).
+    assert_telemetry_event([amoc, throttle, process], warning, ?FUNCTION_NAME, 2, 100).
 
 low_interval_get_remapped(_) ->
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 1, 1, 1)),
+    ?assertMatch({ok, started},
+                 amoc_throttle:start(?FUNCTION_NAME,
+                                     #{rate => 1, interval => 1, parallelism => 1})),
     State = get_state_of_one_process(?FUNCTION_NAME),
     ?assertMatch(#{name := ?FUNCTION_NAME,
                    interval := 1,
                    delay_between_executions := 10},
                  State),
-    assert_telemetry_event([amoc, throttle, process], error, ?FUNCTION_NAME, 1, 1).
+    assert_telemetry_event([amoc, throttle, process], warning, ?FUNCTION_NAME, 1, 1).
 
 start_and_stop(_) ->
     %% Starts successfully
@@ -205,29 +229,14 @@ change_rate_gradually_verify_descriptions(_) ->
        {error, _},
        amoc_throttle_controller:verify_config(E1)).
 
-send_and_wait(_) ->
-    %% it failts if the throttle wasn't started yet
-    ?assertMatch({error, no_throttle_process_registered},
-                 amoc_throttle:send_and_wait(?FUNCTION_NAME, receive_this)),
-    %% Start 100-per-10ms throttle with a single process
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 10, 1)),
-    %% send_and_wait passes fine
-    ?assertMatch(ok, amoc_throttle:send_and_wait(?FUNCTION_NAME, receive_this)),
-    %% One message is received sufficiently fast
-    amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch(ok, ?RECV(receive_this, 100)),
-    %% If someone else fills the throttle heavily,
-    %% it will take proportionally so long to execute for me
-    fill_throttle(?FUNCTION_NAME, 100 * 10),
-    amoc_throttle:send(?FUNCTION_NAME, receive_this),
-    ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)).
-
 just_wait(_) ->
     %% it failts if the throttle wasn't started yet
     ?assertMatch({error, no_throttle_process_registered},
                  amoc_throttle:wait(?FUNCTION_NAME)),
     %% Start 100-per-10ms throttle with a single process
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 10, 1)),
+    ?assertMatch({ok, started},
+                 amoc_throttle:start(?FUNCTION_NAME,
+                                     #{rate => 100, interval => 10, parallelism => 1})),
     %% wait passes fine
     ?assertMatch(ok, amoc_throttle:wait(?FUNCTION_NAME)),
     %% One message is received sufficiently fast
@@ -241,19 +250,25 @@ just_wait(_) ->
 
 wait_for_process_to_die_sends_a_kill(_) ->
     erlang:process_flag(trap_exit, true),
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 10, 1)),
+    ?assertMatch({ok, started},
+                 amoc_throttle:start(?FUNCTION_NAME,
+                                     #{rate => 100, interval => 10, parallelism => 1})),
     amoc_throttle:run(?FUNCTION_NAME, fun() -> exit(?FUNCTION_NAME) end),
     ?assertMatch(ok, ?RECV({'EXIT', _, ?FUNCTION_NAME}, 100)).
 
 async_runner_dies_while_waiting_raises_exit(_) ->
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 1, 1, 1)),
+    ?assertMatch({ok, started},
+                 amoc_throttle:start(?FUNCTION_NAME,
+                                     #{rate => 1, interval => 1, parallelism => 1})),
     find_new_link_and_kill_it(self()),
     ?assertExit({throttle_wait_died, _, killed}, amoc_throttle:wait(?FUNCTION_NAME)).
 
 async_runner_dies_when_throttler_dies(_) ->
     erlang:process_flag(trap_exit, true),
     {links, OriginalLinks} = erlang:process_info(self(), links),
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 1, 60000, 1)),
+    ?assertMatch({ok, started},
+                 amoc_throttle:start(?FUNCTION_NAME,
+                                     #{rate => 1, interval => 60000, parallelism => 1})),
     wait_until_one_throttle_worker(?FUNCTION_NAME),
     amoc_throttle:send(?FUNCTION_NAME, receive_this),
     wait_until_one_async_runner(self(), OriginalLinks),
@@ -262,7 +277,9 @@ async_runner_dies_when_throttler_dies(_) ->
 
 run_with_interval_zero_limits_only_number_of_parallel_executions(_) ->
     %% Start 10 actions at once in 10 processes
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 10, 0, 1)),
+    ?assertMatch({ok, started},
+                 amoc_throttle:start(?FUNCTION_NAME,
+                                     #{rate => 10, interval => 0, parallelism => 1})),
     %% If someone else fills the throttle heavily,
     %% it will take proportionally so long to execute for me
     fill_throttle(?FUNCTION_NAME, 100),
@@ -271,9 +288,10 @@ run_with_interval_zero_limits_only_number_of_parallel_executions(_) ->
 
 pause_and_resume(_) ->
     %% Start 100-per-10ms throttle with a single process
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 10, 1)),
-    %% send_and_wait passes fine
-    ?assertMatch(ok, amoc_throttle:send_and_wait(?FUNCTION_NAME, receive_this)),
+    ?assertMatch({ok, started},
+                 amoc_throttle:start(?FUNCTION_NAME,
+                                     #{rate => 5000, parallelism => 1})),
+    ?assertMatch(ok, amoc_throttle:wait(?FUNCTION_NAME)),
     %% pauses runs correctly
     ?assertMatch(ok, amoc_throttle:pause(?FUNCTION_NAME)),
     %% It is paused, so messages aren't received
@@ -284,7 +302,9 @@ pause_and_resume(_) ->
     ?assertMatch(ok, ?RECV(receive_this, 200)).
 
 get_state(_) ->
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100, 60000, 1)),
+    ?assertMatch({ok, started},
+                 amoc_throttle:start(?FUNCTION_NAME,
+                                     #{rate => 100, interval => 60000, parallelism => 1})),
     State = get_state_of_one_process(?FUNCTION_NAME),
     ?assertMatch(#{name := ?FUNCTION_NAME,
                    interval := 60000,
