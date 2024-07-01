@@ -5,9 +5,14 @@ See `amoc_throttle`
 ## Overview
 
 Amoc throttle is a module that allows limiting the number of users' actions per given interval, no matter how many users there are in a test.
-It works in both local and distributed environments, allows for dynamic rate changes during a test and exposes metrics which show the number of requests and executions.
+It works in both local and distributed environments, allows for dynamic rate changes during a test and exposes telemetry events showing the number of requests and executions.
 
-Amoc throttle allows setting the execution `Rate` per `Interval` or limiting the number of parallel executions when `Interval` is set to `0`.
+Amoc throttle allows to:
+
+- Setting the execution `Rate` per `Interval`
+- Limiting the number of parallel executions when `Rate` is set to `infinity`
+- Setting the `Interarrival` time between actions.
+
 Each `Rate` is identified with a `Name`.
 The rate limiting mechanism allows responding to a request only when it does not exceed the given `Rate`.
 Amoc throttle makes sure that the given `Rate` per `Interval` is maintained on a constant level.
@@ -102,8 +107,8 @@ For every `Name`, a `NoOfProcesses` are created, each responsible for keeping ex
 ### Distributed environment
 
 #### Metrics
-In a distributed environment every Amoc node with a throttle started, exposes metrics showing the numbers of requests and executions.
-Those exposed by the master node show the sum of all metrics from all nodes.
+In a distributed environment every Amoc node with a throttle started, exposes telemetry events showing the numbers of requests and executions.
+Those exposed by the master node show the aggregate of all telemetry events from all nodes.
 This allows to quickly see the real rates across the whole system.
 
 #### Workflow
