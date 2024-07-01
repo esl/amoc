@@ -6,8 +6,7 @@
 -export([start/2, stop/1,
          send/2, send/3, wait/1,
          run/2, pause/1, resume/1, unlock/1,
-         change_rate/2, change_rate/3,
-         change_rate_gradually/2, change_rate_gradually/6]).
+         change_rate/2, change_rate_gradually/2]).
 
 -type name() :: atom().
 %% Atom representing the name of the throttle.
@@ -87,11 +86,6 @@ unlock(Name) ->
 change_rate(Name, #{rate := Rate, interval := Interval}) ->
     amoc_throttle_controller:change_rate(Name, Rate, Interval).
 
-%% @see change_rate/2
--spec change_rate(name(), rate(), interval()) -> ok | {error, any()}.
-change_rate(Name, Rate, Interval) ->
-    amoc_throttle_controller:change_rate(Name, Rate, Interval).
-
 %% @doc Allows to set a plan of gradual rate changes for a given `Name'.
 %%
 %% `Rate' will be changed from `FromRate' to `ToRate' in a series of consecutive steps.
@@ -105,14 +99,6 @@ change_rate(Name, Rate, Interval) ->
 -spec change_rate_gradually(name(), gradual_rate_config()) ->
     ok | {error, any()}.
 change_rate_gradually(Name, Config) ->
-    amoc_throttle_controller:change_rate_gradually(Name, Config).
-
-%% @see change_rate_gradually/2
--spec change_rate_gradually(name(), rate(), rate(), interval(), pos_integer(), pos_integer()) ->
-    ok | {error, any()}.
-change_rate_gradually(Name, FromRate, ToRate, RateInterval, StepInterval, StepCount) ->
-    Config = #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
-               step_interval => StepInterval, step_count => StepCount},
     amoc_throttle_controller:change_rate_gradually(Name, Config).
 
 %% @doc Executes a given function `Fn' when it does not exceed the rate for `Name'.

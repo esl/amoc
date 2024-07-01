@@ -27,7 +27,6 @@ groups() ->
        start_and_stop,
        change_rate,
        change_rate_gradually,
-       change_rate_gradually_descriptive,
        change_rate_gradually_verify_descriptions,
        just_wait,
        wait_for_process_to_die_sends_a_kill,
@@ -146,34 +145,33 @@ start_and_stop(_) ->
 
 change_rate(_) ->
     ?assertMatch({error, {no_throttle_by_name, ?FUNCTION_NAME}},
-                 amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL)),
+                 amoc_throttle:change_rate(?FUNCTION_NAME,
+                                           #{rate => 100, interval => ?DEFAULT_INTERVAL})),
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
-    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL)),
-    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)),
-    E1 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 2},
-    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E1)).
+    E1 = #{rate => 100, interval => ?DEFAULT_INTERVAL},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E1)),
+    E2 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 1},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E2)),
+    E3 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 2},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E3)).
 
 change_rate_gradually(_) ->
+    C1 = #{from_rate => 100, to_rate => 200, interval => 1,
+           step_interval => 1, step_count => 1},
     ?assertMatch({error, {no_throttle_by_name, ?FUNCTION_NAME}},
-                 amoc_throttle:change_rate_gradually(?FUNCTION_NAME, 100, 200, 1, 1, 1)),
+                 amoc_throttle:change_rate_gradually(?FUNCTION_NAME, C1)),
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
-    ?assertMatch(ok, amoc_throttle:change_rate_gradually(?FUNCTION_NAME, 10, 3000, 1, 100, 300)),
-    %% We cannot change rate while a current gradual change is already running.
-    ?assertMatch({error, cannot_change_rate},
-                 amoc_throttle:change_rate_gradually(?FUNCTION_NAME, 50, 200, 1, 1, 1)),
-    ?assertMatch({error, cannot_change_rate},
-                 amoc_throttle:change_rate(?FUNCTION_NAME, 100, ?DEFAULT_INTERVAL + 1)).
 
-change_rate_gradually_descriptive(_) ->
-    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
-    %% Bad description fails to change rate
-    D1 = #{from_rate => 50, to_rate => 200, interval => 1,
-           step_interval => 1, step_count => 1, step_size => 1},
-    ?assertMatch({error, _}, amoc_throttle:change_rate_gradually(?FUNCTION_NAME, D1)),
-    %% Good description changes rate successfully
-    Description = #{from_rate => 10, to_rate => 3000, interval => 1,
-                    step_interval => 100, step_count => 300, step_size => 9},
-    ?assertMatch(ok, amoc_throttle:change_rate_gradually(?FUNCTION_NAME, Description)).
+    C2 = #{from_rate => 10, to_rate => 3000, interval => 1,
+           step_interval => 100, step_count => 300},
+    ?assertMatch(ok, amoc_throttle:change_rate_gradually(?FUNCTION_NAME, C2)),
+    %% We cannot change rate while a current gradual change is already running.
+    C3 = #{from_rate => 50, to_rate => 200, interval => 1,
+           step_interval => 1, step_count => 1},
+    ?assertMatch({error, cannot_change_rate},
+                 amoc_throttle:change_rate_gradually(?FUNCTION_NAME, C3)),
+    E1 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 1},
+    ?assertMatch({error, cannot_change_rate}, amoc_throttle:change_rate(?FUNCTION_NAME, E1)).
 
 %% Bad description also fails
 change_rate_gradually_verify_descriptions(_) ->
