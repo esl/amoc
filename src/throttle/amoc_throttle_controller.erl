@@ -17,7 +17,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 -ifdef(TEST).
--export([verify_config/1]).
+-export([verify_gradual_config/1]).
 -endif.
 
 -define(SERVER, ?MODULE).
@@ -71,38 +71,14 @@ start_link() ->
 -spec ensure_throttle_processes_started(name(), amoc_throttle:config()) ->
     {ok, started | already_started} |
     {error, invalid_throttle | wrong_reconfiguration | wrong_no_of_procs}.
-ensure_throttle_processes_started(
-  Name, #{interarrival := Interarrival} = Config)
-  when is_atom(Name), ?TIMEOUT(Interarrival) ->
-    raise_event_on_slave_node(Name, init),
-    Config1 = #{rate => ?DEFAULT_INTERVAL div Interarrival, interval => ?DEFAULT_INTERVAL},
-    Config2 = Config1#{parallelism => maps:get(parallelism, Config, ?DEFAULT_NO_PROCESSES)},
-    gen_server:call(?MASTER_SERVER, {start_processes, Name, Config2});
-ensure_throttle_processes_started(
-  Name, #{rate := Rate, interval := Interval, parallelism := NoOfProcesses} = Config)
-  when is_atom(Name), ?TIMEOUT(Rate), ?NONNEG_INT(Interval), ?POS_INT(NoOfProcesses) ->
-    raise_event_on_slave_node(Name, init),
-    gen_server:call(?MASTER_SERVER, {start_processes, Name, Config});
-ensure_throttle_processes_started(
-  Name, #{rate := Rate, interval := Interval} = Config)
-  when is_atom(Name), ?TIMEOUT(Rate), ?NONNEG_INT(Interval) ->
-    raise_event_on_slave_node(Name, init),
-    Config1 = Config#{parallelism => ?DEFAULT_NO_PROCESSES},
-    gen_server:call(?MASTER_SERVER, {start_processes, Name, Config1});
-ensure_throttle_processes_started(
-  Name, #{rate := Rate, parallelism := NoOfProcesses} = Config)
-  when is_atom(Name), ?TIMEOUT(Rate), ?POS_INT(NoOfProcesses) ->
-    raise_event_on_slave_node(Name, init),
-    Config1 = Config#{interval => ?DEFAULT_INTERVAL},
-    gen_server:call(?MASTER_SERVER, {start_processes, Name, Config1});
-ensure_throttle_processes_started(
-  Name, #{rate := Rate} = Config)
-  when is_atom(Name), ?TIMEOUT(Rate) ->
-    raise_event_on_slave_node(Name, init),
-    Config1 = Config#{interval => ?DEFAULT_INTERVAL, parallelism => ?DEFAULT_NO_PROCESSES},
-    gen_server:call(?MASTER_SERVER, {start_processes, Name, Config1});
-ensure_throttle_processes_started(_Name, _Config) ->
-    {error, invalid_throttle}.
+ensure_throttle_processes_started(Name, Config) when is_atom(Name) ->
+    case verify_config(Config) of
+        {error, invalid_throttle} ->
+            {error, invalid_throttle};
+        VerifiedConfig ->
+            raise_event_on_slave_node(Name, init),
+            gen_server:call(?MASTER_SERVER, {start_processes, Name, VerifiedConfig})
+    end.
 
 -spec pause(name()) -> ok | {error, any()}.
 pause(Name) ->
@@ -122,7 +98,7 @@ change_rate(Name, Rate, Interval) ->
 
 -spec change_rate_gradually(name(), amoc_throttle:gradual_rate_config()) -> ok | {error, any()}.
 change_rate_gradually(Name, GradualChangeRate) ->
-    case verify_config(GradualChangeRate) of
+    case verify_gradual_config(GradualChangeRate) of
         {error, _} = Error ->
             Error;
         Config ->
@@ -370,9 +346,36 @@ run_cmd(Pid, resume) ->
 run_cmd(Pid, unlock) ->
     amoc_throttle_process:unlock(Pid).
 
--spec verify_config(amoc_throttle:gradual_rate_config()) -> gradual_rate_change() | {error, any()}.
-verify_config(Config) ->
-    try do_verify_config(Config) of
+-spec verify_config(amoc_throttle:config()) -> amoc_throttle:config() | {error, any()}.
+verify_config(#{interarrival := infinity} = Config) ->
+    Config1 = #{rate => 0, interval => ?DEFAULT_INTERVAL},
+    Config1#{parallelism => maps:get(parallelism, Config, ?DEFAULT_NO_PROCESSES)};
+verify_config(#{interarrival := 0} = Config) ->
+    Config1 = #{rate => infinity, interval => ?DEFAULT_INTERVAL},
+    Config1#{parallelism => maps:get(parallelism, Config, ?DEFAULT_NO_PROCESSES)};
+verify_config(#{interarrival := Interarrival} = Config)
+  when ?POS_INT(Interarrival) ->
+    Config1 = #{rate => ?DEFAULT_INTERVAL div Interarrival, interval => ?DEFAULT_INTERVAL},
+    Config1#{parallelism => maps:get(parallelism, Config, ?DEFAULT_NO_PROCESSES)};
+verify_config(#{rate := Rate, interval := Interval, parallelism := NoOfProcesses} = Config)
+  when ?TIMEOUT(Rate), ?NONNEG_INT(Interval), ?POS_INT(NoOfProcesses) ->
+    Config;
+verify_config(#{rate := Rate, interval := Interval} = Config)
+  when ?TIMEOUT(Rate), ?NONNEG_INT(Interval) ->
+    Config#{parallelism => ?DEFAULT_NO_PROCESSES};
+verify_config(#{rate := Rate, parallelism := NoOfProcesses} = Config)
+  when ?TIMEOUT(Rate), ?POS_INT(NoOfProcesses) ->
+    Config#{interval => ?DEFAULT_INTERVAL};
+verify_config(#{rate := Rate} = Config)
+  when ?TIMEOUT(Rate) ->
+    Config#{interval => ?DEFAULT_INTERVAL, parallelism => ?DEFAULT_NO_PROCESSES};
+verify_config(_Config) ->
+    {error, invalid_throttle}.
+
+-spec verify_gradual_config(amoc_throttle:gradual_rate_config()) ->
+    gradual_rate_change() | {error, any()}.
+verify_gradual_config(Config) ->
+    try do_verify_gradual_config(Config) of
         Change -> Change
     catch error:Reason ->
               {error, Reason}
@@ -386,8 +389,8 @@ check_step_size_with_from_to_rate(From, To, StepSize) when From > To, StepSize <
 
 check_step_parameters(StepSize, StepSize) -> ok.
 
--spec do_verify_config(amoc_throttle:gradual_rate_config()) -> gradual_rate_change().
-do_verify_config(
+-spec do_verify_gradual_config(amoc_throttle:gradual_rate_config()) -> gradual_rate_change().
+do_verify_gradual_config(
   #{from_rate := FromRate, to_rate := ToRate,
     step_interval := StepInterval, step_count := StepCount, step_size := StepSize} = Config) ->
     RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
@@ -395,14 +398,14 @@ do_verify_config(
     check_step_parameters((ToRate - FromRate) div StepCount, StepSize),
     #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
       step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_config(
+do_verify_gradual_config(
   #{from_rate := FromRate, to_rate := ToRate, duration := Duration}) ->
     StepSize = ?DEFAULT_STEP_SIZE * step_size_sign(FromRate, ToRate),
     StepCount = abs((ToRate - FromRate) div StepSize),
     StepInterval = abs(Duration div (ToRate - FromRate)),
     #{from_rate => FromRate, to_rate => ToRate, interval => ?DEFAULT_INTERVAL,
       step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_config(
+do_verify_gradual_config(
   #{from_rate := FromRate, to_rate := ToRate,
     step_interval := StepInterval, step_size := StepSize} = Config) ->
     RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
@@ -410,21 +413,21 @@ do_verify_config(
     StepCount = abs((ToRate - FromRate) div StepSize),
     #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
       step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_config(
+do_verify_gradual_config(
   #{from_rate := FromRate, to_rate := ToRate, step_interval := StepInterval} = Config) ->
     RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
     StepSize = ?DEFAULT_STEP_SIZE * step_size_sign(FromRate, ToRate),
     StepCount = abs((ToRate - FromRate) div StepSize),
     #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
       step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_config(
+do_verify_gradual_config(
   #{from_rate := FromRate, to_rate := ToRate, step_count := StepCount} = Config) ->
     RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
     StepSize = ?DEFAULT_STEP_SIZE * step_size_sign(FromRate, ToRate),
     StepInterval = (ToRate - FromRate) div (StepSize * StepCount),
     #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
       step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_config(
+do_verify_gradual_config(
   #{from_rate := FromRate, to_rate := ToRate, step_size := StepSize} = Config) ->
     check_step_size_with_from_to_rate(FromRate, ToRate, StepSize),
     RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
@@ -432,7 +435,7 @@ do_verify_config(
     StepInterval = abs((ToRate - FromRate) div StepCount),
     #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
       step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_config(
+do_verify_gradual_config(
   #{from_rate := FromRate, to_rate := ToRate} = Config) ->
     StepSize = ?DEFAULT_STEP_SIZE * step_size_sign(FromRate, ToRate),
     RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
