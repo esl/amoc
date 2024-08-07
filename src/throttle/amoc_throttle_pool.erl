@@ -23,7 +23,7 @@ start_process_pool(Name, Interval, Rate, NoOfProcesses) ->
         amoc_throttle:interval(),
         amoc_throttle:rate(),
         pos_integer()
-       ) -> {ok, Pid :: pid()}.
+       ) -> supervisor:startlink_ret().
 start_link(Name, Interval, Rate, NoOfProcesses) when NoOfProcesses > 0 ->
     supervisor:start_link(?MODULE, {Name, Interval, Rate, NoOfProcesses}).
 

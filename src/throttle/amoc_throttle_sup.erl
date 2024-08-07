@@ -29,7 +29,7 @@
 
 -export([start_link/0, init/1]).
 
--spec start_link() -> {ok, Pid :: pid()}.
+-spec start_link() -> supervisor:startlink_ret().
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 

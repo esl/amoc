@@ -38,7 +38,7 @@ maybe_wait(wait, RunnerPid) ->
 maybe_wait(_, _) ->
     ok.
 
--spec async_runner(amoc_throttle:name(), pid(), pid(), term()) -> no_return().
+-spec async_runner(amoc_throttle:name(), pid(), pid(), action()) -> true.
 async_runner(Name, Caller, ThrottlerPid, Action) ->
     ThrottlerMonitor = erlang:monitor(process, ThrottlerPid),
     amoc_throttle_controller:raise_event_on_slave_node(Name, request),

@@ -46,7 +46,7 @@
 %% Exported functions
 %%------------------------------------------------------------------------------
 
--spec start_link(atom(), amoc_throttle:interval(), amoc_throttle:rate()) -> {ok, pid()}.
+-spec start_link(atom(), amoc_throttle:interval(), amoc_throttle:rate()) -> gen_server:start_ret().
 start_link(Name, Interval, Rate) ->
     gen_server:start_link(?MODULE, {Name, Interval, Rate}, []).
 
