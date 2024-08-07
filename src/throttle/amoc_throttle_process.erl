@@ -151,12 +151,8 @@ handle_continue(maybe_run_fn, State) ->
     {noreply, NewState, timeout(NewState)}.
 
 -spec format_status(gen_server:format_status()) -> gen_server:format_status().
-format_status(#{state := #state{} = State} = FormatStatus) ->
-    ScheduleLen = length(State#state.schedule),
-    ScheduleRevLen = length(State#state.schedule_reversed),
-    State1 = setelement(#state.schedule, State, ScheduleLen),
-    State2 = setelement(#state.schedule_reversed, State1, ScheduleRevLen),
-    FormatStatus#{state := State2}.
+format_status(#{state := State} = FormatStatus) ->
+    FormatStatus#{state := printable_state(State)}.
 
 %%------------------------------------------------------------------------------
 %% internal functions
