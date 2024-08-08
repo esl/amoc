@@ -12,14 +12,16 @@
 %% Atom representing the name of the throttle.
 
 -type rate() :: infinity | non_neg_integer().
-%% Number of events per given `t:interval/0', or infinity for effectively unlocking all throttling.
-%% Note that a rate of zero means effectively pausing the throttle.
+%% Number of events per given `t:interval/0', or
+%% - infinity for effectively unlocking all throttling,
+%% - zero for effectively pausing the throttle.
 
 -type interarrival() :: infinity | non_neg_integer().
-%% Time in milliseconds between two events, or infinity for effectively pausing the throttle. Note
-%% that an interarrival of zero means effectively unlocking all throttling.
+%% Time in milliseconds between two events, or
+%% - infinity for effectively pausing the throttle,
+%% - zero for effectively unlocking all throttling.
 
--type interval() :: non_neg_integer().
+-type interval() :: pos_integer().
 %% In milliseconds, defaults to 60000 (one minute).
 
 -type throttle() :: #{rate := rate(), interval := interval()} |
