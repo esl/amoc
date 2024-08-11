@@ -17,7 +17,7 @@ run(RunnerPid) ->
 
 -spec throttle(amoc_throttle:name(), action()) -> ok | {error, any()}.
 throttle(Name, Action) ->
-    case amoc_throttle_process:get_throttle_process(Name) of
+    case amoc_throttle_controller:get_throttle_process(Name) of
         {ok, ThrottlerPid} ->
             Args = [Name, self(), ThrottlerPid, Action],
             RunnerPid = erlang:spawn_link(?MODULE, async_runner, Args),

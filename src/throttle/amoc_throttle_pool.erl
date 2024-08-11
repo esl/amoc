@@ -5,52 +5,30 @@
 
 -behaviour(supervisor).
 
--export([start_process_pool/4]).
--export([start_link/4, init/1]).
+-export([start_link/2, init/1]).
 
--spec start_process_pool(
-        amoc_throttle:name(),
-        amoc_throttle:interval(),
-        amoc_throttle:rate(),
-        pos_integer()
-       ) -> ok | error.
-start_process_pool(Name, Interval, Rate, NoOfProcesses) ->
-    {ok, _} = supervisor:start_child(amoc_throttle_pooler, [Name, Interval, Rate, NoOfProcesses]),
-    ok.
+-spec start_link(amoc_throttle:name(), amoc_throttle_controller:pool_config()) ->
+    supervisor:startlink_ret().
+start_link(Name, PoolConfig) ->
+    case supervisor:start_link(?MODULE, {Name, PoolConfig}) of
+        {ok, Pid} ->
+            {ok, Pid};
+        Else ->
+            Else
+    end.
 
--spec start_link(
-        amoc_throttle:name(),
-        amoc_throttle:interval(),
-        amoc_throttle:rate(),
-        pos_integer()
-       ) -> supervisor:startlink_ret().
-start_link(Name, Interval, Rate, NoOfProcesses) when NoOfProcesses > 0 ->
-    supervisor:start_link(?MODULE, {Name, Interval, Rate, NoOfProcesses}).
-
--spec init({amoc_throttle:name(), amoc_throttle:rate(), amoc_throttle:interval(), pos_integer()}) ->
+-spec init({amoc_throttle:name(), amoc_throttle_controller:pool_config()}) ->
     {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
-init({Name, Interval, Rate, NoOfProcesses}) ->
-    RatesPerProcess = calculate_rate_per_process(Rate, NoOfProcesses),
-    Tags = lists:seq(1, NoOfProcesses),
+init({Name, ConfigPerProcess}) ->
     Children = [
-                #{id => {amoc_throttle_process, Name, N},
-                  start => {amoc_throttle_process, start_link, [Name, Interval, RatePerProcess]},
+                #{id => {amoc_throttle_process, N},
+                  start => {amoc_throttle_process, start_link, [Name, MaxN, Delay]},
                   type => worker,
-                  shutdown => timer:seconds(5),
+                  shutdown => timer:seconds(60),
                   restart => transient,
                   modules => [amoc_throttle_process]
                  }
-                || {RatePerProcess, N} <- lists:zip(RatesPerProcess, Tags)
+                || {N, #{max_n := MaxN, delay := Delay}} <- maps:to_list(ConfigPerProcess)
                ],
     SupFlags = #{strategy => one_for_one, intensity => 0},
     {ok, {SupFlags, Children}}.
-
-%% Helpers
-calculate_rate_per_process(Rate, NoOfProcesses) ->
-    calculate_rate_per_process([], Rate, NoOfProcesses).
-
-calculate_rate_per_process(Acc, Rate, 1) ->
-    [Rate | Acc];
-calculate_rate_per_process(Acc, Rate, N) when is_integer(N), N > 1 ->
-    ProcessRate = Rate div N,
-    calculate_rate_per_process([ProcessRate | Acc], Rate - ProcessRate, N - 1).

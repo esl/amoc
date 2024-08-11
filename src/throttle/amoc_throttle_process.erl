@@ -112,7 +112,7 @@ format_status(#{state := State} = FormatStatus) ->
 
 initial_state(Name, infinity, 0) ->
     #state{name = Name, max_n = infinity, delay_between_executions = 0};
-initial_state(Name, 0, infinity) ->
+initial_state(Name, MaxN, infinity) when is_integer(MaxN) ->
     #state{name = Name, max_n = 0, delay_between_executions = infinity};
 initial_state(Name, MaxN, Delay) when is_integer(MaxN), is_integer(Delay) ->
     #state{name = Name, max_n = MaxN, delay_between_executions = Delay}.

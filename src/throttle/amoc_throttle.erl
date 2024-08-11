@@ -24,16 +24,9 @@
 -type interval() :: pos_integer().
 %% In milliseconds, defaults to 60000 (one minute).
 
--type throttle() :: #{rate := rate(), interval := interval()} |
-                    #{interarrival := interarrival()}.
+-type t() :: #{rate := rate(), interval => interval()} |
+             #{interarrival := interarrival()}.
 %% Throttle unit of measurement
-
--type config() :: #{rate := rate(),
-                    interval => interval(),
-                    parallelism => non_neg_integer()}
-                | #{interarrival := interarrival(),
-                    parallelism => non_neg_integer()}.
-%% Literal throttle configuration.
 
 -type gradual_rate_config() :: #{from_rate := non_neg_integer(),
                                  to_rate := non_neg_integer(),
@@ -42,8 +35,8 @@
                                  step_size => pos_integer(),
                                  step_count => pos_integer(),
                                  duration => pos_integer()} |
-                               #{from_interarrival := interarrival(),
-                                 to_interarrival := interarrival(),
+                               #{from_interarrival := pos_integer(),
+                                 to_interarrival := pos_integer(),
                                  step_interval => pos_integer(),
                                  step_size => pos_integer(),
                                  step_count => pos_integer(),
@@ -55,14 +48,14 @@
 %%
 %% All other values can be calculated from the provided.
 
--export_type([name/0, rate/0, interval/0, throttle/0, config/0, gradual_rate_config/0]).
+-export_type([t/0, name/0, rate/0, interval/0, gradual_rate_config/0]).
 
 %% @doc Starts the throttle mechanism for a given `Name' with a given config.
 %%
-%% The optional arguments are an `Interval' (default is one minute) and a ` NoOfProcesses' (default is 10).
 %% `Name' is needed to identify the rate as a single test can have different rates for different tasks.
-%% `Interval' is given in milliseconds and can be changed to a different value for convenience or higher granularity.
--spec start(name(), config() | rate()) -> {ok, started | already_started} | {error, any()}.
+%% `Interval' is given in milliseconds, the default is one minute,
+%% and can be changed to a different value for convenience or higher granularity.
+-spec start(name(), t() | rate()) -> {ok, started | already_started} | {error, any()}.
 start(Name, #{} = Config) ->
     amoc_throttle_controller:ensure_throttle_processes_started(Name, Config);
 start(Name, Rate) ->
@@ -75,23 +68,23 @@ start(Name, Rate) ->
 pause(Name) ->
     amoc_throttle_controller:pause(Name).
 
-%% @doc Resumes the executions for the given `Name', to their original `Rate' and `Interval' values.
--spec resume(name()) -> ok | {error, any()}.
-resume(Name) ->
-    amoc_throttle_controller:resume(Name).
-
 %% @doc Unlocks executions for the given `Name' as if `Rate' was set to `infinity'.
 -spec unlock(name()) -> ok | {error, any()}.
 unlock(Name) ->
     amoc_throttle_controller:unlock(Name).
 
+%% @doc Resumes the executions for the given `Name', to their original `Rate' and `Interval' values.
+-spec resume(name()) -> ok | {error, any()}.
+resume(Name) ->
+    amoc_throttle_controller:resume(Name).
+
 %% @doc Sets `Throttle' for `Name' according to the given values.
 %%
 %% Can change whether Amoc throttle limits `Name' to parallel executions or to `Rate' per `Interval',
 %% according to the given `Interval' value.
--spec change_rate(name(), throttle()) -> ok | {error, any()}.
-change_rate(Name, #{rate := Rate, interval := Interval}) ->
-    amoc_throttle_controller:change_rate(Name, Rate, Interval).
+-spec change_rate(name(), t()) -> ok | {error, any()}.
+change_rate(Name, Config) ->
+    amoc_throttle_controller:change_rate(Name, Config).
 
 %% @doc Allows to set a plan of gradual rate changes for a given `Name'.
 %%

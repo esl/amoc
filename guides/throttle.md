@@ -1,6 +1,6 @@
 ## API
 
-See `amoc_throttle`
+See `amoc_throttle`.
 
 ## Overview
 
@@ -9,9 +9,8 @@ It works in both local and distributed environments, allows for dynamic rate cha
 
 Amoc throttle allows to:
 
-- Setting the execution `Rate` per `Interval`
+- Setting the execution `Rate` per `Interval`, or inversely, the `Interarrival` time between actions.
 - Limiting the number of parallel executions when `Rate` is set to `infinity`
-- Setting the `Interarrival` time between actions.
 
 Each `Rate` is identified with a `Name`.
 The rate limiting mechanism allows responding to a request only when it does not exceed the given `Rate`.
