@@ -28,6 +28,7 @@
 -define(DEFAULT_STEP_SIZE, 1).
 -define(DEFAULT_INTERVAL, 60000). %% one minute
 -define(TIMEOUT(N), (infinity =:= N orelse is_integer(N) andalso N >= 0)).
+-define(NON_NEG_INT(N), (is_integer(N) andalso N >= 0)).
 -define(POS_INT(N), (is_integer(N) andalso N > 0)).
 
 -record(throttle_info, {
@@ -343,12 +344,20 @@ pool_config(infinity, _) ->
 pool_config(0, _) ->
     Config = #{max_n => 0, delay => infinity, status => active, pid => undefined},
     maps:from_keys(lists:seq(1, no_of_processes()), Config);
+pool_config(Rate, 0) ->
+    Config = #{max_n => Rate, delay => infinity, status => inactive, pid => undefined},
+    PoolConfig = #{1 := First} = maps:from_keys(lists:seq(1, no_of_processes()), Config),
+    PoolConfig#{1 := First#{status => active}};
 pool_config(Rate, Interval) ->
     NoOfProcesses = no_of_processes(),
     RatePerMinutePerProcess = (60000 * Rate div Interval) div NoOfProcesses,
     DelayPerProcess = (NoOfProcesses * Interval) div Rate,
     Rem = ((60000 * Rate div Interval) rem NoOfProcesses)
             + ((NoOfProcesses * Interval) rem Rate),
+    calculate_availability(RatePerMinutePerProcess, DelayPerProcess, NoOfProcesses, Rem).
+
+-spec calculate_availability(integer(), integer(), pos_integer(), integer()) -> pool_config().
+calculate_availability(RatePerMinutePerProcess, DelayPerProcess, NoOfProcesses, Rem) ->
     Fun = fun(N, {Acc, R}) ->
                   case {RatePerMinutePerProcess < NoOfProcesses, R} of
                       {true, 0} ->
@@ -441,7 +450,7 @@ verify_config(#{interarrival := Interarrival} = Config)
   when 1 =:= map_size(Config), ?POS_INT(Interarrival) ->
     #{rate => ?DEFAULT_INTERVAL div Interarrival, interval => ?DEFAULT_INTERVAL};
 verify_config(#{rate := Rate, interval := Interval} = Config)
-  when 2 =:= map_size(Config), ?TIMEOUT(Rate), ?POS_INT(Interval) ->
+  when 2 =:= map_size(Config), ?TIMEOUT(Rate), ?NON_NEG_INT(Interval) ->
     Config;
 verify_config(#{rate := Rate} = Config)
   when 1 =:= map_size(Config), ?TIMEOUT(Rate) ->

@@ -27,7 +27,9 @@ groups() ->
        low_interval_does_not_get_remapped,
        start_and_stop,
        change_rate,
-       change_rate_triggers_paralellism,
+       interval_equal_zero_limits_parallelism,
+       change_rate_to_interval_zero_limits_parallelism,
+       change_rate_triggers_parallelism,
        change_rate_gradually,
        change_interarrival_gradually,
        change_rate_gradually_verify_descriptions,
@@ -147,7 +149,20 @@ change_rate(_) ->
     ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E3)),
     ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 200)).
 
-change_rate_triggers_paralellism(_) ->
+interval_equal_zero_limits_parallelism(_) ->
+    E1 = #{rate => 36, interval => 0},
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, E1)),
+    #{pool_config := Config0} = get_throttle_info(?FUNCTION_NAME),
+    ?assertEqual(1, map_size(maps:filter(fun(_, #{status := S}) -> S =:= active end, Config0))).
+
+change_rate_to_interval_zero_limits_parallelism(_) ->
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
+    E1 = #{rate => 100, interval => 0},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E1)),
+    #{pool_config := Config0} = get_throttle_info(?FUNCTION_NAME),
+    ?assertEqual(1, map_size(maps:filter(fun(_, #{status := S}) -> S =:= active end, Config0))).
+
+change_rate_triggers_parallelism(_) ->
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 1)),
     #{pool_config := Config0} = get_throttle_info(?FUNCTION_NAME),
     ?assertEqual(1, map_size(maps:filter(fun(_, #{status := S}) -> S =:= active end, Config0))),

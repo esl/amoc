@@ -44,6 +44,9 @@ start_link(Name, MaxN, Delay) ->
 run(Pid, RunnerPid) ->
     gen_server:cast(Pid, {schedule, RunnerPid}).
 
+%% @doc See `initial_state/1'.
+%%
+%% Setting the delay to infinity results in the effective pausing of the process.
 -spec update(pid(), amoc_throttle:rate(), timeout()) -> ok.
 update(Pid, MaxN, Delay) ->
     gen_server:cast(Pid, {update, MaxN, Delay}).
@@ -110,11 +113,16 @@ format_status(#{state := State} = FormatStatus) ->
 %% internal functions
 %%------------------------------------------------------------------------------
 
-initial_state(Name, infinity, 0) ->
-    #state{name = Name, max_n = infinity, delay_between_executions = 0};
-initial_state(Name, MaxN, infinity) when is_integer(MaxN) ->
-    #state{name = Name, max_n = 0, delay_between_executions = infinity};
-initial_state(Name, MaxN, Delay) when is_integer(MaxN), is_integer(Delay) ->
+%% - If `Delay' is infinity, we mean to pause the process, see how at `maybe_start_timer/1'
+%%      a delay of infinity will set `can_run_fn = false'.
+%%
+%% - If `MaxN' is infinity and `Delay' is a number, we mean no limits to throttling,
+%%      see how `maybe_start_timer/1' will not actually start any timer
+%%      and `maybe_run_fn/1' with `max_n = infinity' will loop without pause.
+%%
+%% - If both `MaxN' and `Delay' are numbers, this will be the actual rate/interval.
+-spec initial_state(Name :: atom(), MaxN :: amoc_throttle:rate(), Delay :: timeout()) -> state().
+initial_state(Name, MaxN, Delay) ->
     #state{name = Name, max_n = MaxN, delay_between_executions = Delay}.
 
 merge_state(#state{delay_between_executions = D, max_n = MaxN}, #state{} = OldState) ->

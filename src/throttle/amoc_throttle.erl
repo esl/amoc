@@ -21,8 +21,12 @@
 %% - infinity for effectively pausing the throttle,
 %% - zero for effectively unlocking all throttling.
 
--type interval() :: pos_integer().
+-type interval() :: non_neg_integer().
 %% In milliseconds, defaults to 60000 (one minute).
+%%
+%% Note that an interval of zero means effectively allowing `t:rate/0' number of executions in
+%% parallel. It might be expected for this to be always `infinity' as a result of the limit when
+%% dividing by zero, but this needs to be made explicit in the `t:rate/0' by setting it to infinity.
 
 -type t() :: #{rate := rate(), interval => interval()} |
              #{interarrival := interarrival()}.
@@ -31,13 +35,13 @@
 -type gradual_rate_config() :: #{from_rate := non_neg_integer(),
                                  to_rate := non_neg_integer(),
                                  interval => interval(),
-                                 step_interval => interval(),
+                                 step_interval => pos_integer(),
                                  step_size => pos_integer(),
                                  step_count => pos_integer(),
                                  duration => pos_integer()} |
                                #{from_interarrival := interarrival(),
                                  to_interarrival := interarrival(),
-                                 step_interval => interval(),
+                                 step_interval => pos_integer(),
                                  step_size => pos_integer(),
                                  step_count => pos_integer(),
                                  duration => pos_integer()}.
@@ -109,7 +113,7 @@ change_rate_gradually(Name, Config) ->
 %% `Fn' is executed in the context of a new process spawned on the same node on which
 %% the process executing `run/2' runs, so a call to `run/2' is non-blocking.
 %%
-%% <a href="https://sequencediagram.org/index.html#initialData=C4S2BsFMAIEEFsD2BjaATEBnYAnEAjAV2EjQCgAHAQx1GRGoDtgBzHRQi6aAKh4GVwVAG4xGiNJD5lu3arRD0mwaAFVMkHDNny6DKsziYAno1Q5CjRprKRG5XYv3M2HLnwCyVbJujjJ0rLQjkoGKgAqABbswBAwFOzIkJiYtvZk+IgAHtBQAGYqiHlqGjgAXNAgZtA4kACONVQkZGTqvgC0AHy8sCbVFla+FQBili1tONBd0FExccGJyZjQFQDemMiRpIRQADRGpuaW1pMACgCSACIAvhnZNSAskYXFs4ixUAsoSyuV-fWNZpkAC8wOA0Xe4HAVRY6EgQmMoJabw+8UWKSm3V6hxqx00FQ2WzQO1ILUyOXyLwO-TxkwqVVQkCykHMTUgZCo5OgiFEk2xNMGdOgo0YAAoAJQc5CgYRs6lHQV3HJ4J5UlHzBLfDH06pMlmA9mSKjSkCykjy3GK-kKk6Y9WfTVJFJlADklwA8gB1AByLrIkmw7GMFoGJzIQA" target="_blank">Diagram</a>
+%% <a href="https://sequencediagram.org/index.html#initialData=C4S2BsFMAIEEFsD2BjaATEBnYAnEAjAV2EjQCgyAHAQx1GRBoDtgBzHRQy6aAKl4DK4agDcYTRGkj8yPHjTogGzYNACqmSDllyF9RtRZxMATyaochJky1lITcnqUGW7Tt34BZati3QJUjJy0E7KhqoAKgAWHMAQMJQcyJCYmHYOZPiIAB7QUABmqoj56po4AFzQOJAAjoQpqiRQ8JC4JtCQYiwUGn4AtAB8fLCm5lVWNjjQlQBiVj1l0IPQ0bHxIUkpmNPQAN6YyFGkhFAANMZmFhN+AAoAkgAiAL6ZOVUgrFFFJauIcVAbFBbHbVOoNaBNSAtNodLrACgAXgRwBif3A4BATFY6EgwhMSIov3+CU2qSWQxGl3G1i0lQORzQJ1Ir1yeE+3xWqOJgOSZMqkGykGQxBAiCYENxUNaOHanXs8MwNGSSwArCy8pBCtBihcxpYaVN+YLhaAxRLmtLZXCyNQsrlEGIppS9ddDdB6ccoGhoNRkKamDa-SARNQSLqrgayIrfZAyFJfaAQ2HnRHJmQU9TJuSietEkDUuUAOQPADyAHUAHKFuMNDjtDP6yZAA" target="_blank">Diagram</a>
 %% showing function execution flow in distributed environment.
 %% ```
 %% title Amoc distributed
@@ -120,21 +124,22 @@ change_rate_gradually(Name, Config) ->
 %% participantgroup **Master node**
 %%     participant Throttle process
 %% end
-%% box left of User: inc req rate
+%% box left of User: request telemetry event
 %%
 %% User -> *Async runner : Fun
 %%
 %% User -> Throttle process : {schedule, Async runner PID}
-%% box right of Throttle process : inc req rate
+%% box right of Throttle process : request telemetry event
 %%
 %% ==throtlling delay==
 %%
 %% Throttle process -> Async runner: scheduled
-%%
-%% box left of Async runner : inc exec rate
-%% abox over Async runner : Fun()
+%% box right of Throttle process : execution telemetry event
+%% space -5
+%% box left of Async runner : execution telemetry event
+%% abox over Async runner : scheduled action
 %% activate Async runner
-%% box right of Throttle process : inc exec rate
+%% space
 %% deactivate Async runner
 %% Async runner ->Throttle process:'DOWN'
 %% destroy Async runner
