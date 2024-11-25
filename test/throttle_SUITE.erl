@@ -144,7 +144,8 @@ change_rate(_) ->
     E2 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 1},
     ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E2)),
     E3 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 2},
-    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E3)).
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E3)),
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 200)).
 
 change_rate_triggers_paralellism(_) ->
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 1)),

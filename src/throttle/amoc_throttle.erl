@@ -82,9 +82,11 @@ resume(Name) ->
 %%
 %% Can change whether Amoc throttle limits `Name' to parallel executions or to `Rate' per `Interval',
 %% according to the given `Interval' value.
--spec change_rate(name(), t()) -> ok | {error, any()}.
-change_rate(Name, Config) ->
-    amoc_throttle_controller:change_rate(Name, Config).
+-spec change_rate(name(), t() | rate()) -> ok | {error, any()}.
+change_rate(Name, #{} = Config) ->
+    amoc_throttle_controller:change_rate(Name, Config);
+change_rate(Name, Rate) when is_integer(Rate) ->
+    amoc_throttle_controller:change_rate(Name, #{rate => Rate}).
 
 %% @doc Allows to set a plan of gradual rate changes for a given `Name'.
 %%
