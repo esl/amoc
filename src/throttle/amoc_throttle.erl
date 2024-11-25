@@ -1,5 +1,5 @@
 %% @copyright 2024 Erlang Solutions Ltd.
-%% @doc This module allows to synchronize the users and act on groups of them.
+%% @doc Allows limiting the number of users' actions per interval.
 -module(amoc_throttle).
 
 %% API
@@ -106,37 +106,36 @@ change_rate_gradually(Name, Config) ->
 %% `Fn' is executed in the context of a new process spawned on the same node on which
 %% the process executing `run/2' runs, so a call to `run/2' is non-blocking.
 %%
-%% Diagram showing function execution flow in distributed environment,
-%% generated using https://sequencediagram.org/:
+%% <a href="https://sequencediagram.org/index.html#initialData=C4S2BsFMAIEEFsD2BjaATEBnYAnEAjAV2EjQCgAHAQx1GRGoDtgBzHRQi6aAKh4GVwVAG4xGiNJD5lu3arRD0mwaAFVMkHDNny6DKsziYAno1Q5CjRprKRG5XYv3M2HLnwCyVbJujjJ0rLQjkoGKgAqABbswBAwFOzIkJiYtvZk+IgAHtBQAGYqiHlqGjgAXNAgZtA4kACONVQkZGTqvgC0AHy8sCbVFla+FQBili1tONBd0FExccGJyZjQFQDemMiRpIRQADRGpuaW1pMACgCSACIAvhnZNSAskYXFs4ixUAsoSyuV-fWNZpkAC8wOA0Xe4HAVRY6EgQmMoJabw+8UWKSm3V6hxqx00FQ2WzQO1ILUyOXyLwO-TxkwqVVQkCykHMTUgZCo5OgiFEk2xNMGdOgo0YAAoAJQc5CgYRs6lHQV3HJ4J5UlHzBLfDH06pMlmA9mSKjSkCykjy3GK-kKk6Y9WfTVJFJlADklwA8gB1AByLrIkmw7GMFoGJzIQA" target="_blank">Diagram</a>
+%% showing function execution flow in distributed environment.
 %% ```
-%%        title Amoc distributed
-%%        participantgroup  **Slave node**
-%%            participant User
-%%            participant Async runner
-%%        end
-%%        participantgroup **Master node**
-%%            participant Throttle process
-%%        end
-%%        box left of User: inc req rate
+%% title Amoc distributed
+%% participantgroup  **Slave node**
+%%     participant User
+%%     participant Async runner
+%% end
+%% participantgroup **Master node**
+%%     participant Throttle process
+%% end
+%% box left of User: inc req rate
 %%
-%%        User -> *Async runner : Fun
+%% User -> *Async runner : Fun
 %%
-%%        User -> Throttle process : {schedule, Async runner PID}
-%%        box right of Throttle process : inc req rate
+%% User -> Throttle process : {schedule, Async runner PID}
+%% box right of Throttle process : inc req rate
 %%
-%%        ==throtlling delay==
+%% ==throtlling delay==
 %%
-%%        Throttle process -> Async runner: scheduled
+%% Throttle process -> Async runner: scheduled
 %%
-%%        box left of Async runner : inc exec rate
-%%        abox over Async runner : Fun()
-%%        activate Async runner
-%%        box right of Throttle process : inc exec rate
-%%        deactivate Async runner
-%%        Async runner ->Throttle process:'DOWN'
-%%        destroy Async runner
+%% box left of Async runner : inc exec rate
+%% abox over Async runner : Fun()
+%% activate Async runner
+%% box right of Throttle process : inc exec rate
+%% deactivate Async runner
+%% Async runner ->Throttle process:'DOWN'
+%% destroy Async runner
 %% '''
-%% for the local execution, req/exec rates are increased only by throttle process.
 -spec run(name(), fun(() -> any())) -> ok | {error, any()}.
 run(Name, Fn) ->
     amoc_throttle_runner:throttle(Name, Fn).

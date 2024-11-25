@@ -1,6 +1,6 @@
 ## API
 
-See `amoc_throttle`.
+See `m:amoc_throttle`.
 
 ## Overview
 
