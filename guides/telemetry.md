@@ -62,7 +62,7 @@ This event is raised only on the master node.
 
 ```erlang
 event_name: [amoc, throttle, rate]
-measurements: #{rate_per_minute := float()}
+measurements: #{rate := rate(), interval := interval()}
 metadata: #{monotonic_time := integer(), name := atom(), msg => binary()}
 ```
 

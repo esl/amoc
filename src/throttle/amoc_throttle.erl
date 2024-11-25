@@ -31,20 +31,24 @@
 -type gradual_rate_config() :: #{from_rate := non_neg_integer(),
                                  to_rate := non_neg_integer(),
                                  interval => interval(),
-                                 step_interval => pos_integer(),
+                                 step_interval => interval(),
                                  step_size => pos_integer(),
                                  step_count => pos_integer(),
                                  duration => pos_integer()} |
-                               #{from_interarrival := pos_integer(),
-                                 to_interarrival := pos_integer(),
-                                 step_interval => pos_integer(),
+                               #{from_interarrival := interarrival(),
+                                 to_interarrival := interarrival(),
+                                 step_interval => interval(),
                                  step_size => pos_integer(),
                                  step_count => pos_integer(),
                                  duration => pos_integer()}.
 %% Configuration for a gradual throttle rate change
 %%
-%% `From' and `To' rates are required. `interval' defaults to 1s and `step_size' to 1 (or -1 if applies),
+%% `From' and `To' rates are required.
+%% `interval' defaults to 1s and `step_size' to 1 (or -1 if applies),
 %% that is, the throttle will be changed in increments of 1.
+%%
+%% `duration' is an alternative way of setting `step_interval',
+%% and `step_count' is an alternative for `step_size'.
 %%
 %% All other values can be calculated from the provided.
 
@@ -53,8 +57,6 @@
 %% @doc Starts the throttle mechanism for a given `Name' with a given config.
 %%
 %% `Name' is needed to identify the rate as a single test can have different rates for different tasks.
-%% `Interval' is given in milliseconds, the default is one minute,
-%% and can be changed to a different value for convenience or higher granularity.
 -spec start(name(), t() | rate()) -> {ok, started | already_started} | {error, any()}.
 start(Name, #{} = Config) ->
     amoc_throttle_controller:ensure_throttle_processes_started(Name, Config);
@@ -63,7 +65,7 @@ start(Name, Rate) ->
 
 %% @doc Pauses executions for the given `Name' as if `Rate' was set to `0'.
 %%
-%% Does not stop the scheduled rate changes.
+%% Does not stop the scheduled rate changes. `resume/1' undoes the pausing.
 -spec pause(name()) -> ok | {error, any()}.
 pause(Name) ->
     amoc_throttle_controller:pause(Name).
@@ -74,14 +76,13 @@ unlock(Name) ->
     amoc_throttle_controller:unlock(Name).
 
 %% @doc Resumes the executions for the given `Name', to their original `Rate' and `Interval' values.
+%%
+%% It is the counterpart to the `pause/1' API, resuming the execution of what that mechanism paused.
 -spec resume(name()) -> ok | {error, any()}.
 resume(Name) ->
     amoc_throttle_controller:resume(Name).
 
-%% @doc Sets `Throttle' for `Name' according to the given values.
-%%
-%% Can change whether Amoc throttle limits `Name' to parallel executions or to `Rate' per `Interval',
-%% according to the given `Interval' value.
+%% @doc Sets the throttle `Config' for `Name' according to the given values.
 -spec change_rate(name(), t() | rate()) -> ok | {error, any()}.
 change_rate(Name, #{} = Config) ->
     amoc_throttle_controller:change_rate(Name, Config);
@@ -90,14 +91,14 @@ change_rate(Name, Rate) when is_integer(Rate) ->
 
 %% @doc Allows to set a plan of gradual rate changes for a given `Name'.
 %%
-%% `Rate' will be changed from `FromRate' to `ToRate' in a series of consecutive steps.
-%% Note that `FromRate' does not need to be lower than `ToRate', rates can be changed downwards.
+%% The configuration will be changed in a series of consecutive steps.
+%% Rates can be changed upwards as well as downwards.
 %%
 %% The rate is calculated at each step in relation to the `RateInterval', which can also be `0'.
 %% There will be `NoOfSteps' steps, each taking `StepInterval' time in milliseconds.
 %%
-%% Be aware that, at first, the rate will be changed to `FromRate' per `RateInterval'
-%% and this is not considered a step.
+%% Be aware that, at first, the rate will be changed to the initial point given
+%% in the configuration, and this is not considered a step.
 -spec change_rate_gradually(name(), gradual_rate_config()) ->
     ok | {error, any()}.
 change_rate_gradually(Name, Config) ->

@@ -247,10 +247,10 @@ raise_event(Name, Event) when Event =:= request; Event =:= execute; Event =:= in
     amoc_telemetry:execute([throttle, Event], #{count => 1}, #{name => Name}).
 
 report_rate(Name, infinity, _) ->
-    amoc_telemetry:execute([throttle, rate], #{rate_per_minute => infinity}, #{name => Name});
+    amoc_telemetry:execute([throttle, rate], #{rate => infinity}, #{name => Name});
 report_rate(Name, Rate, Interval) ->
-    RatePerMinute = (Rate * 60000) div Interval,
-    amoc_telemetry:execute([throttle, rate], #{rate_per_minute => RatePerMinute}, #{name => Name}).
+    Measurements = #{rate => Rate, interval => Interval},
+    amoc_telemetry:execute([throttle, rate], Measurements, #{name => Name}).
 
 -spec do_start_throttle(name(), amoc_throttle:rate(), amoc_throttle:interval(), state()) ->
     {reply, {ok, started}, state()} |
