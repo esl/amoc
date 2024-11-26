@@ -10,12 +10,7 @@
 -spec start_link(amoc_throttle:name(), amoc_throttle_config:pool_config()) ->
     supervisor:startlink_ret().
 start_link(Name, PoolConfig) ->
-    case supervisor:start_link(?MODULE, {Name, PoolConfig}) of
-        {ok, Pid} ->
-            {ok, Pid};
-        Else ->
-            Else
-    end.
+    supervisor:start_link(?MODULE, {Name, PoolConfig}).
 
 -spec init({amoc_throttle:name(), amoc_throttle_config:pool_config()}) ->
     {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
