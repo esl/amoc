@@ -146,7 +146,7 @@ maybe_stop_timer(#state{tref = TRef}) ->
     consume_all_timer_ticks(delay_between_executions).
 
 timeout(#state{delay_between_executions = infinity}) ->
-    ?DEFAULT_MSG_TIMEOUT;
+    infinity;
 timeout(#state{delay_between_executions = Delay}) ->
     Delay + ?DEFAULT_MSG_TIMEOUT.
 
