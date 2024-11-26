@@ -210,53 +210,53 @@ change_rate_gradually_verify_descriptions(_) ->
     D0 = #{from_rate => 1000, to_rate => 3000, duration => 30000},
     ?assertMatch(
        #{interval := 60000, step_size := 1, step_count := 2000, step_interval := 15},
-       amoc_throttle_controller:verify_gradual_config(D0)),
+       amoc_throttle_config:verify_gradual_config(D0)),
     %% Condition 1
     D1 = #{from_rate => 3000, to_rate => 100, duration => 30000},
     ?assertMatch(
        #{interval := 60000, step_size := -1, step_count := 2900, step_interval := 10},
-       amoc_throttle_controller:verify_gradual_config(D1)),
+       amoc_throttle_config:verify_gradual_config(D1)),
     %% Condition 2A
     D2A = #{from_rate => 0, to_rate => 3000, interval => 10000, step_size => 2},
     ?assertMatch(
        #{step_size := 2, step_count := 1500, step_interval := 2},
-       amoc_throttle_controller:verify_gradual_config(D2A)),
+       amoc_throttle_config:verify_gradual_config(D2A)),
     %% Condition 2B
     D2B = #{from_rate => 3000, to_rate => 0, interval => 10000, step_size => -2},
     ?assertMatch(
        #{step_size := -2, step_count := 1500, step_interval := 2},
-       amoc_throttle_controller:verify_gradual_config(D2B)),
+       amoc_throttle_config:verify_gradual_config(D2B)),
     %% Condition 3
     D3 = #{from_rate => 80, to_rate => 5000, interval => 1000, step_interval => 10},
     ?assertMatch(
        #{step_size := 1, step_count := 4920, step_interval := 10},
-       amoc_throttle_controller:verify_gradual_config(D3)),
+       amoc_throttle_config:verify_gradual_config(D3)),
     %% Condition 4
     D4 = #{from_rate => 80, to_rate => 5000, interval => 15000, step_count => 90},
     ?assertMatch(
        #{step_size := 1, step_count := 90, step_interval := 54},
-       amoc_throttle_controller:verify_gradual_config(D4)),
+       amoc_throttle_config:verify_gradual_config(D4)),
     %% Condition 5
     D5 = #{from_rate => 80, to_rate => 5000, interval => 15000,
            step_size => 5, step_interval => 50},
     ?assertMatch(
        #{step_size := 5, step_count := 984, step_interval := 50},
-       amoc_throttle_controller:verify_gradual_config(D5)),
+       amoc_throttle_config:verify_gradual_config(D5)),
     %% Condition 6
     D6 = #{from_rate => 80, to_rate => 5000},
     ?assertMatch(
        #{interval := 60000, step_size := 1, step_count := 4920, step_interval := 1},
-       amoc_throttle_controller:verify_gradual_config(D6)),
+       amoc_throttle_config:verify_gradual_config(D6)),
     %% Condition 7
     D7 = #{from_rate => 4000, to_rate => 1200},
     ?assertMatch(
        #{interval := 60000, step_size := -1, step_count := 2800, step_interval := 1},
-       amoc_throttle_controller:verify_gradual_config(D7)),
+       amoc_throttle_config:verify_gradual_config(D7)),
     %% Error 1
     E1 = #{from_rate => 100, to_rate => 10, step_size => 1},
     ?assertMatch(
        {error, _},
-       amoc_throttle_controller:verify_gradual_config(E1)).
+       amoc_throttle_config:verify_gradual_config(E1)).
 
 just_wait(_) ->
     %% it fails if the throttle wasn't started yet

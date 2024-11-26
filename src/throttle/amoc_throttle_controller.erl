@@ -18,22 +18,13 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
--ifdef(TEST).
--export([verify_gradual_config/1]).
--endif.
-
 -define(PG_SCOPE, amoc_throttle).
 -define(SERVER, ?MODULE).
 -define(MASTER_SERVER, {?SERVER, amoc_cluster:master_node()}).
--define(DEFAULT_STEP_SIZE, 1).
--define(DEFAULT_INTERVAL, 60000). %% one minute
--define(TIMEOUT(N), (infinity =:= N orelse is_integer(N) andalso N >= 0)).
--define(NON_NEG_INT(N), (is_integer(N) andalso N >= 0)).
--define(POS_INT(N), (is_integer(N) andalso N > 0)).
 
 -record(throttle_info, {
     pool_sup :: pid(),
-    pool_config :: pool_config(),
+    pool_config :: amoc_throttle_config:pool_config(),
     rate :: amoc_throttle:rate(),
     interval :: amoc_throttle:interval(),
     active = true :: boolean(),
@@ -52,20 +43,10 @@
 -type state() :: #{name() => throttle_info()}.
 -type event() :: init | execute | request.
 
--type config() :: #{rate := amoc_throttle:rate(),
-                    interval := amoc_throttle:interval()}.
--type gradual() :: #{from_rate := non_neg_integer(),
-                     to_rate := non_neg_integer(),
-                     interval := amoc_throttle:interval(),
-                     step_interval := pos_integer(),
-                     step_size := pos_integer(),
-                     step_count := pos_integer()}.
--type pool_config() :: #{ProcessN :: non_neg_integer() :=
-                         #{max_n := infinity | non_neg_integer(),
-                           delay := non_neg_integer(),
-                           status := active | inactive,
-                           pid => undefined | pid()}}.
--export_type([pool_config/0]).
+-type start_throttle() :: {start_throttle, name(), amoc_throttle_config:config()}.
+-type change_rate() :: {change_rate, name(), amoc_throttle_config:config()}.
+-type change_rate_gradually() :: {change_rate_gradually, name(), amoc_throttle_config:gradual()}.
+-type operation() :: {pause | resume | unlock | stop, name()}.
 
 %%%===================================================================
 %%% API
@@ -75,19 +56,15 @@
 pg_scope() ->
     ?PG_SCOPE.
 
--spec no_of_processes() -> non_neg_integer().
-no_of_processes() ->
-    3 * erlang:system_info(schedulers_online).
-
 -spec get_throttle_process(amoc_throttle:name()) ->
     {error, no_throttle_process_registered} | {ok, pid()}.
 get_throttle_process(Name) ->
     case pg:get_members(?PG_SCOPE, Name) of
-        [] ->
-            {error, no_throttle_process_registered};
-        List -> %% nonempty list
+        [_ | _] = List -> %% nonempty list
             N = rand:uniform(length(List)),
-            {ok, lists:nth(N, List)}
+            {ok, lists:nth(N, List)};
+        [] ->
+            {error, no_throttle_process_registered}
     end.
 
 -spec start_link() -> gen_server:start_ret().
@@ -98,7 +75,7 @@ start_link() ->
     {ok, started | already_started} |
     {error, invalid_throttle | wrong_reconfiguration | error_starting_pool}.
 ensure_throttle_processes_started(Name, Config) when is_atom(Name) ->
-    case verify_config(Config) of
+    case amoc_throttle_config:verify_config(Config) of
         {error, invalid_throttle} ->
             {error, invalid_throttle};
         VerifiedConfig ->
@@ -108,7 +85,7 @@ ensure_throttle_processes_started(Name, Config) when is_atom(Name) ->
 
 -spec change_rate(name(), amoc_throttle:t()) -> ok | {error, any()}.
 change_rate(Name, Config) ->
-    case verify_config(Config) of
+    case amoc_throttle_config:verify_config(Config) of
         {error, invalid_throttle} ->
             {error, invalid_throttle};
         VerifiedConfig ->
@@ -117,7 +94,7 @@ change_rate(Name, Config) ->
 
 -spec change_rate_gradually(name(), amoc_throttle:gradual_rate_config()) -> ok | {error, any()}.
 change_rate_gradually(Name, GradualChangeRate) ->
-    case verify_gradual_config(GradualChangeRate) of
+    case amoc_throttle_config:verify_gradual_config(GradualChangeRate) of
         {error, _} = Error ->
             Error;
         VerifiedConfig ->
@@ -161,20 +138,20 @@ raise_event_on_slave_node(Name, Event) ->
 %%% gen_server callbacks
 %%%===================================================================
 
--spec init([]) -> {ok, #{}}.
+-spec init([]) -> {ok, state()}.
 init([]) ->
     {ok, #{}}.
 
--spec handle_call({start_throttle, name(), config()}, gen_server:from(), state()) ->
+-spec handle_call(start_throttle(), gen_server:from(), state()) ->
                      {reply, {ok, started | already_started}, state()} |
                      {reply, {error, wrong_reconfiguration | error_starting_pool}, state()};
-                 ({change_rate, name(), config()}, gen_server:from(), state()) ->
+                 (change_rate(), gen_server:from(), state()) ->
                      {reply, ok, state()} |
                      {reply, {error, any()}, state()};
-                 ({change_rate_gradually, name(), gradual()}, gen_server:from(), state()) ->
+                 (change_rate_gradually(), gen_server:from(), state()) ->
                      {reply, ok, state()} |
                      {reply, {error, any()}, state()};
-                 ({pause | resume | unlock | stop}, gen_server:from(), state()) ->
+                 (operation(), gen_server:from(), state()) ->
                      {reply, ok, state()} |
                      {reply, Error :: any(), state()};
                  ({get_info, name()}, gen_server:from(), state()) ->
@@ -257,10 +234,11 @@ report_rate(Name, Rate, Interval) ->
     {reply, {ok, started}, state()} |
     {reply, {error, error_starting_pool}, state()}.
 do_start_throttle(Name, Rate, Interval, State) ->
-    PoolConfig = pool_config(Rate, Interval),
+    PoolConfig = amoc_throttle_config:pool_config(Rate, Interval),
     case amoc_throttle_pooler:start_pool(Name, PoolConfig) of
         {ok, PoolSup} when is_pid(PoolSup) ->
-            PoolConfig1 = process_config(Name, PoolSup, PoolConfig),
+            PoolConfig1 = amoc_throttle_config:process_pool_config(PoolSup, PoolConfig),
+            process_pool(Name, PoolConfig1),
             raise_event(Name, init),
             report_rate(Name, Rate, Interval),
             Info = #throttle_info{pool_sup = PoolSup, pool_config = PoolConfig1,
@@ -282,7 +260,7 @@ do_change_rate(Name, Rate, Interval, Info, State) ->
 -spec do_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval(), throttle_info()) ->
     throttle_info().
 do_change_rate(Name, Rate, Interval, #throttle_info{pool_config = OldPoolConfig} = Info) ->
-    NewPoolConfig = pool_config(Rate, Interval),
+    NewPoolConfig = amoc_throttle_config:pool_config(Rate, Interval),
     report_rate(Name, Rate, Interval),
     PoolConfig1 = update_throttle_processes(Name, OldPoolConfig, NewPoolConfig),
     Info#throttle_info{rate = Rate, interval = Interval, pool_config = PoolConfig1}.
@@ -335,79 +313,7 @@ continue_plan(Name, State, Info, Plan) ->
     NewPlan = Plan#change_rate_plan{no_of_steps = NoOfSteps - 1},
     State#{Name => Info1#throttle_info{change_plan = NewPlan}}.
 
-%% Helpers
-
--spec pool_config(amoc_throttle:rate(), amoc_throttle:interval()) -> pool_config().
-pool_config(infinity, _) ->
-    Config = #{max_n => infinity, delay => 0, status => active, pid => undefined},
-    maps:from_keys(lists:seq(1, no_of_processes()), Config);
-pool_config(0, _) ->
-    Config = #{max_n => 0, delay => infinity, status => active, pid => undefined},
-    maps:from_keys(lists:seq(1, no_of_processes()), Config);
-pool_config(Rate, 0) ->
-    Config = #{max_n => Rate, delay => 0, status => inactive, pid => undefined},
-    PoolConfig = #{1 := First} = maps:from_keys(lists:seq(1, no_of_processes()), Config),
-    PoolConfig#{1 := First#{status => active}};
-pool_config(Rate, Interval) ->
-    NoOfProcesses = no_of_processes(),
-    RatePerMinutePerProcess = (60000 * Rate div Interval) div NoOfProcesses,
-    DelayPerProcess = (NoOfProcesses * Interval) div Rate,
-    Rem = ((60000 * Rate div Interval) rem NoOfProcesses)
-            + ((NoOfProcesses * Interval) rem Rate),
-    calculate_availability(RatePerMinutePerProcess, DelayPerProcess, NoOfProcesses, Rem).
-
--spec calculate_availability(integer(), integer(), pos_integer(), integer()) -> pool_config().
-calculate_availability(RatePerMinutePerProcess, DelayPerProcess, NoOfProcesses, Rem) ->
-    Fun = fun(N, {Acc, R}) ->
-                  case {RatePerMinutePerProcess < NoOfProcesses, R} of
-                      {true, 0} ->
-                          Config = #{max_n => RatePerMinutePerProcess,
-                                     delay => DelayPerProcess + 1,
-                                     status => inactive, pid => undefined},
-                          {Acc#{N => Config}, R};
-                      {true, R} ->
-                          Config = #{max_n => RatePerMinutePerProcess,
-                                     delay => DelayPerProcess,
-                                     status => active, pid => undefined},
-                          {Acc#{N => Config}, R - 1};
-                      {false, 0} ->
-                          Config = #{max_n => RatePerMinutePerProcess,
-                                     delay => DelayPerProcess,
-                                     status => active, pid => undefined},
-                          {Acc#{N => Config}, R};
-                      {false, R} ->
-                          Config = #{max_n => RatePerMinutePerProcess,
-                                     delay => DelayPerProcess + 1,
-                                     status => active, pid => undefined},
-                          {Acc#{N => Config}, R - 1}
-                  end
-          end,
-    {PoolConfig, _} = lists:foldl(Fun, {#{}, Rem}, lists:seq(1, NoOfProcesses)),
-    PoolConfig.
-
--spec process_config(amoc_throttle:name(), pid(), pool_config()) -> pool_config().
-process_config(Name, PoolSup, PoolConfig) ->
-    Processes = supervisor:which_children(PoolSup),
-    Workers = [ {N, Pid} || {{amoc_throttle_process, N}, Pid, _, _} <- Processes, is_pid(Pid) ],
-    Fun1 = fun(N, Config) ->
-                   {_, Pid} = lists:keyfind(N, 1, Workers),
-                   Config#{pid => Pid}
-           end,
-    PoolConfig1 = maps:map(Fun1, PoolConfig),
-    process_pool(Name, PoolConfig1).
-
--spec process_pool(amoc_throttle:name(), pool_config()) -> pool_config().
-process_pool(Name, PoolConfig1) ->
-    Fun2 = fun({_, #{status := active, pid := Pid}}) ->
-                   {true, Pid};
-              (_) ->
-                   false
-           end,
-    Pids = lists:filtermap(Fun2, maps:to_list(PoolConfig1)),
-    pg:join(?PG_SCOPE, Name, Pids),
-    PoolConfig1.
-
--spec do_gradual_change_rate(name(), throttle_info(), gradual(), state()) ->
+-spec do_gradual_change_rate(name(), throttle_info(), amoc_throttle_config:gradual(), state()) ->
     {reply, ok, state()}.
 do_gradual_change_rate(Name, Info,
   #{from_rate := LowRate, to_rate := HighRate, interval := RateInterval,
@@ -419,8 +325,23 @@ do_gradual_change_rate(Name, Info,
     NewInfo = Info1#throttle_info{rate = LowRate, interval = RateInterval, change_plan = Plan},
     {reply, ok, State#{Name => NewInfo}}.
 
--spec update_throttle_processes(amoc_throttle:name(), pool_config(), pool_config()) ->
-    pool_config().
+-spec process_pool(amoc_throttle:name(), amoc_throttle_config:pool_config()) ->
+    amoc_throttle_config:pool_config().
+process_pool(Name, PoolConfig1) ->
+    Fun2 = fun({_, #{status := active, pid := Pid}}) ->
+                   {true, Pid};
+              (_) ->
+                   false
+           end,
+    Pids = lists:filtermap(Fun2, maps:to_list(PoolConfig1)),
+    pg:join(?PG_SCOPE, Name, Pids),
+    PoolConfig1.
+
+-spec update_throttle_processes(
+        amoc_throttle:name(),
+        amoc_throttle_config:pool_config(),
+        amoc_throttle_config:pool_config()) ->
+    amoc_throttle_config:pool_config().
 update_throttle_processes(Name, OldPoolConfig, NewPoolConfig) ->
     Fun = fun(N, #{status := Status, delay := Delay, max_n := MaxN} = V, {C, J, L}) ->
                   #{status := OldStatus, pid := Pid} = maps:get(N, C),
@@ -438,100 +359,3 @@ update_throttle_processes(Name, OldPoolConfig, NewPoolConfig) ->
     pg:join(?PG_SCOPE, Name, Join),
     pg:leave(?PG_SCOPE, Name, Leave),
     PoolConfig.
-
--spec verify_config(amoc_throttle:t()) -> config() | {error, any()}.
-verify_config(#{interarrival := infinity} = Config)
-  when 1 =:= map_size(Config) ->
-    #{rate => 0, interval => ?DEFAULT_INTERVAL};
-verify_config(#{interarrival := 0} = Config)
-  when 1 =:= map_size(Config) ->
-    #{rate => infinity, interval => ?DEFAULT_INTERVAL};
-verify_config(#{interarrival := Interarrival} = Config)
-  when 1 =:= map_size(Config), ?POS_INT(Interarrival) ->
-    #{rate => ?DEFAULT_INTERVAL div Interarrival, interval => ?DEFAULT_INTERVAL};
-verify_config(#{rate := Rate, interval := Interval} = Config)
-  when 2 =:= map_size(Config), ?TIMEOUT(Rate), ?NON_NEG_INT(Interval) ->
-    Config;
-verify_config(#{rate := Rate} = Config)
-  when 1 =:= map_size(Config), ?TIMEOUT(Rate) ->
-    Config#{interval => ?DEFAULT_INTERVAL};
-verify_config(_Config) ->
-    {error, invalid_throttle}.
-
--spec verify_gradual_config(amoc_throttle:gradual_rate_config()) ->
-    gradual() | {error, any()}.
-verify_gradual_config(Config) ->
-    try do_verify_gradual_config(Config) of
-        Change -> Change
-    catch error:Reason ->
-              {error, Reason}
-    end.
-
-step_size_sign(From, To) when From =< To -> 1;
-step_size_sign(From, To) when From > To -> -1.
-
-check_step_size_with_from_to_rate(From, To, StepSize) when From =< To, StepSize >= 0 -> ok;
-check_step_size_with_from_to_rate(From, To, StepSize) when From > To, StepSize < 0 -> ok.
-
-check_step_parameters(StepSize, StepSize) -> ok.
-
--spec do_verify_gradual_config(amoc_throttle:gradual_rate_config()) -> gradual().
-do_verify_gradual_config(
-  #{from_interarrival := FromInterarrival, to_interarrival := ToInterarrival} = Config0) ->
-    FromRate = ?DEFAULT_INTERVAL div FromInterarrival,
-    ToRate = ?DEFAULT_INTERVAL div ToInterarrival,
-    Config1 = Config0#{from_rate => FromRate, to_rate => ToRate},
-    do_verify_gradual_config(maps:without([from_interarrival, to_interarrival], Config1));
-do_verify_gradual_config(
-  #{from_rate := FromRate, to_rate := ToRate,
-    step_interval := StepInterval, step_count := StepCount, step_size := StepSize} = Config) ->
-    RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
-    check_step_size_with_from_to_rate(FromRate, ToRate, StepSize),
-    check_step_parameters((ToRate - FromRate) div StepCount, StepSize),
-    #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
-      step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_gradual_config(
-  #{from_rate := FromRate, to_rate := ToRate, duration := Duration}) ->
-    StepSize = ?DEFAULT_STEP_SIZE * step_size_sign(FromRate, ToRate),
-    StepCount = abs((ToRate - FromRate) div StepSize),
-    StepInterval = abs(Duration div (ToRate - FromRate)),
-    #{from_rate => FromRate, to_rate => ToRate, interval => ?DEFAULT_INTERVAL,
-      step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_gradual_config(
-  #{from_rate := FromRate, to_rate := ToRate,
-    step_interval := StepInterval, step_size := StepSize} = Config) ->
-    RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
-    check_step_size_with_from_to_rate(FromRate, ToRate, StepSize),
-    StepCount = abs((ToRate - FromRate) div StepSize),
-    #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
-      step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_gradual_config(
-  #{from_rate := FromRate, to_rate := ToRate, step_interval := StepInterval} = Config) ->
-    RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
-    StepSize = ?DEFAULT_STEP_SIZE * step_size_sign(FromRate, ToRate),
-    StepCount = abs((ToRate - FromRate) div StepSize),
-    #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
-      step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_gradual_config(
-  #{from_rate := FromRate, to_rate := ToRate, step_count := StepCount} = Config) ->
-    RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
-    StepSize = ?DEFAULT_STEP_SIZE * step_size_sign(FromRate, ToRate),
-    StepInterval = (ToRate - FromRate) div (StepSize * StepCount),
-    #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
-      step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_gradual_config(
-  #{from_rate := FromRate, to_rate := ToRate, step_size := StepSize} = Config) ->
-    check_step_size_with_from_to_rate(FromRate, ToRate, StepSize),
-    RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
-    StepCount = abs((ToRate - FromRate) div StepSize),
-    StepInterval = abs((ToRate - FromRate) div StepCount),
-    #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
-      step_interval => StepInterval, step_count => StepCount, step_size => StepSize};
-do_verify_gradual_config(
-  #{from_rate := FromRate, to_rate := ToRate} = Config) ->
-    StepSize = ?DEFAULT_STEP_SIZE * step_size_sign(FromRate, ToRate),
-    RateInterval = maps:get(interval, Config, ?DEFAULT_INTERVAL),
-    StepCount = abs((ToRate - FromRate) div StepSize),
-    StepInterval = abs((ToRate - FromRate) div StepCount),
-    #{from_rate => FromRate, to_rate => ToRate, interval => RateInterval,
-      step_interval => StepInterval, step_count => StepCount, step_size => StepSize}.

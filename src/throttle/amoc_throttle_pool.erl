@@ -7,7 +7,7 @@
 
 -export([start_link/2, init/1]).
 
--spec start_link(amoc_throttle:name(), amoc_throttle_controller:pool_config()) ->
+-spec start_link(amoc_throttle:name(), amoc_throttle_config:pool_config()) ->
     supervisor:startlink_ret().
 start_link(Name, PoolConfig) ->
     case supervisor:start_link(?MODULE, {Name, PoolConfig}) of
@@ -17,7 +17,7 @@ start_link(Name, PoolConfig) ->
             Else
     end.
 
--spec init({amoc_throttle:name(), amoc_throttle_controller:pool_config()}) ->
+-spec init({amoc_throttle:name(), amoc_throttle_config:pool_config()}) ->
     {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init({Name, ConfigPerProcess}) ->
     Children = [

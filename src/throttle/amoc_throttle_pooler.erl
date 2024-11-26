@@ -8,7 +8,7 @@
 -export([start_pool/2, stop_pool/1]).
 -export([start_link/0, init/1]).
 
--spec start_pool(amoc_throttle:name(), amoc_throttle_controller:pool_config()) ->
+-spec start_pool(amoc_throttle:name(), amoc_throttle_config:pool_config()) ->
     supervisor:startchild_ret().
 start_pool(Name, PoolConfig) ->
     supervisor:start_child(amoc_throttle_pooler, [Name, PoolConfig]).
