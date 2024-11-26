@@ -153,7 +153,9 @@ interval_equal_zero_limits_parallelism(_) ->
     E1 = #{rate => 36, interval => 0},
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, E1)),
     #{pool_config := Config0} = get_throttle_info(?FUNCTION_NAME),
-    ?assertEqual(1, map_size(maps:filter(fun(_, #{status := S}) -> S =:= active end, Config0))).
+    ActiveWorkers = maps:filter(fun(_, #{status := S}) -> S =:= active end, Config0),
+    ?assertEqual(1, map_size(ActiveWorkers)),
+    ?assertMatch([#{max_n := 36, delay := 0}], maps:values(ActiveWorkers)).
 
 change_rate_to_interval_zero_limits_parallelism(_) ->
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),

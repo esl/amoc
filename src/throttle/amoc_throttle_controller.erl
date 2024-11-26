@@ -345,7 +345,7 @@ pool_config(0, _) ->
     Config = #{max_n => 0, delay => infinity, status => active, pid => undefined},
     maps:from_keys(lists:seq(1, no_of_processes()), Config);
 pool_config(Rate, 0) ->
-    Config = #{max_n => Rate, delay => infinity, status => inactive, pid => undefined},
+    Config = #{max_n => Rate, delay => 0, status => inactive, pid => undefined},
     PoolConfig = #{1 := First} = maps:from_keys(lists:seq(1, no_of_processes()), Config),
     PoolConfig#{1 := First#{status => active}};
 pool_config(Rate, Interval) ->
