@@ -121,6 +121,7 @@ format_status(#{state := State} = FormatStatus) ->
 %%      and `maybe_run_fn/1' with `max_n = infinity' will loop without pause.
 %%
 %% - If both `MaxN' and `Delay' are numbers, this will be the actual rate/interval.
+%%      Note however that if delay is zero, we effectively limit parallelism to `MaxN'.
 -spec initial_state(Name :: atom(), MaxN :: amoc_throttle:rate(), Delay :: timeout()) -> state().
 initial_state(Name, MaxN, Delay) ->
     #state{name = Name, max_n = MaxN, delay_between_executions = Delay}.

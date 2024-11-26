@@ -79,7 +79,7 @@ pause(Name) ->
 unlock(Name) ->
     amoc_throttle_controller:unlock(Name).
 
-%% @doc Resumes the executions for the given `Name', to their original `Rate' and `Interval' values.
+%% @doc Resumes the executions for the given `Name', to their original configuration value.
 %%
 %% It is the counterpart to the `pause/1' API, resuming the execution of what that mechanism paused.
 -spec resume(name()) -> ok | {error, any()}.
@@ -97,9 +97,7 @@ change_rate(Name, Rate) when is_integer(Rate) ->
 %%
 %% The configuration will be changed in a series of consecutive steps.
 %% Rates can be changed upwards as well as downwards.
-%%
-%% The rate is calculated at each step in relation to the `RateInterval', which can also be `0'.
-%% There will be `NoOfSteps' steps, each taking `StepInterval' time in milliseconds.
+%% See the documentation for `t:gradual_rate_config/0' for more info.
 %%
 %% Be aware that, at first, the rate will be changed to the initial point given
 %% in the configuration, and this is not considered a step.
