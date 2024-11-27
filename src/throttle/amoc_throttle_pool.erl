@@ -5,7 +5,14 @@
 
 -behaviour(supervisor).
 
+-export([get_workers/1]).
 -export([start_link/2, init/1]).
+
+-spec get_workers(pid()) -> #{non_neg_integer() := pid()}.
+get_workers(PoolSup) ->
+    Processes = supervisor:which_children(PoolSup),
+    Workers = [ {N, Pid} || {{amoc_throttle_process, N}, Pid, _, _} <- Processes, is_pid(Pid) ],
+    maps:from_list(Workers).
 
 -spec start_link(amoc_throttle:name(), amoc_throttle_config:pool_config()) ->
     supervisor:startlink_ret().

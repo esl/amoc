@@ -76,12 +76,8 @@ pool_config(Rate, Interval) ->
 
 -spec process_pool_config(pid(), pool_config()) -> pool_config().
 process_pool_config(PoolSup, PoolConfig) ->
-    Processes = supervisor:which_children(PoolSup),
-    Workers = [ {N, Pid} || {{amoc_throttle_process, N}, Pid, _, _} <- Processes, is_pid(Pid) ],
-    Fun1 = fun(N, Config) ->
-                   {_, Pid} = lists:keyfind(N, 1, Workers),
-                   Config#{pid => Pid}
-           end,
+    Workers = amoc_throttle_pool:get_workers(PoolSup),
+    Fun1 = fun(N, Config) -> Config#{pid => maps:get(N, Workers)} end,
     maps:map(Fun1, PoolConfig).
 
 -spec calculate_availability(integer(), integer(), pos_integer(), integer()) -> pool_config().
