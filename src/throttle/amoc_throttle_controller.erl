@@ -32,10 +32,9 @@
 }).
 
 -record(change_rate_plan, {
-    high_rate :: pos_integer(),
-    no_of_steps :: non_neg_integer(),
-    step_size :: pos_integer(),
-    timer :: timer:tref()}).
+    rates :: [non_neg_integer()],
+    timer :: timer:tref()
+}).
 
 -type name() :: amoc_throttle:name().
 -type change_rate_plan() :: #change_rate_plan{}.
@@ -45,7 +44,8 @@
 
 -type start_throttle() :: {start_throttle, name(), amoc_throttle_config:config()}.
 -type change_rate() :: {change_rate, name(), amoc_throttle_config:config()}.
--type change_rate_gradually() :: {change_rate_gradually, name(), amoc_throttle_config:gradual()}.
+-type change_rate_gradually() ::
+    {change_rate_gradually, name(), amoc_throttle_config:gradual_plan()}.
 -type operation() :: {pause | resume | unlock | stop, name()}.
 
 %%%===================================================================
@@ -71,35 +71,20 @@ get_throttle_process(Name) ->
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec ensure_throttle_processes_started(name(), amoc_throttle:t()) ->
+-spec ensure_throttle_processes_started(name(), amoc_throttle_config:config()) ->
     {ok, started | already_started} |
     {error, invalid_throttle | wrong_reconfiguration | error_starting_pool}.
 ensure_throttle_processes_started(Name, Config) when is_atom(Name) ->
-    case amoc_throttle_config:verify_config(Config) of
-        {error, invalid_throttle} ->
-            {error, invalid_throttle};
-        VerifiedConfig ->
-            raise_event_on_slave_node(Name, init),
-            gen_server:call(?MASTER_SERVER, {start_throttle, Name, VerifiedConfig})
-    end.
+    raise_event_on_slave_node(Name, init),
+    gen_server:call(?MASTER_SERVER, {start_throttle, Name, Config}).
 
--spec change_rate(name(), amoc_throttle:t()) -> ok | {error, any()}.
+-spec change_rate(name(), amoc_throttle_config:config()) -> ok | {error, any()}.
 change_rate(Name, Config) ->
-    case amoc_throttle_config:verify_config(Config) of
-        {error, invalid_throttle} ->
-            {error, invalid_throttle};
-        VerifiedConfig ->
-            gen_server:call(?MASTER_SERVER, {change_rate, Name, VerifiedConfig})
-    end.
+    gen_server:call(?MASTER_SERVER, {change_rate, Name, Config}).
 
--spec change_rate_gradually(name(), amoc_throttle:gradual_rate_config()) -> ok | {error, any()}.
-change_rate_gradually(Name, GradualChangeRate) ->
-    case amoc_throttle_config:verify_gradual_config(GradualChangeRate) of
-        {error, _} = Error ->
-            Error;
-        VerifiedConfig ->
-            gen_server:call(?MASTER_SERVER, {change_rate_gradually, Name, VerifiedConfig})
-    end.
+-spec change_rate_gradually(name(), amoc_throttle_config:gradual_plan()) -> ok | {error, any()}.
+change_rate_gradually(Name, Config) ->
+    gen_server:call(?MASTER_SERVER, {change_rate_gradually, Name, Config}).
 
 -spec pause(name()) -> ok | {error, any()}.
 pause(Name) ->
@@ -180,7 +165,7 @@ handle_call({change_rate, Name, #{rate := Rate, interval := Interval}}, _From, S
 handle_call({change_rate_gradually, Name, GradualChangeRate}, _From, State) ->
     case State of
         #{Name := #throttle_info{change_plan = undefined} = Info} ->
-            do_gradual_change_rate(Name, Info, GradualChangeRate, State);
+            do_gradual_change_rate(Name, Info, State, GradualChangeRate);
         #{Name := _} ->
             {reply, {error, cannot_change_rate}, State};
         _ ->
@@ -210,12 +195,8 @@ handle_cast(_, State) ->
 handle_info({change_plan, Name}, State) ->
     Info = maps:get(Name, State),
     Plan = Info#throttle_info.change_plan,
-    case Plan#change_rate_plan.no_of_steps of
-        1 -> NewState = change_rate_and_stop_plan(Name, State, Info, Plan),
-            {noreply, NewState};
-        N when N > 1 -> NewState = continue_plan(Name, State, Info, Plan),
-            {noreply, NewState}
-    end.
+    NewState = continue_plan(Name, State, Info, Plan),
+    {noreply, NewState}.
 
 %%%===================================================================
 %%% Internal functions
@@ -265,15 +246,36 @@ do_change_rate(Name, Rate, Interval, #throttle_info{pool_config = OldPoolConfig}
     PoolConfig1 = update_throttle_processes(Name, OldPoolConfig, NewPoolConfig),
     Info#throttle_info{rate = Rate, interval = Interval, pool_config = PoolConfig1}.
 
--spec change_rate_and_stop_plan(name(), state(), throttle_info(), change_rate_plan()) -> state().
-change_rate_and_stop_plan(Name, State, Info, Plan) ->
+-spec do_gradual_change_rate(
+        name(), throttle_info(), state(), amoc_throttle_config:gradual_plan()) ->
+    {reply, ok, state()}.
+do_gradual_change_rate(
+  Name, Info, State,
+  #{rates := [FirstRate | Rates], interval := Interval, step_interval := StepInterval}) ->
+    Info1 = do_change_rate(Name, FirstRate, Interval, Info),
+    {ok, Timer} = timer:send_interval(StepInterval, {change_plan, Name}),
+    Plan = #change_rate_plan{rates = Rates, timer = Timer},
+    NewInfo = Info1#throttle_info{rate = FirstRate, interval = Interval, change_plan = Plan},
+    {reply, ok, State#{Name => NewInfo}}.
+
+-spec continue_plan(name(), state(), throttle_info(), change_rate_plan()) -> state().
+continue_plan(Name, State, Info, #change_rate_plan{rates = [Rate]} = Plan) ->
     Interval = Info#throttle_info.interval,
     TRef = Plan#change_rate_plan.timer,
-    HighRate = Plan#change_rate_plan.high_rate,
-    Info1 = do_change_rate(Name, HighRate, Interval, Info),
+    Info1 = do_change_rate(Name, Rate, Interval, Info),
     {ok, cancel} = timer:cancel(TRef),
     consume_all_timer_ticks({change_plan, Name}),
-    State#{Name => Info1#throttle_info{change_plan = undefined}}.
+    State#{Name => Info1#throttle_info{change_plan = undefined}};
+continue_plan(Name, State, Info, #change_rate_plan{rates = [Rate | Rates]} = Plan) ->
+    Info1 = do_change_rate(Name, Rate, Info#throttle_info.interval, Info),
+    NewPlan = Plan#change_rate_plan{rates = Rates},
+    State#{Name => Info1#throttle_info{change_plan = NewPlan}}.
+
+consume_all_timer_ticks(Msg) ->
+    receive
+        Msg -> consume_all_timer_ticks(Msg)
+    after 0 -> ok
+    end.
 
 do_run_op(stop, Name, #throttle_info{pool_sup = PoolSup}, State) ->
     ok = amoc_throttle_pooler:stop_pool(PoolSup),
@@ -296,34 +298,6 @@ do_run_op(resume, Name, #throttle_info{pool_config = PoolConfig} = Info, State) 
           end,
     maps:foreach(Fun, PoolConfig),
     {reply, ok, State#{Name => Info#throttle_info{active = true}}}.
-
-consume_all_timer_ticks(Msg) ->
-    receive
-        Msg -> consume_all_timer_ticks(Msg)
-    after 0 -> ok
-    end.
-
--spec continue_plan(name(), state(), throttle_info(), change_rate_plan()) -> state().
-continue_plan(Name, State, Info, Plan) ->
-    LowRate = Info#throttle_info.rate,
-    NoOfSteps = Plan#change_rate_plan.no_of_steps,
-    StepSize = Plan#change_rate_plan.step_size,
-    NewRate = LowRate + StepSize,
-    Info1 = do_change_rate(Name, NewRate, Info#throttle_info.interval, Info),
-    NewPlan = Plan#change_rate_plan{no_of_steps = NoOfSteps - 1},
-    State#{Name => Info1#throttle_info{change_plan = NewPlan}}.
-
--spec do_gradual_change_rate(name(), throttle_info(), amoc_throttle_config:gradual(), state()) ->
-    {reply, ok, state()}.
-do_gradual_change_rate(Name, Info,
-  #{from_rate := LowRate, to_rate := HighRate, interval := RateInterval,
-    step_interval := StepInterval, step_count := StepCount, step_size := StepSize}, State) ->
-    Info1 = do_change_rate(Name, LowRate, RateInterval, Info),
-    {ok, Timer} = timer:send_interval(StepInterval, {change_plan, Name}),
-    Plan = #change_rate_plan{high_rate = HighRate, timer = Timer,
-                             no_of_steps = StepCount, step_size = StepSize},
-    NewInfo = Info1#throttle_info{rate = LowRate, interval = RateInterval, change_plan = Plan},
-    {reply, ok, State#{Name => NewInfo}}.
 
 -spec process_pool(amoc_throttle:name(), amoc_throttle_config:pool_config()) ->
     amoc_throttle_config:pool_config().

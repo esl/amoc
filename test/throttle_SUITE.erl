@@ -174,86 +174,131 @@ change_rate_triggers_parallelism(_) ->
     ?assertNotEqual(1, map_size(maps:filter(fun(_, #{status := S}) -> S =:= active end, Config1))).
 
 change_rate_gradually(_) ->
-    C1 = #{from_rate => 100, to_rate => 200, interval => 1,
-           step_interval => 1, step_count => 1},
+    C1 = #{throttle => #{from_rate => 100, to_rate => 200, interval => 1},
+           plan => #{step_interval => 1, step_count => 1}},
     ?assertMatch({error, {no_throttle_by_name, ?FUNCTION_NAME}},
                  amoc_throttle:change_rate_gradually(?FUNCTION_NAME, C1)),
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
-    C2 = #{from_rate => 10, to_rate => 3000, interval => 1,
-           step_interval => 100, step_count => 300},
+    C2 = #{throttle => #{from_rate => 10, to_rate => 3000, interval => 1},
+           plan => #{step_interval => 100, step_count => 300}},
     ?assertMatch(ok, amoc_throttle:change_rate_gradually(?FUNCTION_NAME, C2)),
     %% We cannot change rate while a current gradual change is already running.
-    C3 = #{from_rate => 50, to_rate => 200, interval => 1,
-           step_interval => 1, step_count => 1},
+    C3 = #{throttle => #{from_rate => 50, to_rate => 200, interval => 1},
+           plan => #{step_interval => 1, step_count => 1}},
     ?assertMatch({error, cannot_change_rate},
                  amoc_throttle:change_rate_gradually(?FUNCTION_NAME, C3)),
     E1 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 1},
     ?assertMatch({error, cannot_change_rate}, amoc_throttle:change_rate(?FUNCTION_NAME, E1)).
 
 change_interarrival_gradually(_) ->
-    C1 = #{from_interarrival => 100, to_interarrival => 200},
+    C1 = #{throttle => #{from_interarrival => 100, to_interarrival => 200},
+           plan => #{step_interval => 1, step_count => 1}},
     ?assertMatch({error, {no_throttle_by_name, ?FUNCTION_NAME}},
                  amoc_throttle:change_rate_gradually(?FUNCTION_NAME, C1)),
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
-    C2 = #{from_interarrival => 10, to_interarrival => 3000},
+    C2 = #{throttle => #{from_interarrival => 10, to_interarrival => 3000},
+           plan => #{step_interval => 10, step_count => 1000}},
     ?assertMatch(ok, amoc_throttle:change_rate_gradually(?FUNCTION_NAME, C2)),
     %% We cannot change rate while a current gradual change is already running.
-    C3 = #{from_interarrival => 50, to_interarrival => 200},
+    C3 = #{throttle => #{from_interarrival => 50, to_interarrival => 200},
+           plan => #{step_interval => 1, step_count => 1}},
     ?assertMatch({error, cannot_change_rate},
                  amoc_throttle:change_rate_gradually(?FUNCTION_NAME, C3)),
     E1 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 1},
     ?assertMatch({error, cannot_change_rate}, amoc_throttle:change_rate(?FUNCTION_NAME, E1)).
 
-%% Bad description also fails
 change_rate_gradually_verify_descriptions(_) ->
-    %% Condition 0
-    D0 = #{from_rate => 1000, to_rate => 3000, duration => 30000},
+    %%% Using step_interval and step_count
+    %% Condition 1: increment, explicit interval
+    D1 = #{throttle => #{from_rate => 80, to_rate => 5000, interval => 15000},
+           plan => #{step_interval => 50, step_count => 984}},
+    R1 = amoc_throttle_config:verify_gradual_config(D1),
     ?assertMatch(
-       #{interval := 60000, step_size := 1, step_count := 2000, step_interval := 15},
-       amoc_throttle_config:verify_gradual_config(D0)),
-    %% Condition 1
-    D1 = #{from_rate => 3000, to_rate => 100, duration => 30000},
+       #{rates := Rates, interval := 15000, step_interval := 50} when 985 =:= length(Rates), R1),
+    ?assertEqual(lists:sort(maps:get(rates, R1)), maps:get(rates, R1)),
+    %% Condition 2: decrement, explicit interval
+    D2 = #{throttle => #{from_rate => 5000, to_rate => 80, interval => 1000},
+           plan => #{step_interval => 10, step_count => 4920}},
+    R2 = amoc_throttle_config:verify_gradual_config(D2),
     ?assertMatch(
-       #{interval := 60000, step_size := -1, step_count := 2900, step_interval := 10},
-       amoc_throttle_config:verify_gradual_config(D1)),
-    %% Condition 2A
-    D2A = #{from_rate => 0, to_rate => 3000, interval => 10000, step_size => 2},
+       #{rates := Rates, interval := 1000, step_interval := 10} when 4921 =:= length(Rates), R2),
+    ?assertEqual(lists:reverse(lists:sort(maps:get(rates, R2))), maps:get(rates, R2)),
+    %% Condition 3: increment, default interval
+    D3 = #{throttle => #{from_rate => 1200, to_rate => 4000},
+           plan => #{step_interval => 10, step_count => 100}},
+    R3 = amoc_throttle_config:verify_gradual_config(D3),
     ?assertMatch(
-       #{step_size := 2, step_count := 1500, step_interval := 2},
-       amoc_throttle_config:verify_gradual_config(D2A)),
-    %% Condition 2B
-    D2B = #{from_rate => 3000, to_rate => 0, interval => 10000, step_size => -2},
+       #{rates := Rates, interval := 60000, step_interval := 10} when 101 =:= length(Rates), R3),
+    ?assertEqual(lists:sort(maps:get(rates, R3)), maps:get(rates, R3)),
+    %% Condition 4: decrement, default interval
+    D4 = #{throttle => #{from_rate => 4000, to_rate => 1200},
+           plan => #{step_interval => 10, step_count => 100}},
+    R4 = amoc_throttle_config:verify_gradual_config(D4),
     ?assertMatch(
-       #{step_size := -2, step_count := 1500, step_interval := 2},
-       amoc_throttle_config:verify_gradual_config(D2B)),
-    %% Condition 3
-    D3 = #{from_rate => 80, to_rate => 5000, interval => 1000, step_interval => 10},
+       #{rates := Rates, interval := 60000, step_interval := 10} when 101 =:= length(Rates), R4),
+    ?assertEqual(lists:reverse(lists:sort(maps:get(rates, R4))), maps:get(rates, R4)),
+    %% Condition 5: increment, interarrival
+    D5 = #{throttle => #{from_interarrival => 1000, to_interarrival => 100},
+           plan => #{step_interval => 10, step_count => 100}},
+    R5 = amoc_throttle_config:verify_gradual_config(D5),
     ?assertMatch(
-       #{step_size := 1, step_count := 4920, step_interval := 10},
-       amoc_throttle_config:verify_gradual_config(D3)),
-    %% Condition 4
-    D4 = #{from_rate => 80, to_rate => 5000, interval => 15000, step_count => 90},
+       #{rates := Rates, interval := 60000, step_interval := 10} when 101 =:= length(Rates), R5),
+    ?assertEqual(lists:sort(maps:get(rates, R5)), maps:get(rates, R5)),
+    %% Condition 6: decrement, interarrival
+    D6 = #{throttle => #{from_interarrival => 100, to_interarrival => 1000},
+           plan => #{step_interval => 10, step_count => 100}},
+    R6 = amoc_throttle_config:verify_gradual_config(D6),
     ?assertMatch(
-       #{step_size := 1, step_count := 90, step_interval := 54},
-       amoc_throttle_config:verify_gradual_config(D4)),
-    %% Condition 5
-    D5 = #{from_rate => 80, to_rate => 5000, interval => 15000,
-           step_size => 5, step_interval => 50},
+       #{rates := Rates, interval := 60000, step_interval := 10} when 101 =:= length(Rates), R6),
+    ?assertEqual(lists:reverse(lists:sort(maps:get(rates, R6))), maps:get(rates, R6)),
+
+    %%% Using step_interval and step_count
+    %% Condition 7: increment, explicit interval
+    D7 = #{throttle => #{from_rate => 80, to_rate => 5000, interval => 15000},
+           plan => #{duration => timer:minutes(10)}},
+    R7 = amoc_throttle_config:verify_gradual_config(D7),
     ?assertMatch(
-       #{step_size := 5, step_count := 984, step_interval := 50},
-       amoc_throttle_config:verify_gradual_config(D5)),
-    %% Condition 6
-    D6 = #{from_rate => 80, to_rate => 5000},
+       #{rates := Rates, interval := 15000, step_interval := 100} when 6001 =:= length(Rates), R7),
+    ?assertEqual(lists:sort(maps:get(rates, R7)), maps:get(rates, R7)),
+    %% Condition 8: decrement, explicit interval
+    D8 = #{throttle => #{from_rate => 5000, to_rate => 80, interval => 1000},
+           plan => #{duration => timer:minutes(10)}},
+    R8 = amoc_throttle_config:verify_gradual_config(D8),
     ?assertMatch(
-       #{interval := 60000, step_size := 1, step_count := 4920, step_interval := 1},
-       amoc_throttle_config:verify_gradual_config(D6)),
-    %% Condition 7
-    D7 = #{from_rate => 4000, to_rate => 1200},
+       #{rates := Rates, interval := 1000, step_interval := 100} when 6001 =:= length(Rates), R8),
+    ?assertEqual(lists:reverse(lists:sort(maps:get(rates, R8))), maps:get(rates, R8)),
+    %% Condition 9: increment, default interval
+    D9 = #{throttle => #{from_rate => 1200, to_rate => 4000},
+           plan => #{duration => timer:minutes(30)}},
+    R9 = amoc_throttle_config:verify_gradual_config(D9),
     ?assertMatch(
-       #{interval := 60000, step_size := -1, step_count := 2800, step_interval := 1},
-       amoc_throttle_config:verify_gradual_config(D7)),
-    %% Error 1
-    E1 = #{from_rate => 100, to_rate => 10, step_size => 1},
+       #{rates := Rates, interval := 60000, step_interval := 100} when 18001 =:= length(Rates), R9),
+    ?assertEqual(lists:sort(maps:get(rates, R9)), maps:get(rates, R9)),
+    %% Condition 10: decrement, default interval
+    D10 = #{throttle => #{from_rate => 4000, to_rate => 1200},
+           plan => #{duration => timer:minutes(10)}},
+    R10 = amoc_throttle_config:verify_gradual_config(D10),
+    ?assertMatch(
+       #{rates := Rates, interval := 60000, step_interval := 100} when 6001 =:= length(Rates), R10),
+    ?assertEqual(lists:reverse(lists:sort(maps:get(rates, R10))), maps:get(rates, R10)),
+    %% Condition 11: increment, interarrival
+    D11 = #{throttle => #{from_interarrival => 1000, to_interarrival => 100},
+           plan => #{duration => timer:minutes(10)}},
+    R11 = amoc_throttle_config:verify_gradual_config(D11),
+    ?assertMatch(
+       #{rates := Rates, interval := 60000, step_interval := 100} when 6001 =:= length(Rates), R11),
+    ?assertEqual(lists:sort(maps:get(rates, R11)), maps:get(rates, R11)),
+    %% Condition 12: decrement, interarrival
+    D12 = #{throttle => #{from_interarrival => 100, to_interarrival => 1000},
+           plan => #{duration => timer:minutes(10)}},
+    R12 = amoc_throttle_config:verify_gradual_config(D12),
+    ?assertMatch(
+       #{rates := Rates, interval := 60000, step_interval := 100} when 6001 =:= length(Rates), R12),
+    ?assertEqual(lists:reverse(lists:sort(maps:get(rates, R12))), maps:get(rates, R12)),
+
+    %% Error
+    E1 = #{throttle => #{from_rate => 100, to_rate => 10},
+           plan => #{}},
     ?assertMatch(
        {error, _},
        amoc_throttle_config:verify_gradual_config(E1)).

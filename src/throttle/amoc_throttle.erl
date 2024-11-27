@@ -12,14 +12,22 @@
 %% Atom representing the name of the throttle.
 
 -type rate() :: infinity | non_neg_integer().
-%% Number of events per given `t:interval/0', or
-%% - infinity for effectively unlocking all throttling,
-%% - zero for effectively pausing the throttle.
+%% Number of events per given `t:interval/0'.
+%%
+%% It can also be:
+%% <ul>
+%%   <li>infinity for effectively unlocking all throttling,</li>
+%%   <li>zero for effectively pausing the throttle.</li>
+%% </ul>
 
 -type interarrival() :: infinity | non_neg_integer().
-%% Time in milliseconds between two events, or
-%% - infinity for effectively pausing the throttle,
-%% - zero for effectively unlocking all throttling.
+%% Time in milliseconds between two events.
+%%
+%% It can also be:
+%% <ul>
+%%   <li>infinity for effectively pausing the throttle,</li>
+%%   <li>zero for effectively unlocking all throttling.</li>
+%% </ul>
 
 -type interval() :: non_neg_integer().
 %% In milliseconds, defaults to 60000 (one minute).
@@ -32,40 +40,44 @@
              #{interarrival := interarrival()}.
 %% Throttle unit of measurement
 
--type gradual_rate_config() :: #{from_rate := non_neg_integer(),
-                                 to_rate := non_neg_integer(),
-                                 interval => interval(),
-                                 step_interval => pos_integer(),
-                                 step_size => pos_integer(),
-                                 step_count => pos_integer(),
-                                 duration => pos_integer()} |
-                               #{from_interarrival := interarrival(),
-                                 to_interarrival := interarrival(),
-                                 step_interval => pos_integer(),
-                                 step_size => pos_integer(),
-                                 step_count => pos_integer(),
-                                 duration => pos_integer()}.
-%% Configuration for a gradual throttle rate change
+-type gradual() :: #{from_rate := non_neg_integer(),
+                     to_rate := non_neg_integer(),
+                     interval => interval()} |
+                   #{from_interarrival := non_neg_integer(),
+                     to_interarrival := non_neg_integer()}.
+%% Configuration throttle for a gradual rate change.
 %%
-%% `From' and `To' rates are required.
-%% `interval' defaults to 1s and `step_size' to 1 (or -1 if applies),
-%% that is, the throttle will be changed in increments of 1.
-%%
-%% `duration' is an alternative way of setting `step_interval',
-%% and `step_count' is an alternative for `step_size'.
-%%
-%% All other values can be calculated from the provided.
+%% "from" and "to" prefixed parameters, whether rates or interarrivals, are required.
+%% `interval' applies only to rate and defaults to 1s.
 
--export_type([t/0, name/0, rate/0, interval/0, gradual_rate_config/0]).
+-type plan() :: #{step_interval := pos_integer(),
+                  step_count := pos_integer()} |
+                #{duration := pos_integer()}.
+%% Configuration plan for a gradual rate change.
+%%
+%% The throttle mechanism will take a series of discrete steps,
+%% for as long as the duration given,
+%% or in the shape of the `step_interval' and `step_count'.
+
+-type gradual_plan() :: #{throttle := gradual(),
+                          plan := plan()}.
+%% Gradual plan details. Must specify a `t:gradual/0', and a `t:plan/0'.
+
+-export_type([t/0, name/0, rate/0, interval/0, gradual_plan/0]).
 
 %% @doc Starts the throttle mechanism for a given `Name' with a given config.
 %%
 %% `Name' is needed to identify the rate as a single test can have different rates for different tasks.
 -spec start(name(), t() | rate()) -> {ok, started | already_started} | {error, any()}.
 start(Name, #{} = Config) ->
-    amoc_throttle_controller:ensure_throttle_processes_started(Name, Config);
-start(Name, Rate) ->
-    amoc_throttle_controller:ensure_throttle_processes_started(Name, #{rate => Rate}).
+    case amoc_throttle_config:verify_config(Config) of
+        {error, Error} ->
+            {error, Error};
+        VerifiedConfig ->
+            amoc_throttle_controller:ensure_throttle_processes_started(Name, VerifiedConfig)
+    end;
+start(Name, Rate) when is_integer(Rate) ->
+    start(Name, #{rate => Rate}).
 
 %% @doc Pauses executions for the given `Name' as if `Rate' was set to `0'.
 %%
@@ -89,22 +101,32 @@ resume(Name) ->
 %% @doc Sets the throttle `Config' for `Name' according to the given values.
 -spec change_rate(name(), t() | rate()) -> ok | {error, any()}.
 change_rate(Name, #{} = Config) ->
-    amoc_throttle_controller:change_rate(Name, Config);
+    case amoc_throttle_config:verify_config(Config) of
+        {error, Error} ->
+            {error, Error};
+        VerifiedConfig ->
+            amoc_throttle_controller:change_rate(Name, VerifiedConfig)
+    end;
 change_rate(Name, Rate) when is_integer(Rate) ->
-    amoc_throttle_controller:change_rate(Name, #{rate => Rate}).
+    change_rate(Name, #{rate => Rate}).
 
 %% @doc Allows to set a plan of gradual rate changes for a given `Name'.
 %%
 %% The configuration will be changed in a series of consecutive steps.
 %% Rates can be changed upwards as well as downwards.
-%% See the documentation for `t:gradual_rate_config/0' for more info.
+%% See the documentation for `t:gradual_plan/0' for more info.
 %%
 %% Be aware that, at first, the rate will be changed to the initial point given
 %% in the configuration, and this is not considered a step.
--spec change_rate_gradually(name(), gradual_rate_config()) ->
+-spec change_rate_gradually(name(), gradual_plan()) ->
     ok | {error, any()}.
 change_rate_gradually(Name, Config) ->
-    amoc_throttle_controller:change_rate_gradually(Name, Config).
+    case amoc_throttle_config:verify_gradual_config(Config) of
+        {error, _} = Error ->
+            Error;
+        VerifiedConfig ->
+            amoc_throttle_controller:change_rate_gradually(Name, VerifiedConfig)
+    end.
 
 %% @doc Executes a given function `Fn' when it does not exceed the rate for `Name'.
 %%
