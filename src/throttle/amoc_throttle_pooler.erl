@@ -11,11 +11,11 @@
 -spec start_pool(amoc_throttle:name(), amoc_throttle_config:pool_config()) ->
     supervisor:startchild_ret().
 start_pool(Name, PoolConfig) ->
-    supervisor:start_child(amoc_throttle_pooler, [Name, PoolConfig]).
+    supervisor:start_child(?MODULE, [Name, PoolConfig]).
 
 -spec stop_pool(pid()) -> ok.
 stop_pool(Pool) ->
-    ok = supervisor:terminate_child(amoc_throttle_pooler, Pool).
+    ok = supervisor:terminate_child(?MODULE, Pool).
 
 -spec start_link() -> supervisor:startlink_ret().
 start_link() ->
