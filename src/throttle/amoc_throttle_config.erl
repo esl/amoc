@@ -12,6 +12,7 @@
 -define(DEFAULT_STEP_INTERVAL, 100). %% every 100ms
 
 -export([verify_config/1, verify_gradual_config/1, pool_config/2, process_pool_config/2]).
+-export([no_of_processes/0]).
 -export_type([config/0, gradual_plan/0, pool_config/0]).
 
 -type process_number() :: non_neg_integer().
@@ -58,21 +59,66 @@ verify_gradual_config(Config) ->
 -spec pool_config(amoc_throttle:rate(), amoc_throttle:interval()) -> pool_config().
 pool_config(infinity, _) ->
     Config = #{max_n => infinity, delay => 0, status => active, pid => undefined},
-    maps:from_keys(lists:seq(1, no_of_processes()), Config);
+    maps:from_keys(lists:seq(1, ?MODULE:no_of_processes()), Config);
 pool_config(0, _) ->
     Config = #{max_n => 0, delay => infinity, status => active, pid => undefined},
-    maps:from_keys(lists:seq(1, no_of_processes()), Config);
+    maps:from_keys(lists:seq(1, ?MODULE:no_of_processes()), Config);
 pool_config(Rate, 0) ->
     Config = #{max_n => Rate, delay => 0, status => inactive, pid => undefined},
-    PoolConfig = #{1 := First} = maps:from_keys(lists:seq(1, no_of_processes()), Config),
+    PoolConfig = #{1 := First} = maps:from_keys(lists:seq(1, ?MODULE:no_of_processes()), Config),
     PoolConfig#{1 := First#{status => active}};
-pool_config(Rate, Interval) ->
-    NoOfProcesses = no_of_processes(),
-    RatePerMinutePerProcess = (60000 * Rate div Interval) div NoOfProcesses,
-    DelayPerProcess = (NoOfProcesses * Interval) div Rate,
-    Rem = ((60000 * Rate div Interval) rem NoOfProcesses)
-            + ((NoOfProcesses * Interval) rem Rate),
-    calculate_availability(RatePerMinutePerProcess, DelayPerProcess, NoOfProcesses, Rem).
+pool_config(Rate, Interval) when ?POS_INT(Rate), ?POS_INT(Interval) ->
+    NoOfProcesses = ?MODULE:no_of_processes(),
+    RatesPerProcess = calculate_rate_per_process(NoOfProcesses, Rate, Interval, +0.0, []),
+    #{} = lists:foldl(fun assign_process/2, #{}, RatesPerProcess).
+
+-define(THRESHOLD, 10).
+calculate_rate_per_process(1, Rate, Interval, RoundingError, Acc) ->
+    case delay(RoundingError, Rate, Interval) of
+        {Delay, Remaining} when Delay =:= infinity; Remaining < 0.5 ->
+            [{1, Rate, Delay} | Acc];
+        {Delay, _} ->
+            [{1, Rate, Delay + 1} | Acc]
+    end;
+calculate_rate_per_process(N, Rate, Interval, RoundingError, Acc) when is_integer(N), N > 1 ->
+    ProcessRate = Rate div N,
+    case ProcessRate of
+        _ when ProcessRate =< ?THRESHOLD, Rate =< ?THRESHOLD ->
+            {Delay, RoundingError1} = delay(RoundingError, Rate, Interval),
+            Acc1 = [{N, Rate, Delay} | Acc],
+            calculate_rate_per_process(N - 1, 0, Interval, RoundingError1, Acc1);
+        _ when ProcessRate =< ?THRESHOLD ->
+            {Delay, RoundingError1} = delay(RoundingError, ?THRESHOLD, Interval),
+            Acc1 = [{N, ?THRESHOLD, Delay} | Acc],
+            calculate_rate_per_process(N - 1, Rate - ?THRESHOLD, Interval, RoundingError1, Acc1);
+        _ ->
+            {Delay, RoundingError1} = delay(RoundingError, ProcessRate, Interval),
+            Acc1 = [{N, ProcessRate, Delay} | Acc],
+            calculate_rate_per_process(N - 1, Rate - ProcessRate, Interval, RoundingError1, Acc1)
+    end.
+
+delay(RemainingError, 0, _Interval) ->
+    {infinity, RemainingError};
+delay(RemainingError, Rate, Interval) ->
+    Remaining = Interval rem Rate,
+    RemainingError1 = RemainingError + (Remaining / Rate),
+    case {Interval div Rate, RemainingError1} of
+        {DelayBetweenExecutions, _} when RemainingError1 >= 1.0 ->
+            {DelayBetweenExecutions + 1, RemainingError1 - 1};
+        {DelayBetweenExecutions, _} ->
+            {DelayBetweenExecutions, RemainingError1}
+    end.
+
+assign_process({N, RatePerProcess, infinity}, Config) ->
+    Config#{N => #{max_n => RatePerProcess,
+                   delay => infinity,
+                   status => inactive,
+                   pid => undefined}};
+assign_process({N, RatePerProcess, Delay}, Config) ->
+    Config#{N => #{max_n => RatePerProcess,
+                   delay => Delay,
+                   status => active,
+                   pid => undefined}}.
 
 -spec process_pool_config(pid(), pool_config()) -> pool_config().
 process_pool_config(PoolSup, PoolConfig) ->
@@ -80,38 +126,9 @@ process_pool_config(PoolSup, PoolConfig) ->
     Fun1 = fun(N, Config) -> Config#{pid => maps:get(N, Workers)} end,
     maps:map(Fun1, PoolConfig).
 
--spec calculate_availability(integer(), integer(), pos_integer(), integer()) -> pool_config().
-calculate_availability(RatePerMinutePerProcess, DelayPerProcess, NoOfProcesses, Rem) ->
-    Fun = fun(N, {Acc, R}) ->
-                  case {RatePerMinutePerProcess < NoOfProcesses, R} of
-                      {true, 0} ->
-                          Config = #{max_n => RatePerMinutePerProcess,
-                                     delay => DelayPerProcess + 1,
-                                     status => inactive, pid => undefined},
-                          {Acc#{N => Config}, R};
-                      {true, R} ->
-                          Config = #{max_n => RatePerMinutePerProcess,
-                                     delay => DelayPerProcess,
-                                     status => active, pid => undefined},
-                          {Acc#{N => Config}, R - 1};
-                      {false, 0} ->
-                          Config = #{max_n => RatePerMinutePerProcess,
-                                     delay => DelayPerProcess,
-                                     status => active, pid => undefined},
-                          {Acc#{N => Config}, R};
-                      {false, R} ->
-                          Config = #{max_n => RatePerMinutePerProcess,
-                                     delay => DelayPerProcess + 1,
-                                     status => active, pid => undefined},
-                          {Acc#{N => Config}, R - 1}
-                  end
-          end,
-    {#{} = PoolConfig, _} = lists:foldl(Fun, {#{}, Rem}, lists:seq(1, NoOfProcesses)),
-    PoolConfig.
-
 -spec no_of_processes() -> non_neg_integer().
 no_of_processes() ->
-    3 * erlang:system_info(schedulers_online).
+    min(30, 2 * erlang:system_info(schedulers_online)).
 
 -spec do_verify_gradual_config(amoc_throttle:gradual_plan()) -> gradual_plan().
 do_verify_gradual_config(
@@ -159,4 +176,4 @@ do_verify_gradual_config(
 calculate_step(N, N, _, _, To) -> To;
 calculate_step(0, _, _, From, _) -> From;
 calculate_step(N, _, StepRate, From, _) ->
-    From + floor(StepRate * N).
+    From + round(StepRate * N).

@@ -10,7 +10,8 @@
 
 all() ->
     [
-     {group, api}
+     {group, api},
+     {group, properties}
     ].
 
 groups() ->
@@ -35,14 +36,32 @@ groups() ->
        change_rate_gradually,
        change_interarrival_gradually,
        change_rate_gradually_verify_descriptions,
-       change_rate_gradually_verify_descriptions_properties,
        just_wait,
        wait_for_process_to_die_sends_a_kill,
        async_runner_dies_while_waiting_raises_exit,
        async_runner_dies_when_throttler_dies,
        pause_and_resume,
        get_state
-     ]}
+     ]},
+     {properties, [],
+      [
+       change_rate_gradually_verify_descriptions_properties,
+       % Note that the smallest delay possible for a process is 1ms (receive operations),
+       % hence if we give for example 10 workers 1ms delays, we get 600_000 ticks per minute.
+       % and if we give for example 48 workers 1ms delays, we get 2_880_000 ticks per minute.
+       % That means, that is realistically the maximum rate we could possibly manage
+       % with a static pool of such number of workers.
+       pool_config_is_precise_for_rates_1,
+       pool_config_is_precise_for_rates_2,
+       pool_config_is_precise_for_rates_3,
+       pool_config_is_precise_for_rates_4,
+       pool_config_is_precise_for_rates_5,
+       pool_config_is_precise_for_rates_6,
+       pool_config_is_precise_for_rates_7,
+       pool_config_is_precise_for_rates_8,
+       pool_config_is_precise_for_rates_9,
+       pool_config_is_precise_for_rates_10
+      ]}
     ].
 
 init_per_suite(Config) ->
@@ -55,6 +74,18 @@ init_per_suite(Config) ->
 end_per_suite(_) ->
     application:stop(amoc),
     telemetry_helpers:stop(),
+    ok.
+
+init_per_group(properties, Config) ->
+    meck:new(amoc_throttle_config, [passthrough, non_strict, no_link]),
+    meck:expect(amoc_throttle_config, no_of_processes, [], 100),
+    Config;
+init_per_group(_, Config) ->
+    Config.
+
+end_per_group(properties, _Config) ->
+    meck:unload(amoc_throttle_config);
+end_per_group(_, _Config) ->
     ok.
 
 init_per_testcase(_, Config) ->
@@ -351,7 +382,41 @@ change_rate_gradually_verify_descriptions_properties(_) ->
                     integer(1, 1 bsl 8),
                     integer(1, 1 bsl 24)},
                    Fun(From, To, Interval, StepInterval, StepCount)),
-    run_prop(?FUNCTION_NAME, Prop, 1 bsl 16, 3).
+    run_prop(?FUNCTION_NAME, Prop, 1 bsl 16, 1).
+
+pool_config_is_precise_for_rates_1(_) ->
+    pool_config_property_tests(lists:seq(1, 100_000), timer:minutes(1)).
+
+pool_config_is_precise_for_rates_2(_) ->
+    pool_config_property_tests(lists:seq(100_000, 200_000), timer:minutes(1)).
+
+pool_config_is_precise_for_rates_3(_) ->
+    pool_config_property_tests(lists:seq(200_000, 300_000), timer:minutes(1)).
+
+pool_config_is_precise_for_rates_4(_) ->
+    pool_config_property_tests(lists:seq(300_000, 400_000), timer:minutes(1)).
+
+pool_config_is_precise_for_rates_5(_) ->
+    pool_config_property_tests(lists:seq(400_000, 500_000), timer:minutes(1)).
+
+pool_config_is_precise_for_rates_6(_) ->
+    pool_config_property_tests(lists:seq(500_000, 600_000), timer:minutes(1)).
+
+pool_config_is_precise_for_rates_7(_) ->
+    pool_config_property_tests(lists:seq(600_000, 700_000), timer:minutes(1)).
+
+pool_config_is_precise_for_rates_8(_) ->
+    pool_config_property_tests(lists:seq(700_000, 800_000), timer:minutes(1)).
+
+pool_config_is_precise_for_rates_9(_) ->
+    pool_config_property_tests(lists:seq(800_000, 900_000), timer:minutes(1)).
+
+pool_config_is_precise_for_rates_10(_) ->
+    pool_config_property_tests(lists:seq(900_000, 1_000_000), timer:minutes(1)).
+
+% TODO: introduce dynamically sized pools in order to manage higher rates.
+pool_config_is_precise_for_high_rates(_) ->
+    pool_config_property_tests(lists:seq(1 bsl 24, 1 bsl 32), timer:minutes(1)).
 
 just_wait(_) ->
     %% it fails if the throttle wasn't started yet
@@ -431,9 +496,36 @@ assert_telemetry_event(Name, Measurement, Throttle, Rate, Interval) ->
                        end,
     ?assert(lists:any(IsLowRateEventFn, TelemetryEvents)).
 
-run_prop(PropName, Property, NumTests, WorkersPerScheduler) ->
-    Opts = [noshrink, {start_size, 1}, {numtests, NumTests},
-            {numworkers, WorkersPerScheduler * erlang:system_info(schedulers_online)}],
+pool_config_property_tests(RateGen, IntervalGen) ->
+    Fun = fun(Rate, Interval) ->
+              R1 = amoc_throttle_config:pool_config(Rate, Interval),
+              accumulated_is_requested(Rate, Interval, R1)
+    end,
+    [ Fun(Rate, IntervalGen) || Rate <- RateGen].
+
+accumulated_is_requested(Rate, Interval, Res) ->
+    Fold = fun(_N, #{status := active, delay := D}, Acc) ->
+                   Acc + (1 / D);
+              (_, _, Acc) ->
+                   Acc
+           end,
+    NumberOfActionsPerMs = maps:fold(Fold, +0.0, Res),
+    Expected = Rate / Interval,
+    %% This is checking that the difference is less than 1% by multipliting
+    %% by a 100 and then checking it is smaller.
+    Error = (abs(NumberOfActionsPerMs - Expected) * 100),
+    Expected >= Error
+    orelse throw(#{throttle => #{rate => Rate, interval => Interval},
+                   expected_rate_per_minute => Expected,
+                   returned_aggregated_rate_per_minute => NumberOfActionsPerMs,
+                   error_percentage => Error/Expected,
+                   config => filter_only_actives(Res)}).
+
+filter_only_actives(Res) ->
+    maps:filter(fun(_, #{status := Status}) -> Status =:= active end, Res).
+
+run_prop(PropName, Property, NumTests, Workers) ->
+    Opts = [noshrink, {start_size, 1}, {numtests, NumTests}, {numworkers, Workers}],
     Res = proper:counterexample(proper:conjunction([{PropName, Property}]), Opts),
     ?assertEqual(true, Res).
 
