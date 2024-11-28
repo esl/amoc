@@ -121,7 +121,8 @@ do_verify_gradual_config(
        ?NON_NEG_INT(FromRate), ?NON_NEG_INT(ToRate), ?NON_NEG_INT(Interval),
        ?POS_INT(StepInterval), ?POS_INT(StepCount) ->
     StepRate = (ToRate - FromRate) / StepCount,
-    StepPlan = [ calculate_step(Step, StepRate, FromRate) || Step <- lists:seq(0, StepCount) ],
+    StepPlan = [ calculate_step(Step, StepCount, StepRate, FromRate, ToRate)
+                 || Step <- lists:seq(0, StepCount) ],
     #{rates => StepPlan, interval => Interval, step_interval => StepInterval};
 
 do_verify_gradual_config(
@@ -150,8 +151,12 @@ do_verify_gradual_config(
 
 -spec calculate_step(
         Step :: non_neg_integer(),
+        StepCount :: non_neg_integer(),
         StepRate :: float(),
-        FromRate :: non_neg_integer()) ->
+        FromRate :: non_neg_integer(),
+        ToRate :: non_neg_integer()) ->
     non_neg_integer().
-calculate_step(N, StepRate, From) ->
+calculate_step(N, N, _, _, To) -> To;
+calculate_step(0, _, _, From, _) -> From;
+calculate_step(N, _, StepRate, From, _) ->
     From + floor(StepRate * N).

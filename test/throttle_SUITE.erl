@@ -1,6 +1,7 @@
 -module(throttle_SUITE).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("proper/include/proper.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -compile([export_all, nowarn_export_all]).
 
@@ -33,6 +34,7 @@ groups() ->
        change_rate_gradually,
        change_interarrival_gradually,
        change_rate_gradually_verify_descriptions,
+       change_rate_gradually_verify_descriptions_properties,
        just_wait,
        wait_for_process_to_die_sends_a_kill,
        async_runner_dies_while_waiting_raises_exit,
@@ -303,6 +305,31 @@ change_rate_gradually_verify_descriptions(_) ->
        {error, _},
        amoc_throttle_config:verify_gradual_config(E1)).
 
+change_rate_gradually_verify_descriptions_properties(_) ->
+    Fun = fun(From, To, Interval, StepInterval, StepCount) ->
+              D1 = #{throttle => #{from_rate => From, to_rate => To, interval => Interval},
+                     plan => #{step_interval => StepInterval, step_count => StepCount}},
+              R1 = amoc_throttle_config:verify_gradual_config(D1),
+              ?assertMatch(#{rates := Rates,
+                             interval := Interval,
+                             step_interval := StepInterval}
+                             when 1 + StepCount =:= length(Rates), R1),
+              Rates = maps:get(rates, R1),
+              SortedRates = lists:sort(Rates),
+              From =:= lists:nth(1, Rates) andalso
+              To =:= lists:last(Rates) andalso
+              (From =< To andalso SortedRates =:= Rates
+               orelse From > To andalso lists:reverse(SortedRates) =:= Rates)
+    end,
+    Prop = ?FORALL({From, To, Interval, StepInterval, StepCount},
+                   {integer(1, 1 bsl 61),
+                    integer(1, 1 bsl 61),
+                    integer(1, 1 bsl 24),
+                    integer(1, 1 bsl 8),
+                    integer(1, 1 bsl 24)},
+                   Fun(From, To, Interval, StepInterval, StepCount)),
+    run_prop(?FUNCTION_NAME, Prop, 1 bsl 16, 3).
+
 just_wait(_) ->
     %% it fails if the throttle wasn't started yet
     ?assertMatch({error, no_throttle_process_registered},
@@ -386,6 +413,12 @@ assert_telemetry_event(Name, Measurement, Throttle, Rate, Interval) ->
                                Interval =:= maps:get(interval, Metadata, undefined)
                        end,
     ?assert(lists:any(IsLowRateEventFn, TelemetryEvents)).
+
+run_prop(PropName, Property, NumTests, WorkersPerScheduler) ->
+    Opts = [noshrink, {start_size, 1}, {numtests, NumTests},
+            {numworkers, WorkersPerScheduler * erlang:system_info(schedulers_online)}],
+    Res = proper:counterexample(proper:conjunction([{PropName, Property}]), Opts),
+    ?assertEqual(true, Res).
 
 get_throttle_workers(Name) ->
     pg:get_members(amoc_throttle, Name).
