@@ -24,6 +24,7 @@ groups() ->
        start_interarrival_infinity,
        start_rate_zero,
        start_rate_infinity,
+       start_interval_zero,
        low_rate_does_not_get_remapped,
        low_interval_does_not_get_remapped,
        start_and_stop,
@@ -115,6 +116,13 @@ start_rate_infinity(_) ->
     State = get_throttle_info(?FUNCTION_NAME),
     ?assertMatch(#{interval := 60000, rate := infinity}, State).
 
+start_interval_zero(_) ->
+    %% Starts successfully
+    Description = #{rate => 60, interval => 0},
+    ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, Description)),
+    State = get_throttle_info(?FUNCTION_NAME),
+    ?assertMatch(#{interval := 0, rate := 60}, State).
+
 low_rate_does_not_get_remapped(_) ->
     ?assertMatch({ok, started},
                  amoc_throttle:start(?FUNCTION_NAME,
@@ -143,13 +151,28 @@ change_rate(_) ->
     ?assertMatch({error, {no_throttle_by_name, ?FUNCTION_NAME}},
                  amoc_throttle:change_rate(?FUNCTION_NAME, #{rate => 100})),
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, 100)),
-    E1 = #{rate => 100, interval => ?DEFAULT_INTERVAL},
-    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E1)),
-    E2 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 1},
-    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E2)),
-    E3 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 2},
-    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, E3)),
-    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 200)).
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, 101)),
+    R1 = #{rate => 100, interval => ?DEFAULT_INTERVAL + 1},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, R1)),
+    R2 = #{rate => 10000, interval => 100},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, R2)),
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    ?assertMatch(ok, ?RECV(receive_this, 100)),
+    R3 = #{rate => 0},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, R3)),
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)),
+    R4 = #{rate => infinity},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, R4)),
+    ?assertMatch(ok, ?RECV(receive_this, 100)),
+    I1 = #{interarrival => 1},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, I1)),
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    ?assertMatch(ok, ?RECV(receive_this, 100)),
+    I2 = #{interarrival => 30000},
+    ?assertMatch(ok, amoc_throttle:change_rate(?FUNCTION_NAME, I2)),
+    amoc_throttle:send(?FUNCTION_NAME, receive_this),
+    ?assertMatch({error, not_received_yet}, ?RECV(receive_this, 200)).
 
 interval_equal_zero_limits_parallelism(_) ->
     E1 = #{rate => 36, interval => 0},
