@@ -39,7 +39,7 @@ groups() ->
        wait_for_process_to_die_sends_a_kill,
        async_runner_dies_while_waiting_raises_exit,
        async_runner_dies_when_throttler_dies,
-       pause_and_resume_and_unlock,
+       pause_and_resume,
        get_state
      ]}
     ].
@@ -373,7 +373,7 @@ async_runner_dies_when_throttler_dies(_) ->
     amoc_throttle:stop(?FUNCTION_NAME),
     ?assertMatch(ok, ?RECV({'EXIT', _, {throttler_worker_died, _, _}}, 100)).
 
-pause_and_resume_and_unlock(_) ->
+pause_and_resume(_) ->
     %% Start a 10-per-ms throttle
     Description = #{rate => 600000},
     ?assertMatch({ok, started}, amoc_throttle:start(?FUNCTION_NAME, Description)),
@@ -386,12 +386,6 @@ pause_and_resume_and_unlock(_) ->
     %% After resume the message is then received
     ?assertMatch(ok, amoc_throttle:resume(?FUNCTION_NAME)),
     ?assertMatch(ok, ?RECV(receive_this, 200)),
-    %% If unlocked, all messages are always received
-    ?assertMatch(ok, amoc_throttle:unlock(?FUNCTION_NAME)),
-    amoc_throttle:send(?FUNCTION_NAME, receive_this_too),
-    ?assertMatch(ok, ?RECV(receive_this_too, 200)),
-    %% From unlock it can resume
-    ?assertMatch(ok, amoc_throttle:resume(?FUNCTION_NAME)),
     State = get_throttle_info(?FUNCTION_NAME),
     ?assertMatch(#{rate := 600000}, State).
 

@@ -9,7 +9,7 @@
 %% API
 -export([start_link/0,
          ensure_throttle_processes_started/2,
-         pause/1, resume/1, unlock/1, stop/1, get_info/1,
+         pause/1, resume/1, stop/1, get_info/1,
          change_rate/2, change_rate_gradually/2,
          pg_scope/0,
          get_throttle_process/1,
@@ -46,7 +46,7 @@
 -type change_rate() :: {change_rate, name(), amoc_throttle_config:config()}.
 -type change_rate_gradually() ::
     {change_rate_gradually, name(), amoc_throttle_config:gradual_plan()}.
--type operation() :: {pause | resume | unlock | stop, name()}.
+-type operation() :: {pause | resume | stop, name()}.
 
 %%%===================================================================
 %%% API
@@ -93,10 +93,6 @@ pause(Name) ->
 -spec resume(name()) -> ok | {error, any()}.
 resume(Name) ->
     gen_server:call(?MASTER_SERVER, {resume, Name}).
-
--spec unlock(name()) -> ok | {error, any()}.
-unlock(Name) ->
-    gen_server:call(?MASTER_SERVER, {unlock, Name}).
 
 -spec get_info(name()) -> #{_ := _} | {error, any()}.
 get_info(Name) ->
@@ -172,7 +168,7 @@ handle_call({change_rate_gradually, Name, GradualChangeRate}, _From, State) ->
             {reply, {error, {no_throttle_by_name, Name}}, State}
     end;
 handle_call({Op, Name}, _From, State)
-  when stop =:= Op; pause =:= Op; unlock =:= Op; resume =:= Op ->
+  when stop =:= Op; pause =:= Op; resume =:= Op ->
     case State of
         #{Name := Info} ->
             do_run_op(Op, Name, Info, State);
@@ -280,19 +276,14 @@ consume_all_timer_ticks(Msg) ->
 do_run_op(stop, Name, #throttle_info{pool_sup = PoolSup}, State) ->
     ok = amoc_throttle_pooler:stop_pool(PoolSup),
     {reply, ok, maps:remove(Name, State)};
-do_run_op(pause, Name, #throttle_info{pool_config = PoolConfig} = Info, State) ->
+do_run_op(pause, Name, #throttle_info{pool_config = PoolConfig, active = true} = Info, State) ->
     Fun = fun(_, #{pid := Pid}) ->
                   amoc_throttle_process:update(Pid, 0, infinity)
           end,
     maps:foreach(Fun, PoolConfig),
     {reply, ok, State#{Name => Info#throttle_info{active = false}}};
-do_run_op(unlock, Name, #throttle_info{pool_config = PoolConfig} = Info, State) ->
-    Fun = fun(_, #{pid := Pid}) ->
-                  amoc_throttle_process:update(Pid, infinity, 0)
-          end,
-    maps:foreach(Fun, PoolConfig),
-    {reply, ok, State#{Name => Info#throttle_info{active = true}}};
-do_run_op(resume, Name, #throttle_info{pool_config = PoolConfig} = Info, State) ->
+
+do_run_op(resume, Name, #throttle_info{pool_config = PoolConfig, active = false} = Info, State) ->
     Fun = fun(_, #{max_n := MaxN, delay := Delay, pid := Pid}) ->
                   amoc_throttle_process:update(Pid, MaxN, Delay)
           end,

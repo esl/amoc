@@ -86,17 +86,17 @@ start(Name, Rate) when is_integer(Rate) ->
 pause(Name) ->
     amoc_throttle_controller:pause(Name).
 
-%% @doc Unlocks executions for the given `Name' as if `Rate' was set to `infinity'.
--spec unlock(name()) -> ok | {error, any()}.
-unlock(Name) ->
-    amoc_throttle_controller:unlock(Name).
-
 %% @doc Resumes the executions for the given `Name', to their original configuration value.
 %%
 %% It is the counterpart to the `pause/1' API, resuming the execution of what that mechanism paused.
 -spec resume(name()) -> ok | {error, any()}.
 resume(Name) ->
     amoc_throttle_controller:resume(Name).
+
+%% @doc Unlocks executions for the given `Name' by setting `Rate' to `infinity'.
+-spec unlock(name()) -> ok | {error, any()}.
+unlock(Name) ->
+    change_rate(Name, #{rate => infinity, interval => 0}).
 
 %% @doc Sets the throttle `Config' for `Name' according to the given values.
 -spec change_rate(name(), t() | rate()) -> ok | {error, any()}.
