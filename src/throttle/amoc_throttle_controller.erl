@@ -310,13 +310,16 @@ process_pool(Name, PoolConfig1) ->
 update_throttle_processes(Name, OldPoolConfig, NewPoolConfig) ->
     Fun = fun(N, #{status := Status, delay := Delay, max_n := MaxN} = V, {C, J, L}) ->
                   #{status := OldStatus, pid := Pid} = maps:get(N, C),
-                  amoc_throttle_process:update(Pid, MaxN, Delay),
                   case {Status, OldStatus} of
                       {active, inactive} ->
+                          %% we let the disabling process drain, without possibly setting its delay
+                          %% to infinity and blocking all other processes.
                           {C#{N := V#{pid := Pid}}, [Pid | J], L};
                       {inactive, active} ->
+                          amoc_throttle_process:update(Pid, MaxN, Delay),
                           {C#{N := V#{pid := Pid}}, J, [Pid | L]};
                       {Same, Same} ->
+                          amoc_throttle_process:update(Pid, MaxN, Delay),
                           {C#{N := V#{pid := Pid}}, J, L}
                   end
           end,
