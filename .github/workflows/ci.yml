@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         otp_vsn: ['27', '26', '25']
-        rebar_vsn: ['3.23.0']
+        rebar_vsn: ['3.24.0']
         test-type: ['regular', 'integration']
     runs-on: 'ubuntu-24.04'
     steps:

@@ -1,6 +1,6 @@
 ## API
 
-See `amoc_coordinator`.
+See `m:amoc_coordinator`.
 
 ## Description
 

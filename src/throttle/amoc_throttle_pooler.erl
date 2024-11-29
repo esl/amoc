@@ -5,13 +5,23 @@
 
 -behaviour(supervisor).
 
+-export([start_pool/2, stop_pool/1]).
 -export([start_link/0, init/1]).
 
--spec start_link() -> {ok, Pid :: pid()}.
+-spec start_pool(amoc_throttle:name(), amoc_throttle_config:pool_config()) ->
+    supervisor:startchild_ret().
+start_pool(Name, PoolConfig) ->
+    supervisor:start_child(?MODULE, [Name, PoolConfig]).
+
+-spec stop_pool(pid()) -> ok.
+stop_pool(Pool) ->
+    ok = supervisor:terminate_child(?MODULE, Pool).
+
+-spec start_link() -> supervisor:startlink_ret().
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
--spec init(term()) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
+-spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
     ChildSpec = #{id => amoc_throttle_pool,
                   start => {amoc_throttle_pool, start_link, []},

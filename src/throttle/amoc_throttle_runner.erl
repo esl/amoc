@@ -17,7 +17,7 @@ run(RunnerPid) ->
 
 -spec throttle(amoc_throttle:name(), action()) -> ok | {error, any()}.
 throttle(Name, Action) ->
-    case amoc_throttle_process:get_throttle_process(Name) of
+    case amoc_throttle_controller:get_throttle_process(Name) of
         {ok, ThrottlerPid} ->
             Args = [Name, self(), ThrottlerPid, Action],
             RunnerPid = erlang:spawn_link(?MODULE, async_runner, Args),
@@ -38,7 +38,7 @@ maybe_wait(wait, RunnerPid) ->
 maybe_wait(_, _) ->
     ok.
 
--spec async_runner(amoc_throttle:name(), pid(), pid(), term()) -> no_return().
+-spec async_runner(amoc_throttle:name(), pid(), pid(), action()) -> true.
 async_runner(Name, Caller, ThrottlerPid, Action) ->
     ThrottlerMonitor = erlang:monitor(process, ThrottlerPid),
     amoc_throttle_controller:raise_event_on_slave_node(Name, request),

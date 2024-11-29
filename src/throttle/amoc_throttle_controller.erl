@@ -8,32 +8,33 @@
 
 %% API
 -export([start_link/0,
-         ensure_throttle_processes_started/4,
-         pause/1, resume/1, stop/1,
-         change_rate/3, change_rate_gradually/6,
+         ensure_throttle_processes_started/2,
+         pause/1, resume/1, stop/1, get_info/1,
+         change_rate/2, change_rate_gradually/2,
+         pg_scope/0,
+         get_throttle_process/1,
          raise_event_on_slave_node/2, telemetry_event/2]).
 
 %% gen_server callbacks
--export([init/1,
-         handle_call/3,
-         handle_cast/2,
-         handle_info/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
+-define(PG_SCOPE, amoc_throttle).
 -define(SERVER, ?MODULE).
 -define(MASTER_SERVER, {?SERVER, amoc_cluster:master_node()}).
 
 -record(throttle_info, {
+    pool_sup :: pid(),
+    pool_config :: amoc_throttle_config:pool_config(),
     rate :: amoc_throttle:rate(),
     interval :: amoc_throttle:interval(),
-    no_of_procs :: pos_integer(),
-    active :: boolean(),
-    change_plan :: change_rate_plan() | undefined
+    active = true :: boolean(),
+    change_plan :: undefined | change_rate_plan()
 }).
 
 -record(change_rate_plan, {
-    high_rate :: pos_integer(),
-    no_of_steps :: non_neg_integer(),
-    timer :: timer:tref()}).
+    rates :: [non_neg_integer()],
+    timer :: timer:tref()
+}).
 
 -type name() :: amoc_throttle:name().
 -type change_rate_plan() :: #change_rate_plan{}.
@@ -41,22 +42,49 @@
 -type state() :: #{name() => throttle_info()}.
 -type event() :: init | execute | request.
 
+-type start_throttle() :: {start_throttle, name(), amoc_throttle_config:config()}.
+-type change_rate() :: {change_rate, name(), amoc_throttle_config:config()}.
+-type change_rate_gradually() ::
+    {change_rate_gradually, name(), amoc_throttle_config:gradual_plan()}.
+-type operation() :: {pause | resume | stop, name()}.
+
 %%%===================================================================
 %%% API
 %%%===================================================================
 
--spec(start_link() ->
-    {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
+-spec pg_scope() -> atom().
+pg_scope() ->
+    ?PG_SCOPE.
+
+-spec get_throttle_process(amoc_throttle:name()) ->
+    {error, no_throttle_process_registered} | {ok, pid()}.
+get_throttle_process(Name) ->
+    case pg:get_members(?PG_SCOPE, Name) of
+        [_ | _] = List -> %% nonempty list
+            N = rand:uniform(length(List)),
+            {ok, lists:nth(N, List)};
+        [] ->
+            {error, no_throttle_process_registered}
+    end.
+
+-spec start_link() -> gen_server:start_ret().
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec ensure_throttle_processes_started(name(), amoc_throttle:rate(),
-                                        amoc_throttle:interval(), pos_integer()) ->
+-spec ensure_throttle_processes_started(name(), amoc_throttle_config:config()) ->
     {ok, started | already_started} |
-    {error, wrong_reconfiguration | wrong_no_of_procs}.
-ensure_throttle_processes_started(Name, Rate, Interval, NoOfProcesses) ->
+    {error, invalid_throttle | wrong_reconfiguration | error_starting_pool}.
+ensure_throttle_processes_started(Name, Config) when is_atom(Name) ->
     raise_event_on_slave_node(Name, init),
-    gen_server:call(?MASTER_SERVER, {start_processes, Name, Rate, Interval, NoOfProcesses}).
+    gen_server:call(?MASTER_SERVER, {start_throttle, Name, Config}).
+
+-spec change_rate(name(), amoc_throttle_config:config()) -> ok | {error, any()}.
+change_rate(Name, Config) ->
+    gen_server:call(?MASTER_SERVER, {change_rate, Name, Config}).
+
+-spec change_rate_gradually(name(), amoc_throttle_config:gradual_plan()) -> ok | {error, any()}.
+change_rate_gradually(Name, Config) ->
+    gen_server:call(?MASTER_SERVER, {change_rate_gradually, Name, Config}).
 
 -spec pause(name()) -> ok | {error, any()}.
 pause(Name) ->
@@ -66,16 +94,9 @@ pause(Name) ->
 resume(Name) ->
     gen_server:call(?MASTER_SERVER, {resume, Name}).
 
--spec change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval()) -> ok | {error, any()}.
-change_rate(Name, Rate, Interval) ->
-    gen_server:call(?MASTER_SERVER, {change_rate, Name, Rate, Interval}).
-
--spec change_rate_gradually(name(), amoc_throttle:rate(), amoc_throttle:rate(),
-                            amoc_throttle:interval(), pos_integer(), pos_integer()) ->
-    ok | {error, any()}.
-change_rate_gradually(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps) ->
-    gen_server:call(?MASTER_SERVER, {change_rate_gradually, Name, LowRate, HighRate,
-                                     RateInterval, StepInterval, NoOfSteps}).
+-spec get_info(name()) -> #{_ := _} | {error, any()}.
+get_info(Name) ->
+    gen_server:call(?MASTER_SERVER, {get_info, Name}).
 
 -spec stop(name()) -> ok | {error, any()}.
 stop(Name) ->
@@ -98,87 +119,68 @@ raise_event_on_slave_node(Name, Event) ->
 %%% gen_server callbacks
 %%%===================================================================
 
--spec init([]) -> {ok, #{}}.
+-spec init([]) -> {ok, state()}.
 init([]) ->
     {ok, #{}}.
 
--spec handle_call({start_processes, name(), pos_integer(), amoc_throttle:interval(), pos_integer()},
-                  From :: {pid(), Tag :: term()}, state()) ->
+-spec handle_call(start_throttle(), gen_server:from(), state()) ->
                      {reply, {ok, started | already_started}, state()} |
-                     {reply, {error, wrong_reconfiguration | wrong_no_of_procs}, state()};
-                 ({pause | resume | stop}, From :: {pid(), Tag :: term()}, state()) ->
-                     {reply, ok, state()} |
-                     {reply, Error :: any(), state()};
-                 ({change_rate, name(), amoc_throttle:rate(), amoc_throttle:interval()},
-                  From :: {pid(), Tag :: term()}, state()) ->
+                     {reply, {error, wrong_reconfiguration | error_starting_pool}, state()};
+                 (change_rate(), gen_server:from(), state()) ->
                      {reply, ok, state()} |
                      {reply, {error, any()}, state()};
-                 ({change_rate_gradually, name(), amoc_throttle:rate(), amoc_throttle:rate(),
-                   amoc_throttle:interval(), pos_integer(), pos_integer()},
-                  From :: {pid(), Tag :: term()}, state()) ->
+                 (change_rate_gradually(), gen_server:from(), state()) ->
                      {reply, ok, state()} |
+                     {reply, {error, any()}, state()};
+                 (operation(), gen_server:from(), state()) ->
+                     {reply, ok, state()} |
+                     {reply, Error :: any(), state()};
+                 ({get_info, name()}, gen_server:from(), state()) ->
+                     {reply, #{_ := _}, state()} |
                      {reply, {error, any()}, state()}.
-handle_call({start_processes, Name, Rate, Interval, NoOfProcesses}, _From, State) ->
-    case amoc_throttle_process:get_throttle_processes(Name) of
-        {error, no_throttle_process_registered} ->
-            RealNoOfProcs = start_processes(Name, Rate, Interval, NoOfProcesses),
-            NewState = State#{Name => #throttle_info{rate = Rate, interval = Interval,
-                                                     active = true, no_of_procs = RealNoOfProcs}},
-            {reply, {ok, started}, NewState};
-        {ok, Group} ->
-            verify_new_start_matches_running(Name, Rate, Interval, NoOfProcesses, Group, State)
-    end;
-handle_call({pause, Name}, _From, State) ->
-    case run_in_all_processes(Name, pause) of
-        ok ->
-            Info = maps:get(Name, State),
-            {reply, ok, State#{Name => Info#throttle_info{active = false}}};
-        Error ->
-            {reply, Error, State}
-    end;
-handle_call({resume, Name}, _From, State) ->
-    case run_in_all_processes(Name, resume) of
-        ok ->
-            Info = maps:get(Name, State),
-            {reply, ok, State#{Name => Info#throttle_info{active = true}}};
-        Error -> {reply, Error, State}
-    end;
-handle_call({change_rate, Name, Rate, Interval}, _From, State) ->
+handle_call({start_throttle, Name, #{rate := Rate, interval := Interval}}, _From, State) ->
     case State of
-        #{Name := Info} ->
-            case maybe_change_rate(Name, Rate, Interval, Info) of
-                ok ->
-                    UpdatedInfo = Info#throttle_info{rate = Rate, interval = Interval},
-                    {reply, ok, State#{Name => UpdatedInfo}};
-                Error ->
-                    {reply, Error, State}
-            end;
+        #{Name := #throttle_info{rate = Rate, interval = Interval}} ->
+            {reply, {ok, already_started}, State};
+        #{Name := #throttle_info{}} ->
+            {reply, {error, wrong_reconfiguration}, State};
+        _ ->
+            do_start_throttle(Name, Rate, Interval, State)
+    end;
+handle_call({change_rate, Name, #{rate := Rate, interval := Interval}}, _From, State) ->
+    case State of
+        #{Name := #throttle_info{rate = Rate, interval = Interval}} ->
+            {reply, ok, State};
+        #{Name := #throttle_info{change_plan = undefined} = Info} ->
+            do_change_rate(Name, Rate, Interval, Info, State);
+        #{Name := #throttle_info{}} ->
+            {reply, {error, cannot_change_rate}, State};
         _ ->
             {reply, {error, {no_throttle_by_name, Name}}, State}
     end;
-handle_call({change_rate_gradually, Name, LowRate, HighRate,
-             RateInterval, StepInterval, NoOfSteps},
-            _From, State) ->
+handle_call({change_rate_gradually, Name, GradualChangeRate}, _From, State) ->
     case State of
-        #{Name := Info} ->
-            case Info#throttle_info.change_plan of
-                undefined ->
-                    NewInfo = start_gradual_rate_change(Name, LowRate, HighRate, RateInterval,
-                                                        StepInterval, NoOfSteps, Info),
-                    {reply, ok, State#{Name => NewInfo}};
-                _ ->
-                    {reply, {error, cannot_change_rate}, State}
-            end;
+        #{Name := #throttle_info{change_plan = undefined} = Info} ->
+            do_gradual_change_rate(Name, Info, State, GradualChangeRate);
+        #{Name := _} ->
+            {reply, {error, cannot_change_rate}, State};
         _ ->
             {reply, {error, {no_throttle_by_name, Name}}, State}
     end;
-handle_call({stop, Name}, _From, State) ->
-    case run_in_all_processes(Name, stop) of
-        ok ->
-            {reply, ok, maps:remove(Name, State)};
-        Error ->
-            {reply, Error, State}
-    end.
+handle_call({Op, Name}, _From, State)
+  when stop =:= Op; pause =:= Op; resume =:= Op ->
+    case State of
+        #{Name := Info} ->
+            do_run_op(Op, Name, Info, State);
+        _ ->
+            {reply, {error, {no_throttle_by_name, Name}}, State}
+    end;
+handle_call({get_info, Name}, _From, State) ->
+    Info = maps:get(Name, State),
+    Fields = record_info(fields, throttle_info),
+    [_ | Values] = tuple_to_list(Info),
+    Ret = maps:from_list(lists:zip(Fields, Values)),
+    {reply, Ret, State}.
 
 -spec(handle_cast(any(), state()) -> {noreply, state()}).
 handle_cast(_, State) ->
@@ -189,12 +191,8 @@ handle_cast(_, State) ->
 handle_info({change_plan, Name}, State) ->
     Info = maps:get(Name, State),
     Plan = Info#throttle_info.change_plan,
-    case Plan#change_rate_plan.no_of_steps of
-        1 -> NewState = change_rate_and_stop_plan(Name, State),
-            {noreply, NewState};
-        N when N > 1 -> NewState = continue_plan(Name, State),
-            {noreply, NewState}
-    end.
+    NewState = continue_plan(Name, State, Info, Plan),
+    {noreply, NewState}.
 
 %%%===================================================================
 %%% Internal functions
@@ -203,20 +201,71 @@ handle_info({change_plan, Name}, State) ->
 raise_event(Name, Event) when Event =:= request; Event =:= execute; Event =:= init ->
     amoc_telemetry:execute([throttle, Event], #{count => 1}, #{name => Name}).
 
-report_rate(Name, RatePerMinute) ->
-    amoc_telemetry:execute([throttle, rate], #{rate => RatePerMinute}, #{name => Name}).
+report_rate(Name, infinity, _) ->
+    amoc_telemetry:execute([throttle, rate], #{rate => infinity}, #{name => Name});
+report_rate(Name, Rate, Interval) ->
+    Measurements = #{rate => Rate, interval => Interval},
+    amoc_telemetry:execute([throttle, rate], Measurements, #{name => Name}).
 
--spec change_rate_and_stop_plan(name(), state()) -> state().
-change_rate_and_stop_plan(Name, State) ->
-    Info = maps:get(Name, State),
-    Plan = Info#throttle_info.change_plan,
+-spec do_start_throttle(name(), amoc_throttle:rate(), amoc_throttle:interval(), state()) ->
+    {reply, {ok, started}, state()} |
+    {reply, {error, error_starting_pool}, state()}.
+do_start_throttle(Name, Rate, Interval, State) ->
+    PoolConfig = amoc_throttle_config:pool_config(Rate, Interval),
+    case amoc_throttle_pooler:start_pool(Name, PoolConfig) of
+        {ok, PoolSup} when is_pid(PoolSup) ->
+            PoolConfig1 = amoc_throttle_config:process_pool_config(PoolSup, PoolConfig),
+            process_pool(Name, PoolConfig1),
+            raise_event(Name, init),
+            report_rate(Name, Rate, Interval),
+            Info = #throttle_info{pool_sup = PoolSup, pool_config = PoolConfig1,
+                                  rate = Rate, interval = Interval},
+            NewState = State#{Name => Info},
+            {reply, {ok, started}, NewState};
+        _ ->
+            {reply, {error, error_starting_pool}, State}
+    end.
+
+-spec do_change_rate(
+        name(), amoc_throttle:rate(), amoc_throttle:interval(), throttle_info(), state()) ->
+    {reply, ok, state()} |
+    {reply, {error, any()}, state()}.
+do_change_rate(Name, Rate, Interval, Info, State) ->
+    NewInfo = do_change_rate(Name, Rate, Interval, Info),
+    {reply, ok, State#{Name => NewInfo}}.
+
+-spec do_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval(), throttle_info()) ->
+    throttle_info().
+do_change_rate(Name, Rate, Interval, #throttle_info{pool_config = OldPoolConfig} = Info) ->
+    NewPoolConfig = amoc_throttle_config:pool_config(Rate, Interval),
+    report_rate(Name, Rate, Interval),
+    PoolConfig1 = update_throttle_processes(Name, OldPoolConfig, NewPoolConfig),
+    Info#throttle_info{rate = Rate, interval = Interval, pool_config = PoolConfig1}.
+
+-spec do_gradual_change_rate(
+        name(), throttle_info(), state(), amoc_throttle_config:gradual_plan()) ->
+    {reply, ok, state()}.
+do_gradual_change_rate(
+  Name, Info, State,
+  #{rates := [FirstRate | Rates], interval := Interval, step_interval := StepInterval}) ->
+    Info1 = do_change_rate(Name, FirstRate, Interval, Info),
+    {ok, Timer} = timer:send_interval(StepInterval, {change_plan, Name}),
+    Plan = #change_rate_plan{rates = Rates, timer = Timer},
+    NewInfo = Info1#throttle_info{rate = FirstRate, interval = Interval, change_plan = Plan},
+    {reply, ok, State#{Name => NewInfo}}.
+
+-spec continue_plan(name(), state(), throttle_info(), change_rate_plan()) -> state().
+continue_plan(Name, State, Info, #change_rate_plan{rates = [Rate]} = Plan) ->
     Interval = Info#throttle_info.interval,
     TRef = Plan#change_rate_plan.timer,
-    HighRate = Plan#change_rate_plan.high_rate,
-    ok = do_change_rate(Name, HighRate, Interval),
+    Info1 = do_change_rate(Name, Rate, Interval, Info),
     {ok, cancel} = timer:cancel(TRef),
     consume_all_timer_ticks({change_plan, Name}),
-    State#{Name => Info#throttle_info{rate = HighRate, change_plan = undefined}}.
+    State#{Name => Info1#throttle_info{change_plan = undefined}};
+continue_plan(Name, State, Info, #change_rate_plan{rates = [Rate | Rates]} = Plan) ->
+    Info1 = do_change_rate(Name, Rate, Info#throttle_info.interval, Info),
+    NewPlan = Plan#change_rate_plan{rates = Rates},
+    State#{Name => Info1#throttle_info{change_plan = NewPlan}}.
 
 consume_all_timer_ticks(Msg) ->
     receive
@@ -224,102 +273,57 @@ consume_all_timer_ticks(Msg) ->
     after 0 -> ok
     end.
 
--spec continue_plan(name(), state()) -> state().
-continue_plan(Name, State) ->
-    Info = maps:get(Name, State),
-    Plan = Info#throttle_info.change_plan,
-    LowRate = Info#throttle_info.rate,
-    HighRate = Plan#change_rate_plan.high_rate,
-    NoOfSteps = Plan#change_rate_plan.no_of_steps,
+do_run_op(stop, Name, #throttle_info{pool_sup = PoolSup}, State) ->
+    ok = amoc_throttle_pooler:stop_pool(PoolSup),
+    {reply, ok, maps:remove(Name, State)};
+do_run_op(pause, Name, #throttle_info{pool_config = PoolConfig, active = true} = Info, State) ->
+    Fun = fun(_, #{pid := Pid}) ->
+                  amoc_throttle_process:update(Pid, 0, infinity)
+          end,
+    maps:foreach(Fun, PoolConfig),
+    {reply, ok, State#{Name => Info#throttle_info{active = false}}};
 
-    Step = (HighRate - LowRate) div (NoOfSteps),
-    NewRate = LowRate + Step,
-    ok = do_change_rate(Name, NewRate, Info#throttle_info.interval),
+do_run_op(resume, Name, #throttle_info{pool_config = PoolConfig, active = false} = Info, State) ->
+    Fun = fun(_, #{max_n := MaxN, delay := Delay, pid := Pid}) ->
+                  amoc_throttle_process:update(Pid, MaxN, Delay)
+          end,
+    maps:foreach(Fun, PoolConfig),
+    {reply, ok, State#{Name => Info#throttle_info{active = true}}}.
 
-    NewPlan = Plan#change_rate_plan{no_of_steps = NoOfSteps - 1},
-    State#{Name => Info#throttle_info{rate = NewRate, change_plan = NewPlan}}.
+-spec process_pool(amoc_throttle:name(), amoc_throttle_config:pool_config()) ->
+    amoc_throttle_config:pool_config().
+process_pool(Name, PoolConfig1) ->
+    Fun2 = fun({_, #{status := active, pid := Pid}}) ->
+                   {true, Pid};
+              (_) ->
+                   false
+           end,
+    Pids = lists:filtermap(Fun2, maps:to_list(PoolConfig1)),
+    pg:join(?PG_SCOPE, Name, Pids),
+    PoolConfig1.
 
--spec rate_per_minute(amoc_throttle:rate(), amoc_throttle:interval()) -> amoc_throttle:rate().
-rate_per_minute(_, 0) -> 0;
-rate_per_minute(Rate, Interval) ->
-    (Rate * 60000) div Interval.
-
--spec start_processes(name(), amoc_throttle:rate(), amoc_throttle:interval(), pos_integer()) ->
-    pos_integer().
-start_processes(Name, Rate, Interval, NoOfProcesses) ->
-    raise_event(Name, init),
-    RatePerMinute = rate_per_minute(Rate, Interval),
-    report_rate(Name, RatePerMinute),
-    RealNoOfProcesses = min(Rate, NoOfProcesses),
-    start_throttle_processes(Name, Interval, Rate, RealNoOfProcesses),
-    RealNoOfProcesses.
-
--spec maybe_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval(), throttle_info()) ->
-    ok | {error, any()}.
-maybe_change_rate(Name, Rate, Interval, Info) ->
-    CurrentRatePerMin = rate_per_minute(Info#throttle_info.rate, Info#throttle_info.interval),
-    ReqRatePerMin = rate_per_minute(Rate, Interval),
-    case {CurrentRatePerMin, Info#throttle_info.change_plan} of
-        {ReqRatePerMin, _} -> ok;
-        {_, undefined} -> do_change_rate(Name, Rate, Interval);
-        _ -> {error, cannot_change_rate}
-    end.
-
--spec do_change_rate(name(), amoc_throttle:rate(), amoc_throttle:interval()) -> ok | {error, any()}.
-do_change_rate(Name, Rate, Interval) ->
-    case amoc_throttle_process:get_throttle_processes(Name) of
-        {ok, List} ->
-            RatePerMinute = rate_per_minute(Rate, Interval),
-            report_rate(Name, RatePerMinute),
-            update_throttle_processes(List, Interval, Rate, length(List)),
-            ok;
-        Error ->
-            Error
-    end.
-
--spec start_gradual_rate_change(
-        name(), amoc_throttle:rate(), amoc_throttle:rate(),
-        amoc_throttle:interval(), pos_integer(), pos_integer(), throttle_info()) ->
-    throttle_info().
-start_gradual_rate_change(Name, LowRate, HighRate, RateInterval, StepInterval, NoOfSteps, Info) ->
-    ok = do_change_rate(Name, LowRate, RateInterval),
-    {ok, Timer} = timer:send_interval(StepInterval, {change_plan, Name}),
-    Plan = #change_rate_plan{high_rate = HighRate, no_of_steps = NoOfSteps, timer = Timer},
-    Info#throttle_info{rate = LowRate, interval = RateInterval, change_plan = Plan}.
-
-start_throttle_processes(Name, Interval, Rate, N) ->
-    ok = amoc_throttle_pool:start_process_pool(Name, Interval, Rate, N).
-
-update_throttle_processes([Pid], Interval, Rate, 1) ->
-    amoc_throttle_process:update(Pid, Interval, Rate);
-update_throttle_processes([Pid | Tail], Interval, Rate, N) when N > 1 ->
-    ProcessRate = Rate div N,
-    amoc_throttle_process:update(Pid, Interval, ProcessRate),
-    update_throttle_processes(Tail, Interval, Rate - ProcessRate, N - 1).
-
-run_in_all_processes(Name, Cmd) ->
-    case amoc_throttle_process:get_throttle_processes(Name) of
-        {ok, List} ->
-            [run_cmd(P, Cmd) || P <- List],
-            ok;
-        Error ->
-            Error
-    end.
-
-verify_new_start_matches_running(Name, Rate, Interval, NoOfProcesses, Group, State) ->
-    ExpectedNoOfProcesses = min(Rate, NoOfProcesses),
-    case {length(Group), State} of
-        {ExpectedNoOfProcesses, #{Name := #throttle_info{rate = Rate, interval = Interval}}} ->
-            {reply, {ok, already_started}, State};
-        {ExpectedNoOfProcesses, #{Name := #throttle_info{}}} ->
-            {reply, {error, wrong_reconfiguration}, State};
-        _ ->
-            {reply, {error, wrong_no_of_procs}, State}
-    end.
-
-run_cmd(Pid, stop) ->
-    amoc_throttle_process:stop(Pid);
-run_cmd(Pid, pause) ->
-    amoc_throttle_process:pause(Pid);
-run_cmd(Pid, resume) ->
-    amoc_throttle_process:resume(Pid).
+-spec update_throttle_processes(
+        amoc_throttle:name(),
+        amoc_throttle_config:pool_config(),
+        amoc_throttle_config:pool_config()) ->
+    amoc_throttle_config:pool_config().
+update_throttle_processes(Name, OldPoolConfig, NewPoolConfig) ->
+    Fun = fun(N, #{status := Status, delay := Delay, max_n := MaxN} = V, {C, J, L}) ->
+                  #{status := OldStatus, pid := Pid} = maps:get(N, C),
+                  case {Status, OldStatus} of
+                      {active, inactive} ->
+                          %% we let the disabling process drain, without possibly setting its delay
+                          %% to infinity and blocking all other processes.
+                          {C#{N := V#{pid := Pid}}, [Pid | J], L};
+                      {inactive, active} ->
+                          amoc_throttle_process:update(Pid, MaxN, Delay),
+                          {C#{N := V#{pid := Pid}}, J, [Pid | L]};
+                      {Same, Same} ->
+                          amoc_throttle_process:update(Pid, MaxN, Delay),
+                          {C#{N := V#{pid := Pid}}, J, L}
+                  end
+          end,
+    {PoolConfig, Join, Leave} = maps:fold(Fun, {OldPoolConfig, [], []}, NewPoolConfig),
+    pg:join(?PG_SCOPE, Name, Join),
+    pg:leave(?PG_SCOPE, Name, Leave),
+    PoolConfig.

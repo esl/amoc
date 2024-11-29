@@ -25,11 +25,9 @@
 
 -behaviour(supervisor).
 
--define(PG_SCOPE, amoc_throttle).
-
 -export([start_link/0, init/1]).
 
--spec start_link() -> {ok, Pid :: pid()}.
+-spec start_link() -> supervisor:startlink_ret().
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
@@ -37,7 +35,7 @@ start_link() ->
 init([]) ->
     SupFlags = #{strategy => one_for_one},
     Pg = #{id => pg,
-           start => {pg, start_link, [?PG_SCOPE]},
+           start => {pg, start_link, [amoc_throttle_controller:pg_scope()]},
            type => worker,
            shutdown => timer:seconds(5),
            restart => permanent,
