@@ -25,7 +25,7 @@ do(Scenario, Count, Settings) ->
             case {amoc_controller:start_scenario(Scenario, Settings), Count} of
                 {ok, 0} -> ok;
                 {ok, Count} -> amoc_controller:add_users(1, Count);
-                Error -> Error
+                {Error, _} -> Error
             end;
         Error -> Error
     end.

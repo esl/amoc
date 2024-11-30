@@ -39,7 +39,7 @@ end_per_testcase(_, _Config) ->
 
 bad_config_fails_to_start(_) ->
     Ret = amoc_do(testing_scenario, 0, []),
-    ?assertMatch({{error, _}, 0}, Ret).
+    ?assertMatch({error, _}, Ret).
 
 start_with_no_users(_) ->
     Ret = amoc_do(testing_scenario, 0),
@@ -109,7 +109,7 @@ start_and_then_stop_cannot_rerun(_) ->
     Status = amoc:stop(),
     ?assertMatch(ok, Status),
     Retry = amoc_do(testing_scenario, 1),
-    ?assertMatch({{error, {invalid_status, _}}, 1}, Retry).
+    ?assertMatch({error, {invalid_status, _}}, Retry).
 
 after_reset_can_run_again(_) ->
     Ret = amoc_do(testing_scenario, 1),
