@@ -11,7 +11,7 @@
          ensure_throttle_processes_started/2,
          pause/1, resume/1, stop/1, get_info/1,
          change_rate/2, change_rate_gradually/2,
-         pg_scope/0,
+         pg_scope/0, consume_all_messages/1,
          get_throttle_process/1,
          raise_event_on_slave_node/2, telemetry_event/2]).
 
@@ -260,16 +260,17 @@ continue_plan(Name, State, Info, #change_rate_plan{rates = [Rate]} = Plan) ->
     TRef = Plan#change_rate_plan.timer,
     Info1 = do_change_rate(Name, Rate, Interval, Info),
     {ok, cancel} = timer:cancel(TRef),
-    consume_all_timer_ticks({change_plan, Name}),
+    consume_all_messages({change_plan, Name}),
     State#{Name => Info1#throttle_info{change_plan = undefined}};
 continue_plan(Name, State, Info, #change_rate_plan{rates = [Rate | Rates]} = Plan) ->
     Info1 = do_change_rate(Name, Rate, Info#throttle_info.interval, Info),
     NewPlan = Plan#change_rate_plan{rates = Rates},
     State#{Name => Info1#throttle_info{change_plan = NewPlan}}.
 
-consume_all_timer_ticks(Msg) ->
+-spec consume_all_messages(any()) -> ok.
+consume_all_messages(Msg) ->
     receive
-        Msg -> consume_all_timer_ticks(Msg)
+        Msg -> consume_all_messages(Msg)
     after 0 -> ok
     end.
 
