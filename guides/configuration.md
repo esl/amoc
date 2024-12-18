@@ -9,11 +9,9 @@ Amoc supports the following generic configuration parameters:
     * default value - empty list (`[]`)
     * example: `AMOC_NODES="['amoc@amoc-1', 'amoc@amoc-2']"`
 
-
-* `interarrival` - a delay (in ms, for each node in the cluster independently) between creating the processes
-  for two consecutive users:
-    * default value - 50 ms.
-    * example: `AMOC_INTERARRIVAL="50"`
+* `user_rate` - a rate (implemented as a `t:amoc_throttle:rate/0`) of user processes per minute:
+    * default value - 1200.
+    * example: `AMOC_USER_RATE="600"`
     * this parameter can be updated at runtime (in the same way as scenario configuration).
 
 * `extra_code_paths` - a list of paths that should be included using `code:add_pathsz/1` interface

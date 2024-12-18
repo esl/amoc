@@ -63,7 +63,7 @@
                           plan := plan()}.
 %% Gradual plan details. Must specify a `t:gradual/0', and a `t:plan/0'.
 
--export_type([t/0, name/0, rate/0, interval/0, gradual_plan/0]).
+-export_type([t/0, name/0, rate/0, interval/0, interarrival/0, gradual_plan/0]).
 
 %% @doc Starts the throttle mechanism for a given `Name' with a given config.
 %%

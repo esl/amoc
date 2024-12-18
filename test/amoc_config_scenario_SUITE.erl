@@ -94,7 +94,7 @@ end_per_testcase(_, Config) ->
 parse_scenario_settings(_) ->
     mock_ets_tables(),
     ets:insert(configurable_modules, {amoc_controller, configurable}),
-    ScenarioSettings = [{interarrival, 500},
+    ScenarioSettings = [{user_rate, 500},
                         {config_scenario_var1, def1}],
     Ret = amoc_config_scenario:parse_scenario_settings(?MODULE, ScenarioSettings),
     ?assertEqual(ok, Ret),
@@ -114,7 +114,7 @@ parse_scenario_settings(_) ->
     %% overwritten variable
     ?assertEqual(val2, amoc_config:get(config_scenario_var2)),
     %% configurable module variable (defined in amoc_controller)
-    ?assertEqual(500, amoc_config:get(interarrival)).
+    ?assertEqual(500, amoc_config:get(user_rate)).
 
 update_settings(_) ->
     set_initial_configuration(),

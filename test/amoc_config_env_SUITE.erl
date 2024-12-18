@@ -1,4 +1,5 @@
 -module(amoc_config_env_SUITE).
+-compile([export_all, nowarn_export_all]).
 
 -include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -10,8 +11,6 @@
                              set_os_env/2,
                              unset_os_env/1,
                              set_empty_os_env/1]).
-
--compile(export_all).
 
 -define(MOCK_MOD, custom_parser).
 
