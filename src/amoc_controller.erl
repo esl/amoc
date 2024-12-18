@@ -12,7 +12,7 @@
 
 -required_variable(#{name => user_rate, default_value => ?DEFAULT_USER_RATE,
                      verification => {?MODULE, verify_user_rate, 1},
-                     description => "Throttle rate for the Scenario:start/1,2 callback (def: 50ms)",
+                     description => "Throttle rate for the Scenario:start/1,2 callback",
                      update => {?MODULE, update_user_rate, 2}}).
 
 -record(state, {scenario :: amoc:scenario() | undefined,
@@ -130,9 +130,9 @@ disable() ->
 %% @private
 -spec verify_user_rate(any()) -> boolean().
 verify_user_rate(UserRate) ->
-    infinity =:= UserRate
+    (infinity =:= UserRate)
     orelse is_integer(UserRate)
-    andalso 0 =< UserRate.
+    andalso (0 =< UserRate).
 
 %% @private
 -spec update_user_rate(user_rate, user_rate()) -> ok.

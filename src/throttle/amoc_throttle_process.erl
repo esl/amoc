@@ -143,7 +143,7 @@ maybe_stop_timer(#state{tref = undefined}) ->
     ok;
 maybe_stop_timer(#state{tref = TRef}) ->
     {ok, cancel} = timer:cancel(TRef),
-    amoc_throttle_controller:consume_all_messages(delay_between_executions).
+    amoc_throttle_controller:consume_all_timer_ticks(delay_between_executions).
 
 timeout(#state{delay_between_executions = infinity}) ->
     infinity;

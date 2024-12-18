@@ -9,7 +9,7 @@ Amoc supports the following generic configuration parameters:
     * default value - empty list (`[]`)
     * example: `AMOC_NODES="['amoc@amoc-1', 'amoc@amoc-2']"`
 
-* `user_rate` - a rate (in ms, implemented as a `t:amoc_throttle:rate/0`) of user processes per minute:
+* `user_rate` - a rate (implemented as a `t:amoc_throttle:rate/0`) of user processes per minute:
     * default value - 1200.
     * example: `AMOC_USER_RATE="600"`
     * this parameter can be updated at runtime (in the same way as scenario configuration).
