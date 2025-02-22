@@ -11,7 +11,7 @@
          ensure_throttle_processes_started/2,
          pause/1, resume/1, stop/1, get_info/1,
          change_rate/2, change_rate_gradually/2,
-         pg_scope/0, consume_all_timer_ticks/1,
+         pg_scope/0,
          get_throttle_process/1,
          raise_event_on_slave_node/2, telemetry_event/2]).
 

@@ -130,9 +130,7 @@ disable() ->
 %% @private
 -spec verify_user_rate(any()) -> boolean().
 verify_user_rate(UserRate) ->
-    (infinity =:= UserRate)
-    orelse is_integer(UserRate)
-    andalso (0 =< UserRate).
+    (is_integer(UserRate) andalso (0 =< UserRate)) orelse (infinity =:= UserRate).
 
 %% @private
 -spec update_user_rate(user_rate, user_rate()) -> ok.
@@ -255,7 +253,7 @@ handle_add(StartId, EndId, #state{status       = running,
   when StartId =< EndId, LastId < StartId ->
     amoc_telemetry:execute([controller, users], #{count => EndId - StartId + 1},
                            #{scenario => Scenario, type => add}),
-    amoc_users_sup:start_children(Scenario, {StartId, EndId}, ScenarioState),
+    amoc_users_sup:start_children(Scenario, StartId, EndId, ScenarioState),
     {ok, State#state{last_user_id = EndId}};
 handle_add(_StartId, _EndId, #state{status = running} = State) ->
     {{error, invalid_range}, State};
@@ -325,7 +323,7 @@ get_user_rate() ->
 
 -spec wait_user_rate() -> boolean().
 wait_user_rate() ->
-    0 =:= get_user_rate()
+    infinity =:= get_user_rate()
     orelse ok =:= amoc_throttle:wait(user_rate).
 
 -spec start_user_rate() -> any().

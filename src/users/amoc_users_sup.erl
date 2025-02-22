@@ -4,7 +4,7 @@
 %%
 %% It spawns a pool of workers as big as online schedulers. When starting a new user, as the user is
 %% identified by ID, a worker will be chosen for this user based on its ID
-%% (see `gen_sup_from_userid/1').
+%% (see `get_sup_from_user_id/1').
 %%
 %% The currently running number of users is stored in an atomic that all workers update and the
 %% controller can read.
@@ -17,7 +17,7 @@
 
 %% API
 -export([handle_up_user/3, handle_down_user/2, count_no_of_users/0]).
--export([start_children/3, stop_child/2, stop_children/2, terminate_all_children/0]).
+-export([start_children/4, stop_child/2, stop_children/2, terminate_all_children/0]).
 -export([distribute/2, get_all_children/0]).
 
 -type count() :: non_neg_integer().
@@ -42,8 +42,7 @@
 start_link() ->
     Ret = supervisor:start_link({local, ?MODULE}, ?MODULE, no_args),
     UserSups = supervisor:which_children(?MODULE),
-    IndexedSupsUnsorted = [ {Pid, N} || {{amoc_users_worker_sup, N}, Pid, _, _} <- UserSups,
-                                        is_integer(N), is_pid(Pid)],
+    IndexedSupsUnsorted = [ {Pid, N} || {{amoc_users_worker_sup, N}, Pid, _, _} <- UserSups ],
     IndexedSups = lists:keysort(2, IndexedSupsUnsorted),
     UserSupPidsTuple = list_to_tuple([ Pid || {Pid, _} <- IndexedSups ]),
     SupCount = tuple_size(UserSupPidsTuple),
@@ -72,6 +71,7 @@ init(no_args) ->
     Strategy = #{strategy => one_for_one, intensity => 0},
     {ok, {Strategy, Specs}}.
 
+%% We start from 2 to simplify user_count atomics management.
 indexes() ->
     lists:seq(2, erlang:system_info(schedulers_online) + 1).
 
@@ -104,7 +104,7 @@ handle_down_user(SupNum, Pid) when SupNum > 1 ->
 stop_child(Pid, Force) ->
     case ets:lookup(?TABLE, Pid) of
         [Object] ->
-            Sup = gen_sup_from_userid(Object),
+            Sup = get_sup_from_user_id(Object),
             amoc_users_worker_sup:stop_children(Sup, [Pid], Force);
         _ ->
             ok
@@ -113,11 +113,11 @@ stop_child(Pid, Force) ->
 %% Group all children based on ID to their respective worker supervisor and cast a request with each
 %% group at once. This way we reduce the number of casts to each worker to always one, instead of
 %% depending on the number of users.
--spec start_children(amoc:scenario(), {amoc_scenario:user_id(), amoc_scenario:user_id()}, any()) ->
+-spec start_children(amoc:scenario(), amoc_scenario:user_id(), amoc_scenario:user_id(), any()) ->
     ok.
-start_children(Scenario, {StartId, EndId}, ScenarioState) ->
+start_children(Scenario, StartId, EndId, ScenarioState) ->
     UserIds = lists:seq(StartId, EndId),
-    Assignments = maps:groups_from_list(fun gen_sup_from_userid/1, UserIds),
+    Assignments = maps:groups_from_list(fun get_sup_from_user_id/1, UserIds),
     CastFun = fun(Sup, Users) ->
                       amoc_users_worker_sup:start_children(Sup, Scenario, Users, ScenarioState)
               end,
@@ -147,7 +147,7 @@ terminate_all_children() ->
 
 -spec stop_children_assignments([{pid(), amoc_scenario:user_id()}], boolean()) -> ok.
 stop_children_assignments(Users, Force) ->
-    Assignments = maps:groups_from_list(fun gen_sup_from_userid/1, fun get_pid/1, Users),
+    Assignments = maps:groups_from_list(fun get_sup_from_user_id/1, fun get_pid/1, Users),
     CastFun = fun(Sup, Assignment) ->
                       amoc_users_worker_sup:stop_children(Sup, Assignment, Force)
               end,
@@ -163,10 +163,10 @@ do_terminate_all_my_children('$end_of_table') ->
     ok.
 
 %% Helpers
--spec gen_sup_from_userid({pid(), amoc_scenario:user_id()} | amoc_scenario:user_id()) -> pid().
-gen_sup_from_userid({_Pid, Id}) ->
-    gen_sup_from_userid(Id);
-gen_sup_from_userid(Id) ->
+-spec get_sup_from_user_id({pid(), amoc_scenario:user_id()} | amoc_scenario:user_id()) -> pid().
+get_sup_from_user_id({_Pid, Id}) ->
+    get_sup_from_user_id(Id);
+get_sup_from_user_id(Id) ->
     #storage{sups = Supervisors, sups_count = SupCount} = persistent_term:get(?MODULE),
     Index = erlang:phash2(Id, SupCount) + 1,
     element(Index, Supervisors).
