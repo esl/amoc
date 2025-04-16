@@ -1,8 +1,6 @@
 .PHONY: default rel deps compile clean ct lint dialyzer xref console
 .PHONY: test integration_test rerun_integration_test
 
-REBAR = rebar3
-
 ifdef SUITE
 SUITE_OPTS = --suite $$SUITE
 endif
@@ -10,14 +8,14 @@ endif
 default: compile
 
 rel:
-	$(REBAR) release
+	rebar3 release
 
 deps:
-	$(REBAR) deps
-	$(REBAR) compile --deps_only
+	rebar3 deps
+	rebar3 compile --deps_only
 
 compile:
-	$(REBAR) compile
+	rebar3 compile
 
 clean:
 	rm -rf _build
@@ -29,16 +27,16 @@ ct:
 	##     make ct SUITE=some_test_SUITE,another_test_SUITE
 	##     SUITE=some_test_SUITE make ct
 	##     SUITE=some_test_SUITE,another_test_SUITE make ct
-	@ echo $(REBAR) ct -c --verbose $(SUITE_OPTS)
-	@ $(REBAR) ct -c --verbose $(SUITE_OPTS)
+	@ echo rebar3 ct -c --verbose $(SUITE_OPTS)
+	@ rebar3 ct -c --verbose $(SUITE_OPTS)
 
 lint:
-	$(REBAR) as elvis lint
+	rebar3 lint
 
 test: compile xref dialyzer ct lint codecov
 
 codecov:
-	$(REBAR) as test codecov analyze
+	rebar3 as test codecov analyze
 
 integration_test:
 	./integration_test/stop_test_cluster.sh
@@ -58,12 +56,12 @@ rerun_integration_test:
 	./integration_test/test_add_new_node.sh
 
 dialyzer:
-	$(REBAR) dialyzer
+	rebar3 dialyzer
 
 xref:
-	$(REBAR) xref
+	rebar3 xref
 
 console:
 	@echo "tests can be executed manually using ct:run/1 function:\n" \
 	      '   ct:run("test").'
-	$(REBAR) as test shell
+	rebar3 as test shell
