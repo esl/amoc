@@ -207,10 +207,9 @@ update_settings_readonly(_) ->
                         {config_scenario_var1, val1}, %% the same value as set initially
                         {config_scenario_var3, val3}],
     ReadOnlyRet = amoc_config_scenario:update_settings(ScenarioSettings),
-    ?assertEqual({error, readonly_parameters,
-                  [{config_scenario_var0, ?MODULE},
-                   {config_scenario_var1, ?MODULE}]},
-                 ReadOnlyRet),
+    ?assertMatch({error, readonly_parameters, _Vars}, ReadOnlyRet),
+    {error, readonly_parameters, Vars} = ReadOnlyRet,
+    is_equal_list([{config_scenario_var0, ?MODULE}, {config_scenario_var1, ?MODULE}], Vars),
     is_equal_list(Table, ets:tab2list(amoc_config)),
     assert_no_update_calls(),
     assert_no_verify_calls().
