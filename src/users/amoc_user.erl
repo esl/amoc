@@ -3,16 +3,10 @@
 -module(amoc_user).
 
 %% API
--export([start_link/3]).
 -export([stop/0, stop/2]).
 -export([init/4]).
 
 -type state() :: term().
-
--spec start_link(amoc:scenario(), amoc_scenario:user_id(), state()) ->
-    {ok, pid()} | {error, term()}.
-start_link(Scenario, Id, State) ->
-    proc_lib:start_link(?MODULE, init, [self(), Scenario, Id, State]).
 
 -spec stop() -> ok.
 stop() ->
@@ -24,6 +18,7 @@ stop(Pid, Force) when is_pid(Pid) ->
 
 -spec init(pid(), amoc:scenario(), amoc_scenario:user_id(), state()) -> term().
 init(Parent, Scenario, Id, State) ->
-    proc_lib:init_ack(Parent, {ok, self()}),
+    amoc_controller:wait_user_rate(),
+    amoc_users_worker_sup:user_up(Parent, Id),
     process_flag(trap_exit, true),
     amoc_scenario:start(Scenario, Id, State).

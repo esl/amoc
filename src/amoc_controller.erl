@@ -8,28 +8,31 @@
 -behaviour(gen_server).
 
 -define(SERVER, ?MODULE).
+-define(DEFAULT_USER_RATE, 1200).
 
--required_variable(#{name => interarrival, default_value => 50,
-                     verification => {?MODULE, non_neg_integer, 1},
-                     description => "a delay between creating the processes for two "
-                                    "consecutive users (ms, def: 50ms)",
-                     update => {?MODULE, maybe_update_interarrival_timer, 2}}).
+-required_variable(#{name => user_rate, default_value => ?DEFAULT_USER_RATE,
+                     verification => {?MODULE, verify_user_rate, 1},
+                     description => "Throttle rate for the Scenario:start/1,2 callback",
+                     update => {?MODULE, update_user_rate, 2}}).
 
 -record(state, {scenario :: amoc:scenario() | undefined,
+                status = idle :: status(),
                 last_user_id = 0 :: last_user_id(),
-                status = idle :: idle | running | terminating | finished |
-                                 {error, any()} | disabled,
-                scenario_state :: any(), %% state returned from Scenario:init/0
-                create_users = [] :: [amoc_scenario:user_id()],
-                tref :: timer:tref() | undefined}).
+                scenario_state :: amoc_scenario:state() %% state returned from Scenario:init/0
+               }).
+
+-type status() :: idle | running | terminating | finished | {error, any()} | disabled.
+%% Scenario status.
 
 -type state() :: #state{}.
 %% Internal state of the node's controller
+
 -type handle_call_res() :: ok | {ok, term()} | {error, term()}.
 -type running_status() :: #{scenario := amoc:scenario(),
                             currently_running_users := user_count(),
                             highest_user_id := last_user_id()}.
 %% Details about the scenario currently running
+
 -type amoc_status() :: idle |
                        {running, running_status()} |
                        {terminating, amoc:scenario()} |
@@ -37,11 +40,14 @@
                        {error, any()} |
                        disabled.
 %% Status of the node, note that amoc_controller is disabled for the master node
+
 -type user_count() :: non_neg_integer().
 %% Number of users currently running in the node
+
 -type last_user_id() :: non_neg_integer().
 %% Highest user id registered in the node
--type interarrival() :: non_neg_integer().
+
+-type user_rate() :: amoc_throttle:rate().
 %% Time to wait in between spawning new users
 
 %% ------------------------------------------------------------------
@@ -65,14 +71,14 @@
 %% ------------------------------------------------------------------
 %% Parameters verification functions
 %% ------------------------------------------------------------------
--export([maybe_update_interarrival_timer/2, non_neg_integer/1]).
+-export([update_user_rate/2, verify_user_rate/1]).
 
--export([zero_users_running/0]).
+-export([wait_user_rate/0, zero_users_running/0]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
--export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -122,14 +128,14 @@ disable() ->
     gen_server:call(?SERVER, disable).
 
 %% @private
--spec non_neg_integer(any()) -> boolean().
-non_neg_integer(Interarrival) ->
-    is_integer(Interarrival) andalso Interarrival >= 0.
+-spec verify_user_rate(any()) -> boolean().
+verify_user_rate(UserRate) ->
+    (is_integer(UserRate) andalso (0 =< UserRate)) orelse (infinity =:= UserRate).
 
 %% @private
--spec maybe_update_interarrival_timer(interarrival, term()) -> ok.
-maybe_update_interarrival_timer(interarrival, _) ->
-    gen_server:cast(?SERVER, maybe_update_interarrival_timer).
+-spec update_user_rate(user_rate, user_rate()) -> ok.
+update_user_rate(user_rate, UserRate) ->
+    ok = amoc_throttle:change_rate(user_rate, #{rate => UserRate}).
 
 %% @private
 -spec zero_users_running() -> ok.
@@ -180,8 +186,6 @@ handle_call(_Request, _From, State) ->
 
 %% @private
 -spec handle_cast(any(), state()) -> {noreply, state()}.
-handle_cast(maybe_update_interarrival_timer, State) ->
-    {noreply, maybe_update_interarrival_timer(State)};
 handle_cast(zero_users_running, State) ->
     NewSate = handle_zero_users_running(State),
     {noreply, NewSate};
@@ -190,14 +194,13 @@ handle_cast(_Msg, State) ->
 
 %% @private
 -spec handle_info(any(), state()) -> {noreply, state()}.
-handle_info(start_user, State) ->
-    NewSate = handle_start_user(State),
-    {noreply, NewSate};
-handle_info(start_all_users, State) ->
-    NewSate = handle_start_all_users(State),
-    {noreply, NewSate};
 handle_info(_Msg, State) ->
     {noreply, State}.
+
+%% @private
+-spec terminate(term(), state()) -> any().
+terminate(_Reason, _State) ->
+    amoc_users_sup:terminate_all_children().
 
 %% ------------------------------------------------------------------
 %% internal functions
@@ -243,18 +246,15 @@ handle_update_settings(_Settings, #state{status = Status}) ->
 
 -spec handle_add(amoc_scenario:user_id(), amoc_scenario:user_id(), state()) ->
     {handle_call_res(), state()}.
-handle_add(StartId, EndId, #state{last_user_id = LastId,
-                                  create_users = ScheduledUsers,
-                                  status       = running,
+handle_add(StartId, EndId, #state{status       = running,
+                                  last_user_id = LastId,
                                   scenario     = Scenario,
-                                  tref         = TRef} = State) when StartId =< EndId,
-                                                                     LastId < StartId ->
+                                  scenario_state = ScenarioState} = State)
+  when StartId =< EndId, LastId < StartId ->
     amoc_telemetry:execute([controller, users], #{count => EndId - StartId + 1},
                            #{scenario => Scenario, type => add}),
-    NewUsers = lists:seq(StartId, EndId),
-    NewScheduledUsers = lists:append(ScheduledUsers, NewUsers),
-    NewTRef = maybe_start_timer(TRef),
-    {ok, State#state{create_users = NewScheduledUsers, tref = NewTRef, last_user_id = EndId}};
+    amoc_users_sup:start_children(Scenario, StartId, EndId, ScenarioState),
+    {ok, State#state{last_user_id = EndId}};
 handle_add(_StartId, _EndId, #state{status = running} = State) ->
     {{error, invalid_range}, State};
 handle_add(_StartId, _EndId, #state{status = Status} = State) ->
@@ -287,23 +287,6 @@ handle_disable(#state{status = idle} = State) ->
 handle_disable(#state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
--spec handle_start_user(state()) -> state().
-handle_start_user(#state{create_users   = [UserId | T],
-                         scenario       = Scenario,
-                         scenario_state = ScenarioState} = State) ->
-    amoc_users_sup:start_child(Scenario, UserId, ScenarioState),
-    State#state{create_users = T};
-handle_start_user(#state{create_users = [], tref = TRef} = State) ->
-    State#state{tref = maybe_stop_timer(TRef)}.
-
--spec handle_start_all_users(state()) -> state().
-handle_start_all_users(#state{create_users   = AllUsers,
-                              scenario       = Scenario,
-                              scenario_state = ScenarioState,
-                              tref = TRef} = State) ->
-    amoc_users_sup:start_children(Scenario, AllUsers, ScenarioState),
-    State#state{create_users = [], tref = maybe_stop_timer(TRef)}.
-
 %% ------------------------------------------------------------------
 %% helpers
 %% ------------------------------------------------------------------
@@ -316,12 +299,15 @@ start_tables() -> %% ETS creation
     {ok | error, any()}.
 init_scenario(Scenario, Settings) ->
     case amoc_config_scenario:parse_scenario_settings(Scenario, Settings) of
-        ok -> amoc_scenario:init(Scenario);
+        ok ->
+            start_user_rate(),
+            amoc_scenario:init(Scenario);
         {error, Type, Reason} -> {error, {Type, Reason}}
     end.
 
 -spec terminate_scenario(state()) -> ok | {ok, any()} | {error, any()}.
 terminate_scenario(#state{scenario = Scenario, scenario_state = ScenarioState}) ->
+    stop_user_rate(),
     amoc_scenario:terminate(Scenario, ScenarioState).
 
 -spec handle_zero_users_running(state()) -> state().
@@ -331,35 +317,20 @@ handle_zero_users_running(#state{status = terminating} = State) ->
 handle_zero_users_running(State) ->
     State.
 
--spec maybe_stop_timer(timer:tref() | undefined) -> undefined.
-maybe_stop_timer(undefined) ->
-    undefined;
-maybe_stop_timer(TRef) ->
-    {ok, cancel} = timer:cancel(TRef),
-    undefined.
+-spec get_user_rate() -> user_rate().
+get_user_rate() ->
+    amoc_config:get(user_rate, ?DEFAULT_USER_RATE).
 
--spec get_interarrival() -> interarrival().
-get_interarrival() ->
-    amoc_config:get(interarrival).
+-spec wait_user_rate() -> boolean().
+wait_user_rate() ->
+    infinity =:= get_user_rate()
+    orelse ok =:= amoc_throttle:wait(user_rate).
 
--spec maybe_update_interarrival_timer(state()) -> state().
-maybe_update_interarrival_timer(#state{tref = undefined} = State) ->
-    State;
-maybe_update_interarrival_timer(#state{tref = TRef} = State) ->
-    {ok, cancel} = timer:cancel(TRef),
-    Value = get_interarrival(),
-    NewTRef = do_interarrival(Value),
-    State#state{tref = NewTRef}.
+-spec start_user_rate() -> any().
+start_user_rate() ->
+    UserRate = get_user_rate(),
+    amoc_throttle:start(user_rate, #{rate => UserRate}).
 
--spec maybe_start_timer(timer:tref() | undefined) -> timer:tref().
-maybe_start_timer(undefined) ->
-    Value = get_interarrival(),
-    do_interarrival(Value);
-maybe_start_timer(TRef) -> TRef.
-
-do_interarrival(0) ->
-    self() ! start_all_users,
-    undefined;
-do_interarrival(Value) ->
-    {ok, NewTRef} = timer:send_interval(Value, start_user),
-    NewTRef.
+-spec stop_user_rate() -> any().
+stop_user_rate() ->
+    amoc_throttle:stop(user_rate).

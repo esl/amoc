@@ -46,7 +46,8 @@ all_tests() ->
      stop_running_scenario_with_no_users_immediately_terminates,
      stop_running_scenario_with_users_stays_in_finished,
      stop_running_scenario_with_users_eventually_terminates,
-     interarrival_equal_zero_starts_all_users_at_once,
+     user_rate_equal_zero_starts_no_users,
+     user_rate_equal_infinity_starts_all_users_at_once,
      scenario_with_state_and_crashing_in_terminate_run_fine,
      scenario_missing_start_callback_fails,
      scenario_with_failing_init_fails
@@ -62,6 +63,7 @@ end_per_suite(Config) ->
 
 init_per_testcase(_TestCase, Config) ->
     application:ensure_all_started(amoc),
+    amoc_cluster:set_master_node(node()),
     Config.
 
 end_per_testcase(_TestCase, Config) ->
@@ -214,12 +216,25 @@ stop_running_scenario_with_users_eventually_terminates(_) ->
     WaitUntilValue = {finished, testing_scenario},
     wait_helper:wait_until(WaitUntilFun, WaitUntilValue).
 
-interarrival_equal_zero_starts_all_users_at_once(_) ->
-    Vars = [{interarrival, 0}, {testing_var1, def1} | test_helpers:other_vars_to_keep_quiet()],
+user_rate_equal_zero_starts_no_users(_) ->
+    Vars = [{user_rate, 0}, {testing_var1, def1}
+            | test_helpers:other_vars_to_keep_quiet()],
+    do_start_scenario(testing_scenario, Vars),
+    amoc_controller:add_users(1, 1000),
+    ct:sleep(100),
+    Status = amoc_controller:get_status(),
+    ?assertMatch(
+       {running, #{scenario := testing_scenario,
+                   currently_running_users := 0}},
+       Status).
+
+user_rate_equal_infinity_starts_all_users_at_once(_) ->
+    Vars = [{user_rate, infinity}, {testing_var1, def1}
+            | test_helpers:other_vars_to_keep_quiet()],
     do_start_scenario(testing_scenario, Vars),
     NumOfUsers = 1000,
     amoc_controller:add_users(1, NumOfUsers),
-    Extra = #{time_left => 25, sleep_time => 5},
+    Extra = #{time_left => 5, sleep_time => 1},
     test_helpers:wait_until_scenario_has_users(testing_scenario, NumOfUsers, NumOfUsers, Extra).
 
 scenario_with_state_and_crashing_in_terminate_run_fine(_) ->

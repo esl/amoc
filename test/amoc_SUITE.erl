@@ -1,15 +1,17 @@
 -module(amoc_SUITE).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -compile([export_all, nowarn_export_all]).
 
 all() ->
     [
+     stop_kill_all_users,
      bad_config_fails_to_start,
      start_with_no_users,
      start_with_some_users,
      start_and_add_some_users,
+     start_and_then_force_remove_some_users_removes_first_ids,
      start_and_then_force_remove_some_users,
      start_and_then_soft_remove_some_users,
      start_and_then_force_remove_more_users_than_running,
@@ -37,9 +39,18 @@ end_per_testcase(_, _Config) ->
 %% test cases
 %%-----------------------------------------------------------------------------------
 
+stop_kill_all_users(_) ->
+    ?assertEqual(ok, amoc_do(testing_scenario, 5)),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, 5, 5),
+    Users = amoc_users_sup:get_all_children(),
+    application:stop(amoc),
+    Pred = fun({Pid, _}) -> not erlang:is_process_alive(Pid) end,
+    WaitUntilFun = fun() -> lists:all(Pred, Users) end,
+    wait_helper:wait_until(WaitUntilFun, true).
+
 bad_config_fails_to_start(_) ->
     Ret = amoc_do(testing_scenario, 0, []),
-    ?assertMatch({{error, _}, 0}, Ret).
+    ?assertMatch({error, _}, Ret).
 
 start_with_no_users(_) ->
     Ret = amoc_do(testing_scenario, 0),
@@ -57,6 +68,14 @@ start_and_add_some_users(_) ->
     test_helpers:wait_until_scenario_has_users(testing_scenario, 0, 0),
     amoc:add(1),
     test_helpers:wait_until_scenario_has_users(testing_scenario, 1, 1).
+
+start_and_then_force_remove_some_users_removes_first_ids(_) ->
+    Ret = amoc_do(testing_scenario, 50),
+    ?assertEqual(ok, Ret),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, 50, 50),
+    Removed = amoc:remove(10, true),
+    ?assertEqual({ok, 10}, Removed),
+    test_helpers:wait_until_scenario_has_users(testing_scenario, 40, 50).
 
 start_and_then_force_remove_some_users(_) ->
     Ret = amoc_do(testing_scenario, 2),
@@ -109,7 +128,7 @@ start_and_then_stop_cannot_rerun(_) ->
     Status = amoc:stop(),
     ?assertMatch(ok, Status),
     Retry = amoc_do(testing_scenario, 1),
-    ?assertMatch({{error, {invalid_status, _}}, 1}, Retry).
+    ?assertMatch({error, {invalid_status, _}}, Retry).
 
 after_reset_can_run_again(_) ->
     Ret = amoc_do(testing_scenario, 1),

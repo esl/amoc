@@ -267,6 +267,7 @@ continue_plan(Name, State, Info, #change_rate_plan{rates = [Rate | Rates]} = Pla
     NewPlan = Plan#change_rate_plan{rates = Rates},
     State#{Name => Info1#throttle_info{change_plan = NewPlan}}.
 
+-spec consume_all_timer_ticks(any()) -> ok.
 consume_all_timer_ticks(Msg) ->
     receive
         Msg -> consume_all_timer_ticks(Msg)
