@@ -34,6 +34,9 @@ maybe_wait(wait, RunnerPid) ->
             exit({throttle_wait_died, RunnerPid, Reason});
         '$scheduled' ->
             ok
+    after
+        infinity ->
+            ok
     end;
 maybe_wait(_, _) ->
     ok.
@@ -50,6 +53,9 @@ async_runner(Name, Caller, ThrottlerPid, Action) ->
             amoc_throttle_controller:raise_event_on_slave_node(Name, execute),
             %% If Action failed, unlink won't be called and the caller will receive an exit signal
             erlang:unlink(Caller)
+    after
+        infinity ->
+            true
     end.
 
 -spec execute(pid(), action()) -> term().
