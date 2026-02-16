@@ -69,6 +69,10 @@ process_var_attr(Module, Attr) ->
 
 -spec check_mandatory_fields(maybe_module_attribute()) ->
     {ok, #{name := name(), description := string(), any() => any()}} | {error, reason()}.
+check_mandatory_fields(#{description := Bin, name := Atom} = Attr) when is_atom(Atom),
+                                                                         is_binary(Bin) ->
+    {ok, Attr#{description => binary_to_list(Bin)}};
+
 check_mandatory_fields(#{description := List, name := Atom} = Attr) when is_atom(Atom),
                                                                          is_list(List) ->
     case io_lib:char_list(List) of
