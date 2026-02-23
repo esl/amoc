@@ -7,6 +7,7 @@
 -export([all/0]).
 -export([get_module_attributes/1,
          get_module_configuration/1,
+         description_binary_and_list/1,
          errors_reporting/1,
          one_of_function/1]).
 
@@ -52,6 +53,7 @@ update_value(_, _) -> ok.
 all() ->
     [get_module_attributes,
      get_module_configuration,
+     description_binary_and_list,
      errors_reporting,
      one_of_function].
 
@@ -108,6 +110,27 @@ get_module_configuration(_) ->
          #module_parameter{name = config_attrs_var7b, mod = ?MODULE, value = def7,
                            verification_fn = VerificationNone, update_fn = UpdateValueFN}],
         Config).
+
+description_binary_and_list(_) ->
+    %% Description as list (string) is accepted and stored as binary
+    ListAttr = #{name => desc_list_var, description => "list description",
+                 default_value => def, verification => none, update => read_only},
+    {ok, [#module_parameter{description = <<"list description">>}]} =
+        amoc_config_attributes:process_module_attributes(?MODULE, [ListAttr]),
+    %% Description as binary is accepted and stored as binary
+    BinAttr = #{name => desc_bin_var, description => <<"binary description">>,
+                default_value => def, verification => none, update => read_only},
+    {ok, [#module_parameter{description = <<"binary description">>}]} =
+        amoc_config_attributes:process_module_attributes(?MODULE, [BinAttr]),
+    %% Unicode in both forms is preserved
+    UnicodeList = #{name => unicode_list_var, description => "café",
+                    default_value => def, verification => none, update => read_only},
+    {ok, [#module_parameter{description = <<"café"/utf8>>}]} =
+        amoc_config_attributes:process_module_attributes(?MODULE, [UnicodeList]),
+    UnicodeBin = #{name => unicode_bin_var, description => <<"café"/utf8>>,
+                   default_value => def, verification => none, update => read_only},
+    {ok, [#module_parameter{description = <<"café"/utf8>>}]} =
+        amoc_config_attributes:process_module_attributes(?MODULE, [UnicodeBin]).
 
 errors_reporting(_) ->
     InvalidParam0 = #{name => "invalid_var0", description => "config_attrs_var0"},

@@ -170,15 +170,14 @@ normalize_coordination_item({{Min, Max}, Actions}) when ?IS_POS_INT(Min), ?IS_PO
     [assert_action({Min, Max}, A) || A <- Actions],
     {{Min, Max}, Actions}.
 
-assert_action(all, Action) when is_function(Action, 1);
-                                is_function(Action, 2) ->
+assert_action(all, Action) when is_function(Action, 1) orelse is_function(Action, 2) ->
     ok;
-assert_action(N, Action) when is_integer(N),
+assert_action(N, Action) when is_integer(N) andalso
                               (is_function(Action, 1) orelse
                                is_function(Action, 2) orelse
                                is_function(Action, 3)) ->
     ok;
-assert_action({Min, Max}, Action) when is_integer(Min), is_integer(Max),
+assert_action({Min, Max}, Action) when is_integer(Min) andalso is_integer(Max) andalso
                                        (is_function(Action, 1) orelse
                                         is_function(Action, 2) orelse
                                         is_function(Action, 3)) ->

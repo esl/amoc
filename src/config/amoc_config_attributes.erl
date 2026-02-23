@@ -68,12 +68,11 @@ process_var_attr(Module, Attr) ->
     end.
 
 -spec check_mandatory_fields(maybe_module_attribute()) ->
-    {ok, #{name := name(), description := string(), any() => any()}} | {error, reason()}.
-check_mandatory_fields(#{description := List, name := Atom} = Attr) when is_atom(Atom),
-                                                                         is_list(List) ->
-    case io_lib:char_list(List) of
-        true -> {ok, Attr};
-        false -> {error, invalid_attribute}
+    {ok, #{name := name(), description := unicode:chardata(), any() => any()}} | {error, reason()}.
+check_mandatory_fields(#{description := Description, name := Atom} = Attr) when is_atom(Atom) ->
+    case unicode:characters_to_binary(Description) of
+        Bin when is_binary(Bin) -> {ok, Attr#{description := Bin}};
+        _ -> {error, invalid_attribute}
     end;
 check_mandatory_fields(_Attr) ->
     {error, invalid_attribute}.
@@ -111,7 +110,7 @@ check_update_method(Attr) ->
     end.
 
 -spec make_module_parameter(#{name := name(),
-                              description := string(),
+                              description := unicode:chardata(),
                               default_value := value(),
                               verification := maybe_verification_fun(),
                               update := maybe_update_fun(),
