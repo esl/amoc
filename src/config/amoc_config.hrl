@@ -37,7 +37,7 @@
 -record(module_parameter, {name :: name(),
                            mod :: module(),
                            value :: value(),
-                           description :: string(),
+                           description :: unicode:chardata(),
                            verification_fn :: maybe_verification_fun(),
                            update_fn = read_only :: maybe_update_fun() | read_only}).
 
@@ -51,7 +51,7 @@
 -type update_method() :: read_only | none | mfa(2) | update_fun().
 
 -type module_attribute() :: #{ name := name(),
-                               description := string(),
+                               description := unicode:chardata(),
                                default_value => value(),
                                verification => verification_method(),
                                update => update_method()}.
