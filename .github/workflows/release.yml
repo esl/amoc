@@ -1,9 +1,7 @@
 name: Publish to Hex
 
 on:
-  release:
-    types: [ released ] # pre- and draft releases are excluded
-  workflow_dispatch:
+  push:
 
 permissions:
   contents: read
@@ -18,6 +16,6 @@ jobs:
           otp-version: "28"
           rebar3-version: "3.27"
       - run: rebar3 compile
-      - run: rebar3 hex publish -r hexpm --yes
+      - run: rebar3 hex publish -r hexpm --yes --dry-run
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
