@@ -42,3 +42,11 @@ To see the full documentation, see [hexdocs](https://hexdocs.pm/amoc).
 You can also try with the livebook demo here:
 
 [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fesl%2Famoc%2Fblob%2Fmaster%2Fguides%2Famoc_livebook.livemd)
+
+## Releasing to Hex.pm
+
+Creating a GitHub release (non-draft, non-prerelease) automatically publishes the package to [Hex.pm](https://hex.pm/) via the **Publish to Hex** workflow.
+This workflow can also be triggered manually from the Actions tab — make sure to run it from the specific tag you want to publish.
+
+To revert a published version, run the **Revert published version from Hex** workflow from the Actions tab, providing the version to revert.
+Hex.pm only allows reverting within 1 hour of publishing — after that, the version can only be *retired*.
