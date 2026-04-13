@@ -61,6 +61,7 @@ process_var_attr(Module, Attr) ->
         {fun check_default_value/1, []},
         {fun check_verification_method/1, []},
         {fun check_update_method/1, []},
+        {fun check_scope/1, []},
         {fun make_module_parameter/2, [Module]}],
     case amoc_config_utils:pipeline(PipelineActions, {ok, Attr}) of
         {error, Reason} -> {error, add_original_attribute(Reason, Attr)};
@@ -109,18 +110,35 @@ check_update_method(Attr) ->
             {ok, Attr#{update => UpdateFn}}
     end.
 
+-spec check_scope(#{any() => any()}) ->
+    {ok, #{scope := scope(), any() => any()}} | {error, reason()}.
+check_scope(Attr) ->
+    Scope = maps:get(scope, Attr, local),
+    case lists:member(Scope, [local, global]) of
+        true ->
+            {ok, Attr#{scope => Scope}};
+        false ->
+            {error, invalid_scope}
+    end.
+
 -spec make_module_parameter(#{name := name(),
                               description := unicode:chardata(),
                               default_value := value(),
                               verification := maybe_verification_fun(),
                               update := maybe_update_fun(),
+                              scope := scope(),
                               any() => any()},
                             module()) ->
     {ok, module_parameter()}.
-make_module_parameter(#{name := Name, description := Description, default_value := Value,
-                        verification := VerificationFn, update := UpdateFn}, Module) ->
+make_module_parameter(#{name := Name,
+                        description := Description,
+                        default_value := Value,
+                        verification := VerificationFn,
+                        update := UpdateFn,
+                        scope := Scope},
+                      Module) ->
     {ok, #module_parameter{name = Name, mod = Module, description = Description, value = Value,
-                           verification_fn = VerificationFn, update_fn = UpdateFn}}.
+                           scope = Scope, verification_fn = VerificationFn, update_fn = UpdateFn}}.
 
 -spec verification_fn(maybe_verification_method()) ->
     maybe_verification_fun() | not_exported | invalid_method.

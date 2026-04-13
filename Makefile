@@ -45,6 +45,7 @@ integration_test:
 	./integration_test/test_amoc_cluster.sh
 	./integration_test/test_distribute_scenario.sh
 	./integration_test/test_run_scenario.sh
+	./integration_test/test_update_settings.sh
 	./integration_test/test_add_new_node.sh
 
 rerun_integration_test:
@@ -53,6 +54,7 @@ rerun_integration_test:
 	./integration_test/test_amoc_cluster.sh
 	./integration_test/test_distribute_scenario.sh
 	./integration_test/test_run_scenario.sh
+	./integration_test/test_update_settings.sh
 	./integration_test/test_add_new_node.sh
 
 dialyzer:

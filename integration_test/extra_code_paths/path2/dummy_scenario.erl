@@ -29,7 +29,15 @@
     #{name => var6, description => "description6"},
     #{name => nodes, description => "this variable is set for docker "
                                     "container via AMOC_NODES env"},
-    #{name => test, description => "this one to be set via REST API"}]).
+    #{name => test1, description => "this variable is to be set via initial settings"},
+    #{name => test2, update => none, description => "this one to be updated"}]).
+
+
+-required_variable([
+    #{name => global_test1, scope => global,
+      description => "this variable is to be set via initial settings"},
+    #{name => global_test2, scope => global, update => none,
+      description => "this one to be updated"}]).
 
 %% parameter verification method
 -export([test_verification_function/1]).
@@ -63,8 +71,9 @@ init() ->
     %% results in exception.
     {invalid_setting, undeclared_variable} =
         (catch amoc_config:get(undeclared_variable)),
-    %% this variable is set via REST API
-    <<"test_value">> = amoc_config:get(test),
+    %% this variable is set via settings
+    <<"test_value2">> = amoc_config:get(test1),
+
     %% dummy_var variable is defined in the dummy_helper module.
     %% if dummy_helper is not propagated, then this call crashes
     default_value = amoc_config:get(dummy_var),

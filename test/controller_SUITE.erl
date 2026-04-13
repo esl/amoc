@@ -117,12 +117,12 @@ no_scenario_running_status_is_idle(_) ->
     ?assertMatch(idle, Status).
 
 disable_controller_returns_status_disable(_) ->
-    amoc_controller:disable(),
+    amoc_controller:disable(testing_scenario, test_helpers:all_vars()),
     Status = amoc_controller:get_status(),
     ?assertMatch(disabled, Status).
 
 disable_controller_then_cant_start_scenario(_) ->
-    amoc_controller:disable(),
+    amoc_controller:disable(testing_scenario, test_helpers:all_vars()),
     Ret = do_start_scenario(testing_scenario),
     ?assertMatch({error, {invalid_status, disabled}}, Ret).
 
