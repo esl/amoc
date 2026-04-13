@@ -5,8 +5,9 @@
 
 -include("amoc_config.hrl").
 
+-type config() :: module_configuration().
 -export([get/1, get/2]).
--export_type([name/0, value/0, settings/0, maybe_module_config/0]).
+-export_type([name/0, value/0, settings/0, config/0, maybe_module_config/0]).
 
 %% ------------------------------------------------------------------
 %% API
