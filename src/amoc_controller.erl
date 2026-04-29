@@ -11,7 +11,7 @@
 -define(DEFAULT_USER_RATE, 1200).
 
 -required_variable(#{name => user_rate, default_value => ?DEFAULT_USER_RATE,
-                     verification => {?MODULE, verify_user_rate, 1},
+                     verification => {?MODULE, verify_user_rate, 1}, scope => global,
                      description => "Throttle rate for the Scenario:start/1,2 callback",
                      update => {?MODULE, update_user_rate, 2}}).
 
@@ -63,10 +63,11 @@
          start_scenario/2,
          stop_scenario/0,
          update_settings/1,
+         propagate_config/2,
          add_users/2,
          remove_users/2,
          get_status/0,
-         disable/0]).
+         disable/2]).
 
 %% ------------------------------------------------------------------
 %% Parameters verification functions
@@ -107,6 +108,11 @@ stop_scenario() ->
 update_settings(Settings) ->
     gen_server:call(?SERVER, {update_settings, Settings}).
 
+-spec propagate_config(node(), amoc_config:config()) ->
+    ok | {error, term()}.
+propagate_config(Node, Config) ->
+    gen_server:cast({?SERVER, Node}, {propagate_config, Config}).
+
 -spec add_users(amoc_scenario:user_id(), amoc_scenario:user_id()) ->
     ok | {error, term()}.
 add_users(StartId, EndId) ->
@@ -123,9 +129,9 @@ get_status() ->
     {ok, Status} = gen_server:call(?SERVER, get_status),
     Status.
 
--spec disable() -> ok | {error, term()}.
-disable() ->
-    gen_server:call(?SERVER, disable).
+-spec disable(amoc:scenario(), amoc_config:settings()) -> ok | {error, term()}.
+disable(Scenario, Settings) ->
+    gen_server:call(?SERVER, {disable, Scenario, Settings}).
 
 %% @private
 -spec verify_user_rate(any()) -> boolean().
@@ -178,8 +184,8 @@ handle_call({remove, Count, ForceRemove}, _From, State) ->
 handle_call(get_status, _From, State) ->
     RetValue = handle_status(State),
     {reply, {ok, RetValue}, State};
-handle_call(disable, _From, State) ->
-    {RetValue, NewState} = handle_disable(State),
+handle_call({disable, Scenario, Settings}, _From, State) ->
+    {RetValue, NewState} = handle_disable(Scenario, Settings, State),
     {reply, RetValue, NewState};
 handle_call(_Request, _From, State) ->
     {reply, {error, not_implemented}, State}.
@@ -189,6 +195,9 @@ handle_call(_Request, _From, State) ->
 handle_cast(zero_users_running, State) ->
     NewSate = handle_zero_users_running(State),
     {noreply, NewSate};
+handle_cast({propagate_config, Config}, State) ->
+    handle_propagate_config(Config),
+    {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -236,13 +245,18 @@ handle_stop_scenario(#state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
 -spec handle_update_settings(amoc_config:settings(), state()) -> handle_call_res().
-handle_update_settings(Settings, #state{status = running}) ->
+handle_update_settings(Settings, #state{status = Status}) when Status =:= disabled;
+                                                               Status =:= running ->
     case amoc_config_scenario:update_settings(Settings) of
         ok -> ok;
         {error, Type, Reason} -> {error, {Type, Reason}}
     end;
 handle_update_settings(_Settings, #state{status = Status}) ->
     {error, {invalid_status, Status}}.
+
+-spec handle_propagate_config(amoc_config:config()) -> ok.
+handle_propagate_config(Config) ->
+    amoc_config_utils:store_scenario_config(Config).
 
 -spec handle_add(amoc_scenario:user_id(), amoc_scenario:user_id(), state()) ->
     {handle_call_res(), state()}.
@@ -281,10 +295,14 @@ handle_status(#state{status = finished, scenario = Scenario}) ->
 handle_status(#state{status = Status}) ->
     Status. %% idle, disabled or {error, Reason}.
 
--spec handle_disable(state()) -> {handle_call_res(), state()}.
-handle_disable(#state{status = idle} = State) ->
-    {ok, State#state{status = disabled}};
-handle_disable(#state{status = Status} = State) ->
+-spec handle_disable(amoc:scenario(), amoc_config:settings(), state()) ->
+    {handle_call_res(), state()}.
+handle_disable(Scenario, Settings, #state{status = idle} = State) ->
+    case amoc_config_scenario:parse_scenario_settings(Scenario, Settings) of
+        ok -> {ok, State#state{status = disabled}};
+        {error, Type, Reason} -> {error, {Type, Reason}}
+    end;
+handle_disable(_Scenario, _Settings, #state{status = Status} = State) ->
     {{error, {invalid_status, Status}}, State}.
 
 %% ------------------------------------------------------------------

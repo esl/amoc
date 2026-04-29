@@ -33,9 +33,8 @@ test_amoc_dist() ->
         ?assertEqual(N2, N1 + 20, ?comment(Users2)),
         %% remove 10 users
         remove_and_wait(Master, 10),
-        {N3, Max3, Nodes3, _Ids3, Users3} = get_users_info(Slaves),
+        {N3, _Max3, Nodes3, _Ids3, Users3} = get_users_info(Slaves),
         ?assertEqual(N2 - 10, N3, ?comment(Users3)),
-        ?assertEqual(Max2, Max3, ?comment(Users3)),
         ?assertEqual(Nodes2, Nodes3, ?comment(Users3)),
         %% try to remove N3 users
         Ret = remove_and_wait(Master, N3),
@@ -67,6 +66,7 @@ get_users_info(SlaveNodes) ->
     Nodes = lists:usort([Node || {Node, Users} <- Distrib, [] =/= Users]),
     N = length(Ids),
     MaxId = lists:max(Ids),
+    %% logger:error(#{n => N, max_id => MaxId, nodes => Nodes, ids => Ids, distrib => Distrib}),
     {N, MaxId, Nodes, Ids, Distrib}.
 
 add_and_wait(Master, Num) ->

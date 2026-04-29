@@ -68,7 +68,7 @@ remove(Count, ForceRemove, Nodes) when is_integer(Count), Count > 0 ->
 %% @see update_settings/2
 -spec update_settings(amoc_config:settings()) -> {ok, any()} | {error, any()}.
 update_settings(Settings) ->
-    Ret = update_settings(Settings, amoc_cluster:slave_nodes()),
+    Ret = update_settings(Settings, amoc_cluster:all_nodes()),
     case Ret of
         {ok, _} -> set_param(settings, Settings);
         {error, _} -> ok
@@ -119,9 +119,9 @@ set_state(State) ->
 
 -spec check_nodes([node()]) -> ok | {error, any()}.
 check_nodes(Nodes) ->
-    SlaveNodes = amoc_cluster:slave_nodes(),
+    AllNodes = amoc_cluster:all_nodes(),
     MasterNode = amoc_cluster:master_node(),
-    case {Nodes -- SlaveNodes, Nodes, node()} of
+    case {Nodes -- AllNodes, Nodes, node()} of
         {[], [_ | _], MasterNode} ->
             %% running on the master node with the proper non-empty Nodes list
             ok;
@@ -129,7 +129,7 @@ check_nodes(Nodes) ->
             %% Nodes list is empty
             {error, empty_nodes_list};
         {BadNodes, _, MasterNode} ->
-            %% non-slave nodes in the list
+            %% non-cluster nodes in the list
             {error, {bad_nodes, BadNodes}};
         {_, _, _} ->
             {error, not_a_master}
@@ -137,7 +137,7 @@ check_nodes(Nodes) ->
 
 -spec prepare_cluster(amoc:scenario(), amoc_config:settings()) -> {ok, any()} | {error, any()}.
 prepare_cluster(Scenario, Settings) ->
-    case setup_master_node() of
+    case setup_master_node(Scenario, Settings) of
         ok ->
             set_param(scenario, Scenario),
             set_param(settings, Settings),
@@ -147,11 +147,11 @@ prepare_cluster(Scenario, Settings) ->
         Error -> Error
     end.
 
--spec setup_master_node() -> ok | {error, any()}.
-setup_master_node() ->
+-spec setup_master_node(amoc:scenario(), amoc_config:settings()) -> ok | {error, any()}.
+setup_master_node(Scenario, Settings) ->
     case {amoc_cluster:set_master_node(node()), get_param(scenario)} of
         {ok, undefined} ->
-            amoc_controller:disable();
+            amoc_controller:disable(Scenario, Settings);
         {ok, AnotherScenario} ->
             {error, {scenario_is_running, AnotherScenario}};
         {Error, _} -> Error

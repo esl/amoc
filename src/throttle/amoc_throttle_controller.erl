@@ -256,16 +256,19 @@ do_gradual_change_rate(
 
 -spec continue_plan(name(), state(), throttle_info(), change_rate_plan()) -> state().
 continue_plan(Name, State, Info, #change_rate_plan{rates = [Rate]} = Plan) ->
-    Interval = Info#throttle_info.interval,
-    TRef = Plan#change_rate_plan.timer,
-    Info1 = do_change_rate(Name, Rate, Interval, Info),
-    {ok, cancel} = timer:cancel(TRef),
-    consume_all_timer_ticks({change_plan, Name}),
+    Info1 = do_change_rate(Name, Rate, Info#throttle_info.interval, Info),
+    stop_change_plan(Name, Plan),
     State#{Name => Info1#throttle_info{change_plan = undefined}};
 continue_plan(Name, State, Info, #change_rate_plan{rates = [Rate | Rates]} = Plan) ->
     Info1 = do_change_rate(Name, Rate, Info#throttle_info.interval, Info),
     NewPlan = Plan#change_rate_plan{rates = Rates},
     State#{Name => Info1#throttle_info{change_plan = NewPlan}}.
+
+-spec stop_change_plan(name(), undefined | change_rate_plan()) -> ok.
+stop_change_plan(_Name, undefined) -> ok;
+stop_change_plan(Name, #change_rate_plan{timer = TRef}) ->
+    {ok, cancel} = timer:cancel(TRef),
+    consume_all_timer_ticks({change_plan, Name}).
 
 -spec consume_all_timer_ticks(any()) -> ok.
 consume_all_timer_ticks(Msg) ->
@@ -274,8 +277,9 @@ consume_all_timer_ticks(Msg) ->
     after 0 -> ok
     end.
 
-do_run_op(stop, Name, #throttle_info{pool_sup = PoolSup}, State) ->
+do_run_op(stop, Name, #throttle_info{pool_sup = PoolSup, change_plan = ChangePlan}, State) ->
     ok = amoc_throttle_pooler:stop_pool(PoolSup),
+    stop_change_plan(Name, ChangePlan),
     {reply, ok, maps:remove(Name, State)};
 do_run_op(pause, Name, #throttle_info{pool_config = PoolConfig, active = true} = Info, State) ->
     Fun = fun(_, #{pid := Pid}) ->
