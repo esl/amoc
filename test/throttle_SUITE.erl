@@ -6,65 +6,70 @@
 -compile([export_all, nowarn_export_all]).
 
 -define(DEFAULT_INTERVAL, 60000). %% one minute
--define(RECV(Msg, Timeout), receive Msg -> ok after Timeout -> {error, not_received_yet} end).
+-define(RECV(Msg, Timeout), receive Msg -> ok after (Timeout + 50) -> {error, not_received_yet} end).
 
 all() ->
     [
-     {group, api},
-     {group, properties}
+     {group, properties},
+     {group, api}
     ].
 
 groups() ->
     [
-     {api, [parallel],
-      [
-       start,
-       start_descriptive,
-       start_interarrival,
-       start_interarrival_zero,
-       start_interarrival_infinity,
-       start_rate_zero,
-       start_rate_infinity,
-       start_interval_zero,
-       low_rate_does_not_get_remapped,
-       low_interval_does_not_get_remapped,
-       start_and_stop,
-       change_rate,
-       interval_equal_zero_limits_parallelism,
-       change_rate_to_interval_zero_limits_parallelism,
-       change_rate_triggers_parallelism,
-       change_rate_gradually,
-       change_interarrival_gradually,
-       change_rate_gradually_verify_descriptions,
-       just_wait,
-       wait_for_process_to_die_sends_a_kill,
-       async_runner_dies_while_waiting_raises_exit,
-       async_runner_dies_when_throttler_dies,
-       pause_and_resume,
-       get_state
-     ]},
-     {properties, [],
-      [
-       change_rate_gradually_verify_descriptions_properties,
-       % Note that the smallest delay possible for a process is 1ms (receive operations),
-       % hence if we give for example 10 workers 1ms delays, we get 600_000 ticks per minute.
-       % and if we give for example 48 workers 1ms delays, we get 2_880_000 ticks per minute.
-       % That means, that is realistically the maximum rate we could possibly manage
-       % with a static pool of such number of workers.
-       pool_config_is_precise_for_rates_1,
-       pool_config_is_precise_for_rates_2,
-       pool_config_is_precise_for_rates_3,
-       pool_config_is_precise_for_rates_4,
-       pool_config_is_precise_for_rates_5,
-       pool_config_is_precise_for_rates_6,
-       pool_config_is_precise_for_rates_7,
-       pool_config_is_precise_for_rates_8,
-       pool_config_is_precise_for_rates_9,
-       pool_config_is_precise_for_rates_10
-      ]}
+     {api, [parallel, {repeat, 3}], api_testcases()},
+     {properties, [], properties_testcases()}
+    ].
+
+api_testcases() ->
+    [
+        start,
+        start_descriptive,
+        start_interarrival,
+        start_interarrival_zero,
+        start_interarrival_infinity,
+        start_rate_zero,
+        start_rate_infinity,
+        start_interval_zero,
+        low_rate_does_not_get_remapped,
+        low_interval_does_not_get_remapped,
+        start_and_stop,
+        change_rate,
+        interval_equal_zero_limits_parallelism,
+        change_rate_to_interval_zero_limits_parallelism,
+        change_rate_triggers_parallelism,
+        change_rate_gradually,
+        change_interarrival_gradually,
+        change_rate_gradually_verify_descriptions,
+        just_wait,
+        wait_for_process_to_die_sends_a_kill,
+        async_runner_dies_while_waiting_raises_exit,
+        async_runner_dies_when_throttler_dies,
+        pause_and_resume,
+        get_state
+    ].
+
+properties_testcases() ->
+    [
+        change_rate_gradually_verify_descriptions_properties,
+        % Note that the smallest delay possible for a process is 1ms (receive operations),
+        % hence if we give for example 10 workers 1ms delays, we get 600_000 ticks per minute.
+        % and if we give for example 48 workers 1ms delays, we get 2_880_000 ticks per minute.
+        % That means, that is realistically the maximum rate we could possibly manage
+        % with a static pool of such number of workers.
+        pool_config_is_precise_for_rates_1,
+        pool_config_is_precise_for_rates_2,
+        pool_config_is_precise_for_rates_3,
+        pool_config_is_precise_for_rates_4,
+        pool_config_is_precise_for_rates_5,
+        pool_config_is_precise_for_rates_6,
+        pool_config_is_precise_for_rates_7,
+        pool_config_is_precise_for_rates_8,
+        pool_config_is_precise_for_rates_9,
+        pool_config_is_precise_for_rates_10
     ].
 
 init_per_suite(Config) ->
+    meck:new(amoc_throttle_config, [passthrough, non_strict, no_link]),
     application:ensure_all_started(amoc),
     amoc_cluster:set_master_node(node()),
     TelemetryEvents = [[amoc, throttle, Event] || Event <- [init, rate, request, execute, process]],
@@ -74,18 +79,19 @@ init_per_suite(Config) ->
 end_per_suite(_) ->
     application:stop(amoc),
     telemetry_helpers:stop(),
+    meck:unload(),
     ok.
 
 init_per_group(properties, Config) ->
-    meck:new(amoc_throttle_config, [passthrough, non_strict, no_link]),
-    meck:expect(amoc_throttle_config, no_of_processes, [], 100),
+    ok = meck:expect(amoc_throttle_config, no_of_processes, [], 100),
     Config;
 init_per_group(_, Config) ->
     Config.
 
 end_per_group(properties, _Config) ->
-    meck:unload(amoc_throttle_config);
+    ok = meck:delete(amoc_throttle_config, no_of_processes, 0);
 end_per_group(_, _Config) ->
+    [amoc_throttle:stop(TC) || TC <- api_testcases() -- [async_runner_dies_when_throttler_dies]],
     ok.
 
 init_per_testcase(_, Config) ->

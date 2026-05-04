@@ -18,6 +18,15 @@ all() ->
      process_scenario_config_returns_error_for_invalid_values,
      process_scenario_config_returns_preprocessed_value].
 
+init_per_suite(Config) ->
+    meck:new(amoc_cluster, [non_strict, no_link]),
+    meck:expect(amoc_cluster, master_node, fun() -> node() end),
+    Config.
+
+end_per_suite(Config) ->
+    meck:unload(amoc_cluster),
+    Config.
+
 process_scenario_config_uses_default_values(_) ->
     ScenarioConfig = correct_scenario_config(),
     given_scenario_parameters_not_set(ScenarioConfig),

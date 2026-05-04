@@ -14,6 +14,7 @@
 %% execution of verification functions is done synchronously
 -define(VERIFY_TIMEOUT, 0).
 
+-define(SLAVE_NODES, ['slave1@host', 'slave2@host']).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% these attributes are required for the testing purposes %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -35,7 +36,8 @@
                       default_value => val1, verification => fun ?MOCK_MOD:verify_fun/1},
                     #{name => config_scenario_var2, description => "config_scenario_var2",
                       default_value => val2, verification => [new_val2, val2],
-                      update => {?MOCK_MOD, update_mfa, 2}}]).
+                      update => {?MOCK_MOD, update_mfa, 2},
+                      scope => global}]).
 %% config_scenario_var3 is not declared with -required_variable(...), but it's fine.
 -override_variable(#{name => config_scenario_var3, description => "config_scenario_var3",
                      default_value => def3}).
@@ -54,6 +56,8 @@ all() ->
      invalid_settings,
      invalid_value,
      update_settings,
+     update_settings_global_on_slave,
+     update_settings_propagate_global,
      update_just_one_parameter,
      update_parameters_with_the_same_values,
      update_settings_readonly,
@@ -69,15 +73,26 @@ init_per_suite(Config) ->
     meck:expect(?MOCK_MOD, verify_mfa, ['_'], true),
     meck:expect(?MOCK_MOD, update_fun, ['_', '_'], ok),
     meck:expect(?MOCK_MOD, verify_fun, ['_'], true),
+    meck:new(amoc_cluster, [non_strict, no_link]),
+    meck:expect(amoc_cluster, master_node, fun() -> node() end),
+    meck:expect(amoc_cluster, slave_nodes, fun() -> [] end),
+    meck:new(amoc_controller, [non_strict, no_link, passthrough]),
+    meck:expect(amoc_controller, propagate_config, fun(_, _) -> ok end),
     Config.
 
 end_per_suite(Config) ->
     meck:unload(?MOCK_MOD),
+    meck:unload(amoc_cluster),
+    meck:unload(amoc_controller),
     Config.
 
 init_per_testcase(TC, Config) when TC =:= crash_during_scenario_settings_parsing;
                                    TC =:= invalid_module_attributes ->
     meck:new(amoc_config_attributes, [no_link]),
+    Config;
+init_per_testcase(update_settings_propagate_global, Config) ->
+    %% set some slave nodes
+    meck:expect(amoc_cluster, slave_nodes, fun() -> ?SLAVE_NODES end),
     Config;
 init_per_testcase(_, Config) ->
     Config.
@@ -85,6 +100,16 @@ init_per_testcase(_, Config) ->
 end_per_testcase(TC, Config) when TC =:= crash_during_scenario_settings_parsing;
                                   TC =:= invalid_module_attributes ->
     meck:unload(amoc_config_attributes),
+    meck:reset(?MOCK_MOD),
+    Config;
+end_per_testcase(update_settings_global_on_slave, Config) ->
+    %% restore master_node expectation for subsequent tests
+    meck:expect(amoc_cluster, master_node, fun() -> node() end),
+    meck:reset(?MOCK_MOD),
+    Config;
+end_per_testcase(update_settings_propagate_global, Config) ->
+    %% restore slave_nodes expectation for subsequent tests
+    meck:expect(amoc_cluster, slave_nodes, fun() -> [] end),
     meck:reset(?MOCK_MOD),
     Config;
 end_per_testcase(_, Config) ->
@@ -138,9 +163,33 @@ update_settings(_) ->
     meck:wait(?MOCK_MOD, update_mfa, [config_scenario_var2, new_val2], ?UPDATE_TIMEOUT),
     ?assertEqual(3, length(meck:history(?MOCK_MOD))).
 
+%% Test: changing global parameter on a non-master node must fail
+update_settings_global_on_slave(_) ->
+    set_initial_configuration(),
+    %% make this node a slave
+    meck:expect(amoc_cluster, master_node, fun() -> 'other@host' end),
+    Ret = amoc_config_scenario:update_settings([{config_scenario_var2, new_val2}]),
+    ?assertMatch({error, changing_global_parameters_on_a_slave_node,
+                  [{config_scenario_var2, amoc_config_scenario_SUITE}]},
+                 Ret),
+    ok.
+
+%% Test: when master, global parameters are propagated to slave nodes
+update_settings_propagate_global(_) ->
+    set_initial_configuration(),
+    meck:reset(amoc_controller),
+    ?assertEqual(ok, amoc_config_scenario:update_settings([{config_scenario_var2, new_val2}])),
+    %% give spawned processes a moment to run
+    timer:sleep(100),
+    CallHistory = meck:history(amoc_controller),
+    ChangedParameters = ets:lookup(amoc_config, config_scenario_var2),
+    ExpectedArgs = [[N, ChangedParameters] || N <- ?SLAVE_NODES],
+    PropagateParams = [Args || {_Pid, {_Mod, Fun, Args}, _Ret} <- CallHistory,
+                               Fun =:= propagate_config],
+    is_equal_list(ExpectedArgs, PropagateParams).
+
 update_just_one_parameter(_) ->
     set_initial_configuration(),
-
     %% update only 1 parameter and check that update
     %% function is call for that parameter
     ?assertEqual(ok, amoc_config_scenario:update_settings([{config_scenario_var2, new_val2}])),
@@ -231,8 +280,6 @@ update_settings_invalid_value(_) ->
 update_settings_undef_param(_) ->
     set_initial_configuration(),
     Table = ets:tab2list(amoc_config),
-    %% reset initial verification calls.
-    meck:reset(?MOCK_MOD),
     %% adding undefined parameter in settings
     ScenarioSettings3 = [{config_scenario_var3, new_val3},
                          {invalid_var2, val2}],
@@ -323,4 +370,5 @@ set_initial_configuration() ->
     %% reset initial verification calls.
     assert_no_update_calls(),
     ?assertEqual(2, length(meck:history(?MOCK_MOD))),
+    %% reset initial verification calls.
     meck:reset(?MOCK_MOD).

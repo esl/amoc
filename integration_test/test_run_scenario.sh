@@ -3,11 +3,12 @@
 source "$(dirname "$0")/helper.sh"
 enable_strict_mode
 
-#############################
-## amoc REST API functions ##
-#############################
+####################
+## amoc functions ##
+####################
 run_scenario() {
-    amoc_eval "$1" "amoc_dist:do(${2}, ${3}, [{test, <<\"test_value\">>}])."
+    amoc_eval "$1" "amoc_dist:do(${2}, ${3}, [{global_test1, <<\"test_value1\">>},
+                                              {test1, <<\"test_value2\">>}])."
 }
 
 result="$(run_scenario amoc-master dummy_scenario 10)"

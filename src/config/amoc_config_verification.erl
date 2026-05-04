@@ -19,9 +19,25 @@ process_scenario_config(Config, Settings) ->
 
 -spec get_value_and_verify(module_parameter(), settings()) ->
     {ok, module_parameter()} | {error, reason()}.
-get_value_and_verify(#module_parameter{name = Name, value = Default,
-                                       verification_fn = VerificationFn} = Param,
+get_value_and_verify(#module_parameter{name = Name, value = Default, scope = Scope} = Param,
                      Settings) ->
+    MasterNode = amoc_cluster:master_node(),
+    case {Scope, node()} of
+        {local, _} ->
+            get_local_value_and_verify(Param, Settings);
+        {global, MasterNode} ->
+            get_local_value_and_verify(Param, Settings);
+        {global, _} ->
+            %% for a global parameters, fetch values from the master
+            NewValue = erpc:call(MasterNode, amoc_config, get, [Name, Default]),
+            {ok, Param#module_parameter{value = NewValue}}
+    end.
+
+-spec get_local_value_and_verify(module_parameter(), settings()) ->
+    {ok, module_parameter()} | {error, reason()}.
+get_local_value_and_verify(#module_parameter{name = Name, value = Default,
+                                             verification_fn = VerificationFn} = Param,
+                           Settings) ->
     DefaultValue = amoc_config_env:get(Name, Default),
     Value = proplists:get_value(Name, Settings, DefaultValue),
     case verify(VerificationFn, Value) of
