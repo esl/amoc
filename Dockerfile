@@ -1,4 +1,4 @@
-ARG otp_vsn=25.3
+ARG otp_vsn=29
 FROM erlang:${otp_vsn}
 MAINTAINER Erlang Solutions <mongoose-im@erlang-solutions.com>
 

@@ -4,7 +4,7 @@ source "$(dirname "$0")/helper.sh"
 enable_strict_mode
 cd "$git_root"
 
-otp_vsn="${OTP_RELEASE:-28}"
+otp_vsn="${OTP_RELEASE:-29}"
 echo "ERLANG/OTP '${otp_vsn}'"
 
 docker build \
